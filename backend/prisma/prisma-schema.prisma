@@ -1,0 +1,648 @@
+# HyperLocal Mission Platform — Prisma 스키마 설계
+
+## 1. `prisma/schema.prisma`
+
+```prisma
+// =============================================================================
+// prisma/schema.prisma
+// HyperLocal Mission Platform — DB Schema v1.0
+// PostgreSQL 15.x + Prisma 5.x
+// =============================================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch", "fullTextIndex"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+/// 사용자 역할 — RBAC 미들웨어와 1:1 매핑
+enum UserRole {
+  OPERATOR    // 운영자 (내부 스태프)
+  PARTICIPANT // 참여자 (지역 주민)
+  CLIENT      // 고객사 (소상공인)
+}
+
+/// 미션 카테고리
+enum MissionCategory {
+  VISIT  // 방문 인증
+  SNS    // SNS 게시물
+  REVIEW // 텍스트 리뷰
+  VIDEO  // 영상 콘텐츠
+}
+
+/// 미션 진행 상태 전이: DRAFT → OPEN → IN_PROGRESS → REVIEWING → CLOSED
+enum MissionStatus {
+  DRAFT       // 임시 저장 (고객사 작성 중)
+  OPEN        // 모집 중 (참여자 지원 가능)
+  IN_PROGRESS // 수행 중 (참여자 배정 완료)
+  REVIEWING   // 검수 중 (운영자 검토)
+  CLOSED      // 종료 (정산 완료 또는 강제 종료)
+}
+
+/// 지원서 상태 전이: PENDING → APPROVED | REJECTED
+enum ApplicationStatus {
+  PENDING  // 지원 완료, 운영자 검토 대기
+  APPROVED // 운영자 승인 완료
+  REJECTED // 운영자 반려
+  CANCELED // 참여자 본인 취소
+}
+
+/// 인증 콘텐츠 검수 상태
+enum SubmissionStatus {
+  SUBMITTED // 제출 완료
+  APPROVED  // 검수 통과
+  REJECTED  // 검수 반려 (반려 사유 필수)
+  REVISION  // 수정 요청 (재제출 가능)
+}
+
+/// 정산 상태
+enum PayoutStatus {
+  PENDING   // 정산 대기 (검수 승인 후)
+  SCHEDULED // 정산 예약 완료
+  COMPLETED // 지급 완료
+  FAILED    // 지급 실패 (재처리 필요)
+  CANCELED  // 취소 (미션 강제 종료 등)
+}
+
+/// SNS 플랫폼 유형
+enum SnsType {
+  INSTAGRAM
+  YOUTUBE
+  TIKTOK
+  NAVER_BLOG
+  KAKAO
+  OTHER
+}
+
+/// 알림 유형
+enum NotificationType {
+  MISSION_OPEN        // 새 미션 오픈
+  APPLICATION_RESULT  // 지원 결과 (승인/반려)
+  SUBMISSION_FEEDBACK // 검수 피드백
+  PAYOUT_COMPLETED    // 정산 완료
+  MISSION_DEADLINE    // 마감 임박
+  SYSTEM              // 시스템 공지
+}
+
+// =============================================================================
+// CORE MODELS
+// =============================================================================
+
+/// 통합 사용자 계정 (OPERATOR / PARTICIPANT / CLIENT 공통)
+model User {
+  id            String    @id @default(uuid()) @db.Uuid
+  email         String    @unique @db.VarChar(320)
+  passwordHash  String    @db.VarChar(255)     // bcrypt hash
+  role          UserRole
+  name          String    @db.VarChar(100)
+  phone         String?   @db.VarChar(20)
+  profileImage  String?   @db.VarChar(2048)    // S3 URL
+  isActive      Boolean   @default(true)
+  isVerified    Boolean   @default(false)      // 이메일 인증 여부
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime? // Soft delete
+
+  // 역할별 프로필 (1:1, role에 따라 하나만 존재)
+  participantProfile ParticipantProfile?
+  clientProfile      ClientProfile?
+  operatorProfile    OperatorProfile?
+
+  // 활동 관계
+  notifications      Notification[]
+  auditLogs          AuditLog[]     @relation("AuditActor")
+
+  @@index([email])
+  @@index([role])
+  @@index([isActive, role])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+/// 참여자 전용 프로필
+model ParticipantProfile {
+  id              String    @id @default(uuid()) @db.Uuid
+  userId          String    @unique @db.Uuid
+  bio             String?   @db.Text
+  regionSi        String    @db.VarChar(50)   // 시 (예: 서울시)
+  regionGu        String    @db.VarChar(50)   // 구 (예: 마포구)
+  regionDong      String?   @db.VarChar(50)   // 동 (선택)
+  totalEarned     Decimal   @default(0) @db.Decimal(12, 2) // 누적 수익
+  missionCount    Int       @default(0)       // 완료 미션 수
+  rating          Decimal?  @db.Decimal(3, 2) // 평균 평점 (0.00 ~ 5.00)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  snsAccounts     SnsAccount[]
+  applications    Application[]
+  submissions     Submission[]
+  payouts         Payout[]
+
+  @@index([regionSi, regionGu])
+  @@index([rating])
+  @@map("participant_profiles")
+}
+
+/// 참여자 SNS 계정 (다수 연동 가능)
+model SnsAccount {
+  id             String    @id @default(uuid()) @db.Uuid
+  profileId      String    @db.Uuid
+  platform       SnsType
+  handle         String    @db.VarChar(200)   // @username 또는 채널명
+  url            String    @db.VarChar(2048)
+  followerCount  Int?                         // 최근 팔로워 수
+  isVerified     Boolean   @default(false)    // 운영자 인증 여부
+  verifiedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  profile        ParticipantProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, platform])           // 플랫폼당 1계정
+  @@index([platform, isVerified])
+  @@map("sns_accounts")
+}
+
+/// 고객사(소상공인) 전용 프로필
+model ClientProfile {
+  id              String    @id @default(uuid()) @db.Uuid
+  userId          String    @unique @db.Uuid
+  businessName    String    @db.VarChar(200)  // 상호명
+  businessNumber  String?   @db.VarChar(20)   // 사업자등록번호
+  category        String    @db.VarChar(100)  // 업종 (예: 카페, 음식점)
+  description     String?   @db.Text
+  address         String    @db.VarChar(500)
+  regionSi        String    @db.VarChar(50)
+  regionGu        String    @db.VarChar(50)
+  regionDong      String?   @db.VarChar(50)
+  latitude        Decimal?  @db.Decimal(10, 8) // 위도
+  longitude       Decimal?  @db.Decimal(11, 8) // 경도
+  contactEmail    String?   @db.VarChar(320)
+  contactPhone    String?   @db.VarChar(20)
+  websiteUrl      String?   @db.VarChar(2048)
+  logoUrl         String?   @db.VarChar(2048)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  missions        Mission[]
+
+  @@index([regionSi, regionGu])
+  @@index([businessName])
+  @@map("client_profiles")
+}
+
+/// 운영자 전용 프로필
+model OperatorProfile {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @unique @db.Uuid
+  department  String?   @db.VarChar(100)
+  position    String?   @db.VarChar(100)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewedSubmissions Submission[] @relation("SubmissionReviewer")
+  approvedApplications Application[] @relation("ApplicationReviewer")
+
+  @@map("operator_profiles")
+}
+
+// =============================================================================
+// MISSION DOMAIN
+// =============================================================================
+
+/// 미션 (소상공인이 등록하는 마케팅 요청 단위)
+model Mission {
+  id                String          @id @default(uuid()) @db.Uuid
+  clientProfileId   String          @db.Uuid
+  title             String          @db.VarChar(200)
+  description       String          @db.Text
+  category          MissionCategory
+  status            MissionStatus   @default(DRAFT)
+
+  // 지역 정보
+  regionSi          String          @db.VarChar(50)
+  regionGu          String          @db.VarChar(50)
+  regionDong        String?         @db.VarChar(50)
+  detailAddress     String?         @db.VarChar(500)
+  latitude          Decimal?        @db.Decimal(10, 8)
+  longitude         Decimal?        @db.Decimal(11, 8)
+
+  // 모집 조건
+  maxParticipants   Int             @default(1)      // 최대 모집 인원
+  currentCount      Int             @default(0)      // 현재 승인된 인원
+  minFollowerCount  Int?                             // 최소 팔로워 수 조건
+  requiredSns       SnsType[]                        // 필수 SNS 플랫폼
+
+  // 보상
+  rewardAmount      Decimal         @db.Decimal(12, 2) // 1인당 보상금 (KRW)
+  rewardDescription String?         @db.Text          // 추가 보상 설명
+
+  // 미션 수행 가이드
+  guideUrl          String?         @db.VarChar(2048)
+  requirements      String?         @db.Text          // 수행 필수 조건
+
+  // 기간
+  startDate         DateTime
+  endDate           DateTime
+  submissionDeadline DateTime                         // 인증 제출 마감
+
+  // 미디어
+  thumbnailUrl      String?         @db.VarChar(2048)
+  imageUrls         String[]        @db.VarChar(2048) // 추가 이미지 배열
+
+  // 메타
+  viewCount         Int             @default(0)
+  isVisible         Boolean         @default(true)   // 공개 여부
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  publishedAt       DateTime?                        // OPEN 상태로 전환된 시각
+  closedAt          DateTime?                        // 종료 시각
+
+  clientProfile     ClientProfile   @relation(fields: [clientProfileId], references: [id])
+  applications      Application[]
+  submissions       Submission[]
+  tags              MissionTag[]
+
+  @@index([status, isVisible])
+  @@index([regionSi, regionGu, status])
+  @@index([category, status])
+  @@index([clientProfileId])
+  @@index([endDate])
+  @@index([createdAt(sort: Desc)])
+  @@map("missions")
+}
+
+/// 미션 태그 (검색 및 필터링용)
+model Tag {
+  id        String       @id @default(uuid()) @db.Uuid
+  name      String       @unique @db.VarChar(50)
+  createdAt DateTime     @default(now())
+
+  missions  MissionTag[]
+
+  @@index([name])
+  @@map("tags")
+}
+
+/// 미션-태그 N:M 조인 테이블
+model MissionTag {
+  missionId String    @db.Uuid
+  tagId     String    @db.Uuid
+  createdAt DateTime  @default(now())
+
+  mission   Mission   @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  tag       Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([missionId, tagId])
+  @@map("mission_tags")
+}
+
+// =============================================================================
+// APPLICATION DOMAIN
+// =============================================================================
+
+/// 참여자의 미션 지원서
+model Application {
+  id              String            @id @default(uuid()) @db.Uuid
+  missionId       String            @db.Uuid
+  participantId   String            @db.Uuid            // ParticipantProfile.id
+  reviewerId      String?           @db.Uuid            // OperatorProfile.id
+  status          ApplicationStatus @default(PENDING)
+  message         String?           @db.Text            // 지원 동기
+  rejectionReason String?           @db.Text            // 반려 사유
+  reviewedAt      DateTime?                             // 운영자 검토 완료 시각
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  mission         Mission           @relation(fields: [missionId], references: [id])
+  participant     ParticipantProfile @relation(fields: [participantId], references: [id])
+  reviewer        OperatorProfile?  @relation("ApplicationReviewer", fields: [reviewerId], references: [id])
+  submission      Submission?
+
+  @@unique([missionId, participantId])  // 미션당 1회 지원
+  @@index([missionId, status])
+  @@index([participantId, status])
+  @@index([status, createdAt])
+  @@map("applications")
+}
+
+// =============================================================================
+// SUBMISSION DOMAIN
+// =============================================================================
+
+/// 참여자의 인증 콘텐츠 제출
+model Submission {
+  id              String           @id @default(uuid()) @db.Uuid
+  missionId       String           @db.Uuid
+  applicationId   String           @unique @db.Uuid   // 지원서당 1건
+  participantId   String           @db.Uuid
+  reviewerId      String?          @db.Uuid            // OperatorProfile.id
+  status          SubmissionStatus @default(SUBMITTED)
+
+  // 제출 콘텐츠
+  contentUrl      String?          @db.VarChar(2048)  // SNS 게시글 URL
+  mediaUrls       String[]         @db.VarChar(2048)  // 첨부 미디어 (S3)
+  description     String?          @db.Text           // 설명 또는 캡션
+  snsPostUrl      String?          @db.VarChar(2048)  // 실제 게시된 SNS URL
+
+  // 검수 정보
+  reviewNote      String?          @db.Text           // 운영자 검수 메모
+  rejectionReason String?          @db.Text           // 반려 / 수정 요청 사유
+  reviewedAt      DateTime?
+  approvedAt      DateTime?
+
+  // 재제출 관리
+  revisionCount   Int              @default(0)        // 수정 횟수
+  maxRevisions    Int              @default(2)        // 최대 수정 허용 횟수
+
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  submittedAt     DateTime         @default(now())   // 최종 제출 시각
+
+  mission         Mission          @relation(fields: [missionId], references: [id])
+  application     Application      @relation(fields: [applicationId], references: [id])
+  participant     ParticipantProfile @relation(fields: [participantId], references: [id])
+  reviewer        OperatorProfile? @relation("SubmissionReviewer", fields: [reviewerId], references: [id])
+  payout          Payout?
+  revisionHistory SubmissionRevision[]
+
+  @@index([missionId, status])
+  @@index([participantId, status])
+  @@index([reviewerId, status])
+  @@index([status, createdAt])
+  @@map("submissions")
+}
+
+/// 제출 이력 (수정 요청 시 이전 버전 보존)
+model SubmissionRevision {
+  id            String    @id @default(uuid()) @db.Uuid
+  submissionId  String    @db.Uuid
+  revisionNo    Int                          // 수정 회차 (1부터 시작)
+  contentUrl    String?   @db.VarChar(2048)
+  mediaUrls     String[]  @db.VarChar(2048)
+  description   String?   @db.Text
+  snsPostUrl    String?   @db.VarChar(2048)
+  createdAt     DateTime  @default(now())
+
+  submission    Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@unique([submissionId, revisionNo])
+  @@map("submission_revisions")
+}
+
+// =============================================================================
+// PAYOUT DOMAIN
+// =============================================================================
+
+/// 참여자 보상 정산
+model Payout {
+  id              String        @id @default(uuid()) @db.Uuid
+  submissionId    String        @unique @db.Uuid
+  participantId   String        @db.Uuid
+  amount          Decimal       @db.Decimal(12, 2)   // 실 지급액 (KRW)
+  platformFee     Decimal       @default(0) @db.Decimal(12, 2) // 플랫폼 수수료
+  netAmount       Decimal       @db.Decimal(12, 2)   // 차감 후 지급액
+  status          PayoutStatus  @default(PENDING)
+
+  // 정산 수단 정보 (스냅샷 — 변경 시 보존용)
+  bankName        String?       @db.VarChar(50)
+  bankAccount     String?       @db.VarChar(50)      // 마스킹 처리 권장
+  accountHolder   String?       @db.VarChar(50)
+
+  // PG / 정산 시스템 연동
+  externalTxId    String?       @db.VarChar(200)     // 외부 거래 ID
+  scheduledAt     DateTime?                          // 정산 예약 일시
+  completedAt     DateTime?                          // 지급 완료 일시
+  failReason      String?       @db.Text             // 실패 사유
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  submission      Submission    @relation(fields: [submissionId], references: [id])
+  participant     ParticipantProfile @relation(fields: [participantId], references: [id])
+
+  @@index([participantId, status])
+  @@index([status, scheduledAt])
+  @@index([createdAt(sort: Desc)])
+  @@map("payouts")
+}
+
+// =============================================================================
+// NOTIFICATION DOMAIN
+// =============================================================================
+
+/// 사용자 알림
+model Notification {
+  id          String           @id @default(uuid()) @db.Uuid
+  userId      String           @db.Uuid
+  type        NotificationType
+  title       String           @db.VarChar(200)
+  body        String           @db.Text
+  isRead      Boolean          @default(false)
+  readAt      DateTime?
+  // 연관 리소스 링크 (Deep Link용)
+  resourceId  String?          @db.Uuid
+  resourceType String?         @db.VarChar(50)  // "mission" | "submission" | "payout"
+  createdAt   DateTime         @default(now())
+
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt(sort: Desc)])
+  @@index([userId, type])
+  @@map("notifications")
+}
+
+// =============================================================================
+// AUDIT DOMAIN
+// =============================================================================
+
+/// 감사 로그 (운영자 액션 추적)
+model AuditLog {
+  id          String    @id @default(uuid()) @db.Uuid
+  actorId     String    @db.Uuid             // User.id (액션 수행자)
+  action      String    @db.VarChar(100)     // 예: "SUBMISSION_APPROVED"
+  targetTable String    @db.VarChar(100)     // 예: "submissions"
+  targetId    String    @db.Uuid             // 대상 레코드 ID
+  before      Json?                          // 변경 전 스냅샷
+  after       Json?                          // 변경 후 스냅샷
+  ipAddress   String?   @db.VarChar(45)      // IPv4/IPv6
+  userAgent   String?   @db.VarChar(500)
+  createdAt   DateTime  @default(now())
+
+  actor       User      @relation("AuditActor", fields: [actorId], references: [id])
+
+  @@index([actorId, createdAt(sort: Desc)])
+  @@index([targetTable, targetId])
+  @@index([action, createdAt(sort: Desc)])
+  @@map("audit_logs")
+}
+```
+
+---
+
+## 2. `lib/prisma.ts` — PrismaClient 싱글톤
+
+```typescript
+// src/lib/prisma.ts
+// =============================================================================
+// PrismaClient 싱글톤 패턴
+// Next.js / Node.js 환경에서 핫 리로드 시 중복 인스턴스 방지
+// =============================================================================
+
+import { PrismaClient, Prisma } from "@prisma/client";
+
+// ─── 로그 설정 ────────────────────────────────────────────────────────────────
+
+const LOG_LEVELS: Prisma.LogDefinition[] = 
+  process.env.NODE_ENV === "production"
+    ? [
+        { level: "warn",  emit: "event" },
+        { level: "error", emit: "event" },
+      ]
+    : [
+        { level: "query", emit: "event" },  // 개발 환경: 쿼리 로깅
+        { level: "warn",  emit: "event" },
+        { level: "error", emit: "event" },
+      ];
+
+// ─── PrismaClient 팩토리 ──────────────────────────────────────────────────────
+
+function createPrismaClient(): PrismaClient {
+  const client = new PrismaClient({
+    log: LOG_LEVELS,
+    errorFormat: process.env.NODE_ENV === "production" ? "minimal" : "pretty",
+  });
+
+  // 개발 환경: 실행 쿼리 및 소요 시간 출력
+  if (process.env.NODE_ENV !== "production") {
+    // @ts-ignore — Prisma 이벤트 타입 추론 제한으로 인한 우회
+    client.$on("query", (e: Prisma.QueryEvent) => {
+      console.log(`\n[Prisma Query]`);
+      console.log(`  SQL      : ${e.query}`);
+      console.log(`  Params   : ${e.params}`);
+      console.log(`  Duration : ${e.duration}ms`);
+    });
+  }
+
+  // 경고 / 오류 공통 로깅
+  // @ts-ignore
+  client.$on("warn",  (e: Prisma.LogEvent) => console.warn("[Prisma Warn]",  e.message));
+  // @ts-ignore
+  client.$on("error", (e: Prisma.LogEvent) => console.error("[Prisma Error]", e.message));
+
+  return client;
+}
+
+// ─── 싱글톤 선언 ──────────────────────────────────────────────────────────────
+
+// Node.js 전역 객체에 캐시 (Next.js 핫 리로드 / ts-node-dev 재시작 대응)
+declare global {
+  // eslint-disable-next-line no-var
+  var __prismaClient: PrismaClient | undefined;
+}
+
+export const prisma: PrismaClient =
+  globalThis.__prismaClient ?? createPrismaClient();
+
+if (process.env.NODE_ENV !== "production") {
+  // 개발 환경에서만 전역 캐시에 저장 (프로덕션은 모듈 캐시만 사용)
+  globalThis.__prismaClient = prisma;
+}
+
+// ─── 프로세스 종료 시 연결 정리 ───────────────────────────────────────────────
+
+async function gracefulShutdown(signal: string): Promise<void> {
+  console.log(`[Prisma] ${signal} 수신 — DB 연결 종료 중...`);
+  await prisma.$disconnect();
+  console.log("[Prisma] 연결 종료 완료");
+  process.exit(0);
+}
+
+process.on("SIGINT",  () => gracefulShutdown("SIGINT"));
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+
+export default prisma;
+```
+
+---
+
+## 3. 마이그레이션 전략 (환경별)
+
+### 3-1. 환경별 명령어 및 전략
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                  마이그레이션 전략 요약                            │
+├─────────────┬───────────────────────────────────────────────────┤
+│ 환경        │ 전략                                               │
+├─────────────┼───────────────────────────────────────────────────┤
+│ 로컬 개발   │ prisma migrate dev --name <이름>                   │
+│             │ → SQL 자동 생성 + DB 즉시 적용                     │
+├─────────────┼───────────────────────────────────────────────────┤
+│ CI (PR 검증)│ prisma migrate diff                                │
+│             │ → 스키마 변경 감지 후 SQL 출력 (적용 없음)          │
+├─────────────┼───────────────────────────────────────────────────┤
+│ 스테이징    │ prisma migrate deploy                              │
+│             │ → 미적용 마이그레이션만 순차 적용                   │
+├─────────────┼───────────────────────────────────────────────────┤
+│ 프로덕션    │ prisma migrate deploy (CI/CD 파이프라인 내 자동화)  │
+│             │ → 배포 전 백업 필수 / 롤백 스크립트 준비            │
+└─────────────┴───────────────────────────────────────────────────┘
+```
+
+### 3-2. 최초 초기화 순서
+
+```bash
+# 1. 환경변수 설정
+cp .env.example .env
+# DATABASE_URL=postgresql://user:pass@localhost:5432/hyperlocal_db 수정
+
+# 2. Docker로 PostgreSQL 기동
+docker-compose up -d postgres
+
+# 3. 최초 마이그레이션 생성 및 적용
+pnpm prisma migrate dev --name init
+
+# 4. Prisma Client 생성
+pnpm prisma generate
+
+# 5. 시드 데이터 삽입
+pnpm prisma db seed
+```
+
+### 3-3. 컬럼 변경 시 주의사항 (Safe Migration 원칙)
+
+```
+파괴적 변경 (Destructive Change) 방지 규칙:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. 컬럼 삭제
+   ❌ 즉시 DROP COLUMN
+   ✅ Step 1: 애플리케이션 코드에서 해당 컬럼 제거
+      Step 2: 1~2 스프린트 후 DB 컬럼 실제 삭제
+
+2. Not Null 컬럼 추가
+   ❌ ALTER TABLE ADD COLUMN col TEXT NOT NULL
+   ✅ Step 1: NULL 허용으로 컬럼 추가
+      Step 2: 데이터 백필(Backfill) 실행
+      Step 3: NOT NULL 제약 추가
+
+3. Enum 값 추가
+   ✅ 안전 (PostgreSQL ALTER TYPE ... ADD VALUE)
+   ❌ Enum 값 삭제는 불가 → 신규 Enum 타입 생성 후 교체
+
+4. 인덱스 추가 (대용량 테이블)
+   ✅ CREATE INDEX CONCURRENTLY 사용 (락 없이 생성)
+   → Prisma는 CONCURRENTLY 미지원이므로 수동 SQL 실

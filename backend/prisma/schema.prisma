@@ -1,0 +1,398 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  OPERATOR
+  PARTICIPANT
+  CLIENT
+}
+
+enum MissionCategory {
+  VISIT
+  SNS
+  REVIEW
+  VIDEO
+}
+
+enum MissionStatus {
+  DRAFT
+  OPEN
+  IN_PROGRESS
+  REVIEWING
+  CLOSED
+}
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELED
+}
+
+enum SubmissionStatus {
+  SUBMITTED
+  APPROVED
+  REJECTED
+  REVISION
+}
+
+enum PayoutStatus {
+  PENDING
+  SCHEDULED
+  COMPLETED
+  FAILED
+  CANCELED
+}
+
+enum SnsType {
+  INSTAGRAM
+  YOUTUBE
+  TIKTOK
+  NAVER_BLOG
+  KAKAO
+  OTHER
+}
+
+enum NotificationType {
+  MISSION_OPEN
+  APPLICATION_RESULT
+  SUBMISSION_FEEDBACK
+  PAYOUT_COMPLETED
+  MISSION_DEADLINE
+  SYSTEM
+}
+
+model User {
+  id            String    @id @default(uuid()) @db.Uuid
+  email         String    @unique @db.VarChar(320)
+  passwordHash  String    @db.VarChar(255)
+  role          UserRole
+  name          String    @db.VarChar(100)
+  phone         String?   @db.VarChar(20)
+  profileImage  String?   @db.VarChar(2048)
+  isActive      Boolean   @default(true)
+  isVerified    Boolean   @default(false)
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  participantProfile ParticipantProfile?
+  clientProfile      ClientProfile?
+  operatorProfile    OperatorProfile?
+  notifications      Notification[]
+  auditLogs          AuditLog[]          @relation("AuditActor")
+  communityPosts     CommunityPost[]
+  communityComments  CommunityComment[]
+  communityLikes     CommunityLike[]
+
+  @@index([email])
+  @@index([role])
+  @@index([isActive, role])
+  @@map("users")
+}
+
+model ParticipantProfile {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @unique @db.Uuid
+  bio          String?  @db.Text
+  regionSi     String   @db.VarChar(50)
+  regionGu     String   @db.VarChar(50)
+  regionDong   String?  @db.VarChar(50)
+  totalEarned  Decimal  @default(0) @db.Decimal(12, 2)
+  missionCount Int      @default(0)
+  rating       Decimal? @db.Decimal(3, 2)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  snsAccounts  SnsAccount[]
+  applications Application[]
+  submissions  Submission[]
+  payouts      Payout[]
+
+  @@index([regionSi, regionGu])
+  @@map("participant_profiles")
+}
+
+model SnsAccount {
+  id            String    @id @default(uuid()) @db.Uuid
+  profileId     String    @db.Uuid
+  platform      SnsType
+  handle        String    @db.VarChar(200)
+  url           String    @db.VarChar(2048)
+  followerCount Int?
+  isVerified    Boolean   @default(false)
+  verifiedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  profile ParticipantProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, platform])
+  @@map("sns_accounts")
+}
+
+model ClientProfile {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @unique @db.Uuid
+  businessName   String   @db.VarChar(200)
+  businessNumber String?  @db.VarChar(20)
+  category       String   @db.VarChar(100)
+  description    String?  @db.Text
+  address        String   @db.VarChar(500)
+  regionSi       String   @db.VarChar(50)
+  regionGu       String   @db.VarChar(50)
+  regionDong     String?  @db.VarChar(50)
+  contactEmail   String?  @db.VarChar(320)
+  contactPhone   String?  @db.VarChar(20)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  missions Mission[]
+
+  @@index([regionSi, regionGu])
+  @@map("client_profiles")
+}
+
+model OperatorProfile {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @unique @db.Uuid
+  department String?  @db.VarChar(100)
+  position   String?  @db.VarChar(100)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewedSubmissions  Submission[]  @relation("SubmissionReviewer")
+  approvedApplications Application[] @relation("ApplicationReviewer")
+
+  @@map("operator_profiles")
+}
+
+model Mission {
+  id               String          @id @default(uuid()) @db.Uuid
+  clientProfileId  String          @db.Uuid
+  title            String          @db.VarChar(200)
+  description      String          @db.Text
+  category         MissionCategory
+  status           MissionStatus   @default(DRAFT)
+  regionSi         String          @db.VarChar(50)
+  regionGu         String          @db.VarChar(50)
+  regionDong       String?         @db.VarChar(50)
+  maxParticipants  Int             @default(1)
+  currentCount     Int             @default(0)
+  rewardAmount     Decimal         @db.Decimal(12, 2)
+  rewardDescription String?        @db.Text
+  requirements     String?         @db.Text
+  startDate        DateTime
+  endDate          DateTime
+  submissionDeadline DateTime
+  thumbnailUrl     String?         @db.VarChar(2048)
+  viewCount        Int             @default(0)
+  isVisible        Boolean         @default(true)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  publishedAt      DateTime?
+  closedAt         DateTime?
+
+  clientProfile ClientProfile @relation(fields: [clientProfileId], references: [id])
+  applications  Application[]
+  submissions   Submission[]
+  tags          MissionTag[]
+
+  @@index([status, isVisible])
+  @@index([regionSi, regionGu, status])
+  @@index([category, status])
+  @@map("missions")
+}
+
+model Tag {
+  id        String     @id @default(uuid()) @db.Uuid
+  name      String     @unique @db.VarChar(50)
+  createdAt DateTime   @default(now())
+  missions  MissionTag[]
+
+  @@map("tags")
+}
+
+model MissionTag {
+  missionId String   @db.Uuid
+  tagId     String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([missionId, tagId])
+  @@map("mission_tags")
+}
+
+model Application {
+  id              String            @id @default(uuid()) @db.Uuid
+  missionId       String            @db.Uuid
+  participantId   String            @db.Uuid
+  reviewerId      String?           @db.Uuid
+  status          ApplicationStatus @default(PENDING)
+  message         String?           @db.Text
+  rejectionReason String?           @db.Text
+  reviewedAt      DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  mission     Mission            @relation(fields: [missionId], references: [id])
+  participant ParticipantProfile @relation(fields: [participantId], references: [id])
+  reviewer    OperatorProfile?   @relation("ApplicationReviewer", fields: [reviewerId], references: [id])
+  submission  Submission?
+
+  @@unique([missionId, participantId])
+  @@index([missionId, status])
+  @@index([participantId, status])
+  @@map("applications")
+}
+
+model Submission {
+  id              String           @id @default(uuid()) @db.Uuid
+  missionId       String           @db.Uuid
+  applicationId   String           @unique @db.Uuid
+  participantId   String           @db.Uuid
+  reviewerId      String?          @db.Uuid
+  status          SubmissionStatus @default(SUBMITTED)
+  contentUrl      String?          @db.VarChar(2048)
+  mediaUrls       String[]         @db.VarChar(2048)
+  description     String?          @db.Text
+  snsPostUrl      String?          @db.VarChar(2048)
+  reviewNote      String?          @db.Text
+  rejectionReason String?          @db.Text
+  reviewedAt      DateTime?
+  approvedAt      DateTime?
+  revisionCount   Int              @default(0)
+  maxRevisions    Int              @default(2)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  submittedAt     DateTime         @default(now())
+
+  mission     Mission            @relation(fields: [missionId], references: [id])
+  application Application        @relation(fields: [applicationId], references: [id])
+  participant ParticipantProfile @relation(fields: [participantId], references: [id])
+  reviewer    OperatorProfile?   @relation("SubmissionReviewer", fields: [reviewerId], references: [id])
+  payout      Payout?
+
+  @@index([missionId, status])
+  @@index([participantId, status])
+  @@map("submissions")
+}
+
+model Payout {
+  id            String      @id @default(uuid()) @db.Uuid
+  submissionId  String      @unique @db.Uuid
+  participantId String      @db.Uuid
+  amount        Decimal     @db.Decimal(12, 2)
+  platformFee   Decimal     @default(0) @db.Decimal(12, 2)
+  netAmount     Decimal     @db.Decimal(12, 2)
+  status        PayoutStatus @default(PENDING)
+  bankName      String?     @db.VarChar(50)
+  bankAccount   String?     @db.VarChar(50)
+  accountHolder String?     @db.VarChar(50)
+  externalTxId  String?     @db.VarChar(200)
+  scheduledAt   DateTime?
+  completedAt   DateTime?
+  failReason    String?     @db.Text
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  submission  Submission         @relation(fields: [submissionId], references: [id])
+  participant ParticipantProfile @relation(fields: [participantId], references: [id])
+
+  @@index([participantId, status])
+  @@map("payouts")
+}
+
+model Notification {
+  id           String           @id @default(uuid()) @db.Uuid
+  userId       String           @db.Uuid
+  type         NotificationType
+  title        String           @db.VarChar(200)
+  body         String           @db.Text
+  isRead       Boolean          @default(false)
+  readAt       DateTime?
+  resourceId   String?          @db.Uuid
+  resourceType String?          @db.VarChar(50)
+  createdAt    DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  actorId     String   @db.Uuid
+  action      String   @db.VarChar(100)
+  targetTable String   @db.VarChar(100)
+  targetId    String   @db.Uuid
+  before      Json?
+  after       Json?
+  ipAddress   String?  @db.VarChar(45)
+  userAgent   String?  @db.VarChar(500)
+  createdAt   DateTime @default(now())
+
+  actor User @relation("AuditActor", fields: [actorId], references: [id])
+
+  @@map("audit_logs")
+}
+
+model CommunityPost {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  category  String   @db.VarChar(50)
+  title     String   @db.VarChar(200)
+  content   String   @db.Text
+  viewCount Int      @default(0)
+  likeCount Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comments CommunityComment[]
+  likes    CommunityLike[]
+
+  @@index([category])
+  @@index([createdAt])
+  @@map("community_posts")
+}
+
+model CommunityComment {
+  id        String   @id @default(uuid()) @db.Uuid
+  postId    String   @db.Uuid
+  userId    String   @db.Uuid
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+
+  post CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@map("community_comments")
+}
+
+model CommunityLike {
+  postId    String   @db.Uuid
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  post CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([postId, userId])
+  @@map("community_likes")
+}

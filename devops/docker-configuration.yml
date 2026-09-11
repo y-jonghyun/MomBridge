@@ -1,0 +1,780 @@
+# Docker 컨테이너 설정 파일
+
+## 프로젝트 구조 전제
+
+```
+hyperlocal-mission-platform/
+├── backend/                 # Node.js/Express API 서버
+│   ├── src/
+│   ├── package.json
+│   └── Dockerfile
+├── frontend/               # Next.js 프론트엔드
+│   ├── src/
+│   ├── package.json
+│   └── Dockerfile.frontend
+├── nginx/                  # 리버스 프록시
+│   ├── nginx.conf
+│   └── nginx.prod.conf
+├── docker-compose.yml
+├── docker-compose.prod.yml
+└── .dockerignore
+```
+
+---
+
+## 1. Dockerfile (백엔드 - 멀티스테이지 빌드)
+
+```dockerfile
+# =============================================================================
+# backend/Dockerfile
+# Node.js Express API Server - Multi-stage Build
+# =============================================================================
+
+# ─────────────────────────────────────────────
+# Stage 1: deps — 의존성 설치 전용 레이어
+# 패키지 파일만 복사해 캐시 레이어를 최대화
+# ─────────────────────────────────────────────
+FROM node:20.11-alpine3.19 AS deps
+
+# 보안: 취약점이 있는 패키지 업데이트
+RUN apk update && apk upgrade --no-cache && \
+    apk add --no-cache \
+        libc6-compat \   
+        dumb-init          
+
+# npm ci를 위한 패키지 파일만 먼저 복사 (캐시 레이어 활용)
+WORKDIR /app
+COPY package.json package-lock.json ./
+
+# production 의존성만 설치 (devDependencies 제외)
+RUN npm ci --only=production && \
+    # 캐시 정리로 이미지 크기 최소화
+    npm cache clean --force
+
+
+# ─────────────────────────────────────────────
+# Stage 2: builder — TypeScript 컴파일 레이어
+# devDependencies 포함해 빌드 수행
+# ─────────────────────────────────────────────
+FROM node:20.11-alpine3.19 AS builder
+
+WORKDIR /app
+
+# 전체 의존성 설치 (devDependencies 포함, 빌드 도구 필요)
+COPY package.json package-lock.json ./
+RUN npm ci && npm cache clean --force
+
+# 소스 코드 복사 (패키지 이후에 복사해 캐시 미스 최소화)
+COPY tsconfig.json ./
+COPY src/ ./src/
+
+# TypeScript 컴파일
+RUN npm run build && \
+    # 불필요한 소스맵 제거 (필요시 주석 해제)
+    # find ./dist -name "*.map" -delete && \
+    echo "✅ Build completed"
+
+
+# ─────────────────────────────────────────────
+# Stage 3: runner — 최종 실행 이미지
+# 컴파일 결과물 + production 의존성만 포함
+# ─────────────────────────────────────────────
+FROM node:20.11-alpine3.19 AS runner
+
+# 메타데이터 레이블
+LABEL maintainer="hyperlocal-team"
+LABEL description="HyperLocal Mission Platform - Backend API"
+LABEL version="1.0.0"
+
+# 보안 패치 및 최소 필수 패키지만 설치
+RUN apk update && apk upgrade --no-cache && \
+    apk add --no-cache \
+        dumb-init \      
+        curl \           
+        tzdata && \      
+    # 한국 시간대 설정
+    cp /usr/share/zoneinfo/Asia/Seoul /etc/localtime && \
+    echo "Asia/Seoul" > /etc/timezone && \
+    apk del tzdata && \
+    # 불필요한 캐시 제거
+    rm -rf /var/cache/apk/*
+
+WORKDIR /app
+
+# ── 보안: non-root 사용자 생성 ──────────────
+# UID/GID 고정으로 파일 권한 일관성 확보
+RUN addgroup \
+        --system \
+        --gid 1001 \
+        nodejs && \
+    adduser \
+        --system \
+        --uid 1001 \
+        --ingroup nodejs \
+        --no-create-home \
+        --shell /bin/false \
+        nodeuser
+
+# ── 파일 복사: builder & deps 스테이지에서 가져옴 ──
+# 컴파일된 결과물
+COPY --from=builder --chown=nodeuser:nodejs /app/dist ./dist
+
+# production 의존성만 (node_modules 전체 복사 방지)
+COPY --from=deps --chown=nodeuser:nodejs /app/node_modules ./node_modules
+
+# 패키지 정보 (런타임 버전 확인용)
+COPY --chown=nodeuser:nodejs package.json ./
+
+# ── 환경 변수 기본값 설정 ──────────────────
+ENV NODE_ENV=production \
+    PORT=4000 \
+    # Node.js 메모리 제한 (컨테이너 OOM 방지)
+    NODE_OPTIONS="--max-old-space-size=512" \
+    # 타임존
+    TZ=Asia/Seoul
+
+# non-root 사용자로 전환
+USER nodeuser
+
+# 포트 노출 (문서화 목적, 실제 바인딩은 compose에서)
+EXPOSE 4000
+
+# ── 헬스체크 ───────────────────────────────
+# 컨테이너 상태를 Docker/orchestrator가 감지
+HEALTHCHECK \
+    --interval=30s \
+    --timeout=10s \
+    --start-period=40s \
+    --retries=3 \
+    CMD curl -f http://localhost:4000/health || exit 1
+
+# ── 엔트리포인트 ────────────────────────────
+# dumb-init: PID 1 좀비 프로세스 방지 + 시그널 핸들링
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["node", "dist/server.js"]
+```
+
+---
+
+## 2. Dockerfile.frontend (프론트엔드 - Next.js)
+
+```dockerfile
+# =============================================================================
+# frontend/Dockerfile.frontend
+# Next.js Frontend - Standalone Output 활용 멀티스테이지 빌드
+# =============================================================================
+
+# ─────────────────────────────────────────────
+# Stage 1: deps — 의존성 레이어 분리
+# ─────────────────────────────────────────────
+FROM node:20.11-alpine3.19 AS deps
+
+RUN apk update && apk upgrade --no-cache && \
+    apk add --no-cache libc6-compat
+
+WORKDIR /app
+
+# package 파일 먼저 복사 → 소스 변경 시 캐시 재사용
+COPY package.json package-lock.json ./
+
+# 전체 의존성 설치 (Next.js build에 devDeps 필요)
+RUN npm ci && npm cache clean --force
+
+
+# ─────────────────────────────────────────────
+# Stage 2: builder — Next.js 빌드
+# ─────────────────────────────────────────────
+FROM node:20.11-alpine3.19 AS builder
+
+WORKDIR /app
+
+# 의존성 가져오기
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# ── 빌드 시 환경 변수 (NEXT_PUBLIC_* 만 번들에 포함됨) ──
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_KAKAO_MAP_KEY
+
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
+    NEXT_PUBLIC_KAKAO_MAP_KEY=${NEXT_PUBLIC_KAKAO_MAP_KEY} \
+    # Standalone 모드: 실행에 필요한 파일만 추출
+    NEXT_TELEMETRY_DISABLED=1
+
+# next.config.js에 output: 'standalone' 설정 필요
+# 이 옵션으로 node_modules 없이 실행 가능한 번들 생성
+RUN npm run build && \
+    echo "✅ Next.js build completed"
+
+
+# ─────────────────────────────────────────────
+# Stage 3: runner — 경량 실행 이미지
+# standalone 출력만 사용해 이미지 크기 대폭 절감
+# ─────────────────────────────────────────────
+FROM node:20.11-alpine3.19 AS runner
+
+LABEL maintainer="hyperlocal-team"
+LABEL description="HyperLocal Mission Platform - Frontend"
+LABEL version="1.0.0"
+
+RUN apk update && apk upgrade --no-cache && \
+    apk add --no-cache \
+        dumb-init \
+        curl \
+        tzdata && \
+    cp /usr/share/zoneinfo/Asia/Seoul /etc/localtime && \
+    echo "Asia/Seoul" > /etc/timezone && \
+    apk del tzdata && \
+    rm -rf /var/cache/apk/*
+
+WORKDIR /app
+
+# ── non-root 사용자 생성 ─────────────────────
+RUN addgroup \
+        --system \
+        --gid 1001 \
+        nodejs && \
+    adduser \
+        --system \
+        --uid 1001 \
+        --ingroup nodejs \
+        --no-create-home \
+        --shell /bin/false \
+        nextjs
+
+# ── Standalone 빌드 결과물 복사 ─────────────
+# Next.js standalone: server.js + 최소 node_modules 포함
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+# 정적 파일 (이미지, CSS, JS chunks)
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# public 디렉토리 (favicon, 메타 이미지 등)
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+
+ENV NODE_ENV=production \
+    PORT=3000 \
+    HOSTNAME="0.0.0.0" \
+    NEXT_TELEMETRY_DISABLED=1 \
+    TZ=Asia/Seoul
+
+USER nextjs
+
+EXPOSE 3000
+
+HEALTHCHECK \
+    --interval=30s \
+    --timeout=10s \
+    --start-period=40s \
+    --retries=3 \
+    CMD curl -f http://localhost:3000/api/health || exit 1
+
+# Next.js standalone 진입점
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["node", "server.js"]
+```
+
+---
+
+## 3. docker-compose.yml (로컬 개발 환경)
+
+```yaml
+# =============================================================================
+# docker-compose.yml
+# 로컬 개발 환경 — Hot Reload + 볼륨 마운트 중심
+# 사용법: docker-compose up -d
+# =============================================================================
+
+version: "3.9"
+
+# ── 공통 설정 재사용 (YAML 앵커) ─────────────────────────────────────────
+x-common-env: &common-env
+  TZ: Asia/Seoul
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"   # 로그 파일 최대 크기
+    max-file: "3"     # 보관 파일 수
+
+x-restart-policy: &restart-policy
+  restart: unless-stopped
+
+# ─────────────────────────────────────────────────────────────────────────────
+services:
+
+  # ── PostgreSQL 데이터베이스 ─────────────────
+  postgres:
+    image: postgres:16.2-alpine
+    container_name: hyperlocal_postgres_dev
+    <<: *restart-policy
+    environment:
+      <<: *common-env
+      POSTGRES_DB: hyperlocal_dev
+      POSTGRES_USER: hyperlocal_user
+      POSTGRES_PASSWORD: dev_password_change_in_prod
+      # 성능 튜닝 (개발용)
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=ko_KR.UTF-8"
+    volumes:
+      # 데이터 영속성
+      - postgres_data:/var/lib/postgresql/data
+      # 초기화 SQL 스크립트 자동 실행
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      # 개발 시 DB 클라이언트 직접 접속 허용
+      - "5432:5432"
+    networks:
+      - hyperlocal_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hyperlocal_user -d hyperlocal_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging: *default-logging
+
+  # ── Redis 캐시 / 큐 ─────────────────────────
+  redis:
+    image: redis:7.2-alpine
+    container_name: hyperlocal_redis_dev
+    <<: *restart-policy
+    command: >
+      redis-server
+      --requirepass dev_redis_password
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --appendfsync everysec
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - hyperlocal_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "dev_redis_password", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    logging: *default-logging
+
+  # ── MinIO (S3 호환 로컬 스토리지) ───────────
+  # 미션 인증 사진, 콘텐츠 파일 저장용
+  minio:
+    image: minio/minio:RELEASE.2024-02-06T21-36-22Z
+    container_name: hyperlocal_minio_dev
+    <<: *restart-policy
+    command: server /data --console-address ":9001"
+    environment:
+      <<: *common-env
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"   # API 엔드포인트
+      - "9001:9001"   # 웹 콘솔 (http://localhost:9001)
+    networks:
+      - hyperlocal_network
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging: *default-logging
+
+  # ── 백엔드 API 서버 ─────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      # 개발 환경: deps 스테이지까지만 빌드 (빌드 속도 우선)
+      target: deps
+    image: hyperlocal/backend:dev
+    container_name: hyperlocal_backend_dev
+    <<: *restart-policy
+    # 개발 시 ts-node-dev로 실행 (hot reload)
+    command: npm run dev
+    environment:
+      <<: *common-env
+      NODE_ENV: development
+      PORT: 4000
+
+      # 데이터베이스
+      DATABASE_URL: postgresql://hyperlocal_user:dev_password_change_in_prod@postgres:5432/hyperlocal_dev
+
+      # Redis
+      REDIS_URL: redis://:dev_redis_password@redis:6379
+
+      # S3 (MinIO)
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin123
+      S3_BUCKET_NAME: hyperlocal-uploads
+      S3_REGION: ap-northeast-2
+
+      # JWT (개발용 — 프로덕션에서는 반드시 교체)
+      JWT_SECRET: dev-jwt-secret-minimum-32-characters-long
+      JWT_EXPIRES_IN: 7d
+      REFRESH_TOKEN_EXPIRES_IN: 30d
+
+      # 카카오 로그인 (개발용 키)
+      KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:-dev_kakao_client_id}
+      KAKAO_REDIRECT_URI: http://localhost:4000/auth/kakao/callback
+
+      # 이메일 (Mailhog 사용)
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      SMTP_SECURE: "false"
+    volumes:
+      # 소스코드 마운트 (Hot reload)
+      - ./backend/src:/app/src:ro
+      # 로그 출력 (디버깅)
+      - ./logs/backend:/app/logs
+      # node_modules는 컨테이너 내부 유지 (성능)
+      - backend_node_modules:/app/node_modules
+    ports:
+      - "4000:4000"
+      - "9229:9229"   # Node.js 디버거 포트
+    networks:
+      - hyperlocal_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    logging: *default-logging
+
+  # ── 프론트엔드 Next.js ─────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.frontend
+      target: deps    # 개발: 의존성만 설치된 스테이지
+    image: hyperlocal/frontend:dev
+    container_name: hyperlocal_frontend_dev
+    <<: *restart-policy
+    command: npm run dev
+    environment:
+      <<: *common-env
+      NODE_ENV: development
+      PORT: 3000
+      NEXT_TELEMETRY_DISABLED: "1"
+
+      # API URL (브라우저에서 접근하는 주소)
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+      NEXT_PUBLIC_KAKAO_MAP_KEY: ${KAKAO_MAP_KEY:-dev_kakao_map_key}
+
+      # Next.js 개발 서버 설정
+      WATCHPACK_POLLING: "true"   # WSL2 파일 감시 이슈 해결
+    volumes:
+      - ./frontend/src:/app/src:ro
+      - ./frontend/public:/app/public:ro
+      - frontend_next_cache:/app/.next  # .next 캐시 유지
+      - frontend_node_modules:/app/node_modules
+    ports:
+      - "3000:3000"
+    networks:
+      - hyperlocal_network
+    depends_on:
+      - backend
+    logging: *default-logging
+
+  # ── Nginx 리버스 프록시 (개발용) ───────────
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: hyperlocal_nginx_dev
+    <<: *restart-policy
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+    ports:
+      - "80:80"
+    networks:
+      - hyperlocal_network
+    depends_on:
+      - frontend
+      - backend
+    logging: *default-logging
+
+  # ── MailHog (개발용 이메일 테스트) ─────────
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: hyperlocal_mailhog_dev
+    <<: *restart-policy
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # 웹 UI (http://localhost:8025)
+    networks:
+      - hyperlocal_network
+    logging: *default-logging
+
+  # ── Adminer (DB 웹 클라이언트) ─────────────
+  adminer:
+    image: adminer:4.8.1
+    container_name: hyperlocal_adminer_dev
+    <<: *restart-policy
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    ports:
+      - "8080:8080"   # http://localhost:8080
+    networks:
+      - hyperlocal_network
+    depends_on:
+      - postgres
+    logging: *default-logging
+
+# ─────────────────────────────────────────────
+# 볼륨 정의
+# ─────────────────────────────────────────────
+volumes:
+  postgres_data:
+    name: hyperlocal_postgres_data_dev
+  redis_data:
+    name: hyperlocal_redis_data_dev
+  minio_data:
+    name: hyperlocal_minio_data_dev
+  backend_node_modules:
+    name: hyperlocal_backend_modules_dev
+  frontend_node_modules:
+    name: hyperlocal_frontend_modules_dev
+  frontend_next_cache:
+    name: hyperlocal_frontend_next_cache_dev
+
+# ─────────────────────────────────────────────
+# 네트워크 정의
+# ─────────────────────────────────────────────
+networks:
+  hyperlocal_network:
+    name: hyperlocal_dev_network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+```
+
+---
+
+## 4. docker-compose.prod.yml (프로덕션 환경)
+
+```yaml
+# =============================================================================
+# docker-compose.prod.yml
+# 프로덕션 환경 — 보안, 고가용성, 리소스 제한 중심
+# 사용법: docker-compose -f docker-compose.prod.yml up -d
+# =============================================================================
+
+version: "3.9"
+
+# ── 공통 설정 앵커 ──────────────────────────────────────────────────────────
+x-common-env: &common-env
+  TZ: Asia/Seoul
+  NODE_ENV: production
+
+x-logging: &prod-logging
+  driver: "json-file"
+  options:
+    max-size: "50m"
+    max-file: "10"
+    labels: "service,environment"
+
+# 프로덕션 재시작 정책
+x-restart-policy: &restart-policy
+  restart: always
+
+# 공통 보안 설정
+x-security-opts: &security-opts
+  security_opt:
+    - no-new-privileges:true  # 권한 상승 방지
+  read_only: true             # 파일시스템 읽기 전용
+
+# ─────────────────────────────────────────────────────────────────────────────
+services:
+
+  # ── PostgreSQL (프로덕션) ───────────────────
+  postgres:
+    image: postgres:16.2-alpine
+    container_name: hyperlocal_postgres_prod
+    <<: [*restart-policy, *security-opts]
+    environment:
+      <<: *common-env
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+      # read_only 모드에서 PostgreSQL 임시 파일 경로
+      - /tmp/postgres:/tmp
+    networks:
+      - backend_network
+    # !! 프로덕션: 포트 외부 노출 금지 !!
+    # ports: 제거 — 내부 네트워크만 통신
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    # 리소스 제한 (OOM 방지)
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 512M
+    logging: *prod-logging
+
+  # ── Redis (프로덕션) ────────────────────────
+  redis:
+    image: redis:7.2-alpine
+    container_name: hyperlocal_redis_prod
+    <<: [*restart-policy, *security-opts]
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --appendfsync everysec
+      --bind 0.0.0.0
+      --protected-mode yes
+      --loglevel warning
+    volumes:
+      - redis_data:/data
+    networks:
+      - backend_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 640M
+        reservations:
+          cpus: "0.1"
+          memory: 256M
+    logging: *prod-logging
+
+  # ── 백엔드 API (프로덕션) ───────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      # 프로덕션: 전체 빌드 (runner 스테이지)
+      target: runner
+      args:
+        NODE_ENV: production
+    image: hyperlocal/backend:${IMAGE_TAG:-latest}
+    container_name: hyperlocal_backend_prod
+    <<: [*restart-policy, *security-opts]
+    environment:
+      <<: *common-env
+      PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME}
+      S3_REGION: ap-northeast-2
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: 1d
+      REFRESH_TOKEN_EXPIRES_IN: 14d
+      KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID}
+      KAKAO_REDIRECT_URI: ${KAKAO_REDIRECT_URI}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+    # read_only 모드에서 쓰기 가능 임시 디렉토리
+    tmpfs:
+      - /tmp:mode=1777,size=64m
+    volumes:
+      - backend_logs:/app/logs
+    networks:
+      - backend_network
+      - frontend_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      # 무중단 배포: 2개 레플리카
+      replicas: 2
+      update_config:
+        parallelism: 1          # 1개씩 순차 업데이트
+        delay: 10s              # 업데이트 간 대기
+        failure_action: rollback
+        order: start-first      # 새 컨테이너 시작 후 구버전 종료
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 768M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging: *prod-logging
+
+  # ── 프론트엔드 Next.js (프로덕션) ──────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.frontend
+      target: runner
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_KAKAO_MAP_KEY: ${NEXT_PUBLIC_KAKAO_MAP_KEY}
+    image: hyperlocal/frontend:${IMAGE_TAG:-latest}
+    container_name: hyperlocal_frontend_prod
+    <<: [*restart-policy, *security-opts]
+    environment:
+      <<: *common-env
+      PORT: 3000
+      HOSTNAME: "0.0.0.0"
+      NEXT_TELEMETRY_DISABLED: "1"
+    tmpfs:
+      - /tmp:mode=1777,size=32m
+    networks:
+      - frontend_network
+    depends_on:
+      - backend
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        order: start-first
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging: *prod-logging
+
+  # ── Nginx (프로덕션 — SSL 종료, 로드밸런싱) ─
+  

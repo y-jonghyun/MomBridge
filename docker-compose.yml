@@ -1,0 +1,62 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mombridge_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mombridge_db
+      POSTGRES_USER: mombridge_user
+      POSTGRES_PASSWORD: mombridge_pass
+      TZ: Asia/Seoul
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mombridge_user -d mombridge_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mombridge_backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 4000
+      DATABASE_URL: postgresql://mombridge_user:mombridge_pass@postgres:5432/mombridge_db
+      JWT_ACCESS_SECRET: mombridge-access-secret-min-32-characters-here
+      JWT_REFRESH_SECRET: mombridge-refresh-secret-min-32-characters-here
+      JWT_ACCESS_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      CORS_ORIGIN: http://localhost:3000
+      LOG_LEVEL: debug
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend/src:/app/src
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: mombridge_frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

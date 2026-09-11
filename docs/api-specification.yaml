@@ -1,0 +1,994 @@
+# HyperLocal Mission Platform — RESTful API 명세서
+
+## OpenAPI 3.0 Specification
+
+```yaml
+openapi: 3.0.3
+info:
+  title: HyperLocal Mission Platform API
+  description: |
+    ## 개요
+    지역 소상공인(고객사)과 지역 주민(참여자)을 하이퍼로컬 미션으로 연결하는 플랫폼 API입니다.
+    운영자가 중간에서 품질을 보증하는 3자 구조로 신뢰성을 확보합니다.
+
+    ## 인증 방식
+    - **Access Token**: JWT Bearer Token (유효기간: 1시간)
+    - **Refresh Token**: HttpOnly Cookie (유효기간: 7일)
+    - 인증이 필요한 엔드포인트는 `Authorization: Bearer <token>` 헤더 필요
+
+    ## 역할(Role) 체계
+    | 역할 | 설명 |
+    |------|------|
+    | `OPERATOR` | 플랫폼 운영자. 모든 리소스 접근 가능 |
+    | `CLIENT` | 고객사(소상공인). 미션 의뢰 및 결과 조회 |
+    | `PARTICIPANT` | 참여자(지역 주민). 미션 수행 및 보상 수령 |
+
+    ## 공통 응답 형식
+    모든 API는 아래 형식으로 응답합니다:
+    ```json
+    {
+      "success": true,
+      "data": {},
+      "message": "요청이 성공적으로 처리되었습니다.",
+      "meta": {}
+    }
+    ```
+
+    ## 에러 응답 형식
+    ```json
+    {
+      "success": false,
+      "error": {
+        "code": "ERROR_CODE",
+        "message": "에러 메시지",
+        "details": []
+      }
+    }
+    ```
+  version: 1.0.0
+  contact:
+    name: HyperLocal Platform Team
+    email: dev@hyperlocal.kr
+
+servers:
+  - url: https://api.hyperlocal.kr/v1
+    description: Production Server
+  - url: https://staging-api.hyperlocal.kr/v1
+    description: Staging Server
+  - url: http://localhost:3000/v1
+    description: Local Development Server
+
+# =====================================================
+# 보안 스키마 정의
+# =====================================================
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT Access Token. 로그인 후 발급되며 1시간 후 만료됩니다.
+        만료 시 `/auth/refresh` 엔드포인트로 갱신하세요.
+
+  # =====================================================
+  # 공통 스키마 정의
+  # =====================================================
+  schemas:
+
+    # ─────────────────────────────────────────────────
+    # 공통 응답 래퍼
+    # ─────────────────────────────────────────────────
+    SuccessResponse:
+      type: object
+      required:
+        - success
+        - message
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "요청이 성공적으로 처리되었습니다."
+        data:
+          type: object
+          description: 실제 응답 데이터 (엔드포인트마다 다름)
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    ErrorResponse:
+      type: object
+      required:
+        - success
+        - error
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              example: "VALIDATION_ERROR"
+            message:
+              type: string
+              example: "입력값이 올바르지 않습니다."
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                    example: "email"
+                  message:
+                    type: string
+                    example: "유효한 이메일 주소를 입력하세요."
+
+    PaginationMeta:
+      type: object
+      properties:
+        totalCount:
+          type: integer
+          example: 150
+        totalPages:
+          type: integer
+          example: 15
+        currentPage:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 10
+        hasNextPage:
+          type: boolean
+          example: true
+        hasPrevPage:
+          type: boolean
+          example: false
+
+    # ─────────────────────────────────────────────────
+    # Auth 도메인 스키마
+    # ─────────────────────────────────────────────────
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+        - name
+        - role
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          example: "participant@example.com"
+          description: 이메일 주소 (로그인 ID로 사용)
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 100
+          example: "Secure1234!"
+          description: |
+            비밀번호 규칙:
+            - 최소 8자
+            - 영문 대소문자, 숫자, 특수문자 각 1개 이상 포함
+        name:
+          type: string
+          minLength: 2
+          maxLength: 50
+          example: "이지원"
+        role:
+          type: string
+          enum:
+            - PARTICIPANT
+            - CLIENT
+          example: "PARTICIPANT"
+          description: 운영자(OPERATOR)는 시드 계정으로만 생성됩니다.
+        phone:
+          type: string
+          pattern: '^01[016789]-?\d{3,4}-?\d{4}$'
+          example: "010-1234-5678"
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: "participant@example.com"
+        password:
+          type: string
+          format: password
+          example: "Secure1234!"
+
+    AuthTokenResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          description: JWT Access Token (1시간 유효)
+        tokenType:
+          type: string
+          example: "Bearer"
+        expiresIn:
+          type: integer
+          example: 3600
+          description: 만료까지 남은 시간 (초)
+        user:
+          $ref: '#/components/schemas/UserProfile'
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        email:
+          type: string
+          format: email
+          example: "participant@example.com"
+        name:
+          type: string
+          example: "이지원"
+        role:
+          type: string
+          enum:
+            - OPERATOR
+            - CLIENT
+            - PARTICIPANT
+          example: "PARTICIPANT"
+        isEmailVerified:
+          type: boolean
+          example: false
+        createdAt:
+          type: string
+          format: date-time
+          example: "2025-01-15T09:00:00Z"
+
+    # ─────────────────────────────────────────────────
+    # 참여자 프로필 스키마
+    # ─────────────────────────────────────────────────
+    ParticipantProfileUpdateRequest:
+      type: object
+      properties:
+        nickname:
+          type: string
+          minLength: 2
+          maxLength: 30
+          example: "지원마케터"
+        bio:
+          type: string
+          maxLength: 500
+          example: "서울 마포구에서 활동하는 라이프스타일 인플루언서입니다."
+        activityRegion:
+          type: string
+          example: "서울 마포구"
+        city:
+          type: string
+          example: "서울특별시"
+        district:
+          type: string
+          example: "마포구"
+        latitude:
+          type: number
+          format: decimal
+          example: 37.5563
+        longitude:
+          type: number
+          format: decimal
+          example: 126.9235
+        snsChannels:
+          type: array
+          maxItems: 5
+          items:
+            $ref: '#/components/schemas/SnsChannel'
+
+    SnsChannel:
+      type: object
+      required:
+        - platform
+        - handle
+      properties:
+        platform:
+          type: string
+          enum:
+            - INSTAGRAM
+            - YOUTUBE
+            - TIKTOK
+            - BLOG
+            - TWITTER
+          example: "INSTAGRAM"
+        handle:
+          type: string
+          maxLength: 100
+          example: "@jiwon_lifestyle"
+        followerCount:
+          type: integer
+          minimum: 0
+          example: 3200
+        profileUrl:
+          type: string
+          format: uri
+          example: "https://instagram.com/jiwon_lifestyle"
+
+    ParticipantProfileResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "660e8400-e29b-41d4-a716-446655440001"
+        userId:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        nickname:
+          type: string
+          example: "지원마케터"
+        bio:
+          type: string
+          example: "서울 마포구에서 활동하는 라이프스타일 인플루언서입니다."
+        activityRegion:
+          type: string
+          example: "서울 마포구"
+        city:
+          type: string
+          example: "서울특별시"
+        district:
+          type: string
+          example: "마포구"
+        totalEarnedPoints:
+          type: integer
+          example: 15000
+        availablePoints:
+          type: integer
+          example: 12000
+        completedMissionCount:
+          type: integer
+          example: 8
+        averageRating:
+          type: number
+          format: decimal
+          example: 4.7
+        snsChannels:
+          type: array
+          items:
+            $ref: '#/components/schemas/SnsChannel'
+        createdAt:
+          type: string
+          format: date-time
+          example: "2025-01-15T09:00:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2025-02-01T12:00:00Z"
+
+    # ─────────────────────────────────────────────────
+    # 고객사 프로필 스키마
+    # ─────────────────────────────────────────────────
+    ClientProfileUpdateRequest:
+      type: object
+      properties:
+        businessName:
+          type: string
+          minLength: 2
+          maxLength: 100
+          example: "홍대 앞 감성카페 모카"
+        businessType:
+          type: string
+          example: "카페/음료"
+        businessRegistrationNumber:
+          type: string
+          pattern: '^\d{3}-\d{2}-\d{5}$'
+          example: "123-45-67890"
+        address:
+          type: string
+          example: "서울특별시 마포구 홍대입구역 3번 출구 앞"
+        city:
+          type: string
+          example: "서울특별시"
+        district:
+          type: string
+          example: "마포구"
+        latitude:
+          type: number
+          format: decimal
+          example: 37.5563
+        longitude:
+          type: number
+          format: decimal
+          example: 126.9235
+        contactName:
+          type: string
+          example: "박사장"
+        contactPhone:
+          type: string
+          example: "010-9876-5432"
+        websiteUrl:
+          type: string
+          format: uri
+          example: "https://instagram.com/moca_cafe"
+
+    ClientProfileResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "770e8400-e29b-41d4-a716-446655440002"
+        userId:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655441111"
+        businessName:
+          type: string
+          example: "홍대 앞 감성카페 모카"
+        businessType:
+          type: string
+          example: "카페/음료"
+        address:
+          type: string
+          example: "서울특별시 마포구 홍대입구역 3번 출구 앞"
+        city:
+          type: string
+          example: "서울특별시"
+        district:
+          type: string
+          example: "마포구"
+        contactName:
+          type: string
+          example: "박사장"
+        totalPostedMissions:
+          type: integer
+          example: 5
+        totalCompletedMissions:
+          type: integer
+          example: 38
+        isVerified:
+          type: boolean
+          example: true
+          description: 사업자 등록번호 인증 여부
+        createdAt:
+          type: string
+          format: date-time
+
+    # ─────────────────────────────────────────────────
+    # 미션 스키마
+    # ─────────────────────────────────────────────────
+    MissionCreateRequest:
+      type: object
+      required:
+        - title
+        - description
+        - missionType
+        - reward
+        - maxParticipants
+        - startDate
+        - endDate
+        - city
+        - district
+      properties:
+        title:
+          type: string
+          minLength: 5
+          maxLength: 100
+          example: "홍대 모카카페 방문 인스타그램 리뷰 미션"
+        description:
+          type: string
+          minLength: 20
+          maxLength: 2000
+          example: |
+            저희 카페를 방문하시고 인스타그램에 솔직한 후기를 남겨주세요.
+            음료 1잔 + 디저트 1개를 직접 경험하시고 인증해주시면 됩니다.
+        missionType:
+          type: string
+          enum:
+            - VISIT_REVIEW
+            - SNS_POST
+            - VIDEO_REVIEW
+            - PHOTO_REVIEW
+            - BLOG_POST
+          example: "VISIT_REVIEW"
+          description: |
+            - VISIT_REVIEW: 방문 후 SNS 리뷰
+            - SNS_POST: SNS 게시물 작성
+            - VIDEO_REVIEW: 영상 리뷰 (유튜브/틱톡)
+            - PHOTO_REVIEW: 사진 리뷰
+            - BLOG_POST: 블로그 포스팅
+        reward:
+          type: object
+          required:
+            - type
+            - value
+          properties:
+            type:
+              type: string
+              enum:
+                - CASH
+                - POINT
+                - PRODUCT
+                - DISCOUNT_COUPON
+              example: "POINT"
+            value:
+              type: integer
+              minimum: 100
+              example: 5000
+              description: POINT는 포인트 값, CASH는 원화 금액
+            description:
+              type: string
+              example: "5,000 포인트 (현금 출금 가능)"
+        maxParticipants:
+          type: integer
+          minimum: 1
+          maximum: 100
+          example: 10
+        startDate:
+          type: string
+          format: date-time
+          example: "2025-03-01T00:00:00Z"
+        endDate:
+          type: string
+          format: date-time
+          example: "2025-03-31T23:59:59Z"
+        city:
+          type: string
+          example: "서울특별시"
+        district:
+          type: string
+          example: "마포구"
+        address:
+          type: string
+          example: "서울특별시 마포구 홍대입구역 3번 출구 앞"
+        latitude:
+          type: number
+          format: decimal
+          example: 37.5563
+        longitude:
+          type: number
+          format: decimal
+          example: 126.9235
+        requirements:
+          type: object
+          description: 미션 참여 조건
+          properties:
+            minFollowers:
+              type: integer
+              minimum: 0
+              example: 500
+              description: 최소 팔로워 수
+            requiredPlatforms:
+              type: array
+              items:
+                type: string
+                enum:
+                  - INSTAGRAM
+                  - YOUTUBE
+                  - TIKTOK
+                  - BLOG
+                  - TWITTER
+              example:
+                - "INSTAGRAM"
+            requiredKeywords:
+              type: array
+              items:
+                type: string
+              maxItems: 10
+              example:
+                - "#홍대카페"
+                - "#모카"
+                - "#감성카페"
+            requiredPhotoCount:
+              type: integer
+              minimum: 1
+              maximum: 20
+              example: 3
+            additionalGuide:
+              type: string
+              maxLength: 1000
+              example: "음료와 매장 인테리어가 함께 나오도록 촬영해주세요."
+        attachments:
+          type: array
+          description: 미션 참고 이미지 URL (업로드 후 URL 전달)
+          items:
+            type: string
+            format: uri
+          maxItems: 5
+          example:
+            - "https://cdn.hyperlocal.kr/missions/sample1.jpg"
+
+    MissionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "880e8400-e29b-41d4-a716-446655440003"
+        clientId:
+          type: string
+          format: uuid
+          example: "770e8400-e29b-41d4-a716-446655440002"
+        clientBusinessName:
+          type: string
+          example: "홍대 앞 감성카페 모카"
+        title:
+          type: string
+          example: "홍대 모카카페 방문 인스타그램 리뷰 미션"
+        description:
+          type: string
+          example: "저희 카페를 방문하시고 인스타그램에 솔직한 후기를 남겨주세요."
+        missionType:
+          type: string
+          enum:
+            - VISIT_REVIEW
+            - SNS_POST
+            - VIDEO_REVIEW
+            - PHOTO_REVIEW
+            - BLOG_POST
+          example: "VISIT_REVIEW"
+        status:
+          type: string
+          enum:
+            - DRAFT
+            - PENDING_APPROVAL
+            - ACTIVE
+            - PAUSED
+            - COMPLETED
+            - REJECTED
+            - CANCELLED
+          example: "ACTIVE"
+          description: |
+            - DRAFT: 임시저장 (고객사 작성 중)
+            - PENDING_APPROVAL: 운영자 승인 대기
+            - ACTIVE: 진행 중 (참여 가능)
+            - PAUSED: 일시 중지
+            - COMPLETED: 완료
+            - REJECTED: 운영자 반려
+            - CANCELLED: 고객사 취소
+        reward:
+          type: object
+          properties:
+            type:
+              type: string
+              example: "POINT"
+            value:
+              type: integer
+              example: 5000
+            description:
+              type: string
+              example: "5,000 포인트"
+        maxParticipants:
+          type: integer
+          example: 10
+        currentParticipants:
+          type: integer
+          example: 3
+        startDate:
+          type: string
+          format: date-time
+          example: "2025-03-01T00:00:00Z"
+        endDate:
+          type: string
+          format: date-time
+          example: "2025-03-31T23:59:59Z"
+        city:
+          type: string
+          example: "서울특별시"
+        district:
+          type: string
+          example: "마포구"
+        address:
+          type: string
+          example: "서울특별시 마포구 홍대입구역 3번 출구 앞"
+        latitude:
+          type: number
+          example: 37.5563
+        longitude:
+          type: number
+          example: 126.9235
+        requirements:
+          type: object
+          properties:
+            minFollowers:
+              type: integer
+              example: 500
+            requiredPlatforms:
+              type: array
+              items:
+                type: string
+              example:
+                - "INSTAGRAM"
+            requiredKeywords:
+              type: array
+              items:
+                type: string
+              example:
+                - "#홍대카페"
+                - "#모카"
+            requiredPhotoCount:
+              type: integer
+              example: 3
+            additionalGuide:
+              type: string
+        attachments:
+          type: array
+          items:
+            type: string
+            format: uri
+        rejectionReason:
+          type: string
+          nullable: true
+          example: null
+          description: 운영자 반려 시 반려 사유
+        viewCount:
+          type: integer
+          example: 142
+        applicationCount:
+          type: integer
+          example: 5
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # ─────────────────────────────────────────────────
+    # 미션 신청(Application) 스키마
+    # ─────────────────────────────────────────────────
+    ApplicationCreateRequest:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          minLength: 10
+          maxLength: 500
+          example: "안녕하세요! 저는 마포구에서 3년간 활동한 라이프스타일 블로거입니다. 진성 후기로 도움드리고 싶습니다."
+        proposedSchedule:
+          type: string
+          format: date-time
+          example: "2025-03-15T14:00:00Z"
+          description: 방문 예정 일시 (VISIT_REVIEW 타입 미션의 경우 권장)
+
+    ApplicationResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "990e8400-e29b-41d4-a716-446655440004"
+        missionId:
+          type: string
+          format: uuid
+          example: "880e8400-e29b-41d4-a716-446655440003"
+        participantId:
+          type: string
+          format: uuid
+          example: "660e8400-e29b-41d4-a716-446655440001"
+        participantNickname:
+          type: string
+          example: "지원마케터"
+        status:
+          type: string
+          enum:
+            - PENDING
+            - APPROVED
+            - REJECTED
+            - CANCELLED
+            - COMPLETED
+          example: "PENDING"
+          description: |
+            - PENDING: 검토 대기 (운영자 확인 전)
+            - APPROVED: 승인됨 (미션 수행 가능)
+            - REJECTED: 거절됨
+            - CANCELLED: 참여자 취소
+            - COMPLETED: 미션 완료 (콘텐츠 승인 후)
+        message:
+          type: string
+          example: "안녕하세요! 저는 마포구에서 3년간 활동한 라이프스타일 블로거입니다."
+        proposedSchedule:
+          type: string
+          format: date-time
+          nullable: true
+        rejectionReason:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # ─────────────────────────────────────────────────
+    # 콘텐츠 인증(Submission) 스키마
+    # ─────────────────────────────────────────────────
+    SubmissionCreateRequest:
+      type: object
+      required:
+        - contentUrl
+        - platform
+      properties:
+        contentUrl:
+          type: string
+          format: uri
+          example: "https://instagram.com/p/ABC123xyz"
+          description: 작성한 SNS 게시물 URL
+        platform:
+          type: string
+          enum:
+            - INSTAGRAM
+            - YOUTUBE
+            - TIKTOK
+            - BLOG
+            - TWITTER
+          example: "INSTAGRAM"
+        caption:
+          type: string
+          maxLength: 2200
+          example: |
+            홍대에서 발견한 감성 카페 ✨
+            #홍대카페 #모카 #감성카페
+        attachedImageUrls:
+          type: array
+          description: 업로드한 인증 이미지 URL 목록
+          items:
+            type: string
+            format: uri
+          maxItems: 10
+          example:
+            - "https://cdn.hyperlocal.kr/submissions/img1.jpg"
+            - "https://cdn.hyperlocal.kr/submissions/img2.jpg"
+        note:
+          type: string
+          maxLength: 500
+          example: "해시태그는 모두 포함했고, 사진 3장 업로드했습니다."
+
+    SubmissionReviewRequest:
+      type: object
+      required:
+        - decision
+      properties:
+        decision:
+          type: string
+          enum:
+            - APPROVED
+            - REJECTED
+          example: "APPROVED"
+        feedback:
+          type: string
+          maxLength: 1000
+          example: "콘텐츠 품질이 우수합니다. 해시태그도 모두 포함되어 있습니다."
+          description: 승인 시 칭찬 메시지 또는 반려 시 반려 사유 (반려 시 필수)
+        qualityScore:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 4
+          description: 콘텐츠 품질 점수 (1-5점)
+
+    SubmissionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "aa0e8400-e29b-41d4-a716-446655440005"
+        applicationId:
+          type: string
+          format: uuid
+          example: "990e8400-e29b-41d4-a716-446655440004"
+        missionId:
+          type: string
+          format: uuid
+          example: "880e8400-e29b-41d4-a716-446655440003"
+        participantId:
+          type: string
+          format: uuid
+          example: "660e8400-e29b-41d4-a716-446655440001"
+        contentUrl:
+          type: string
+          format: uri
+          example: "https://instagram.com/p/ABC123xyz"
+        platform:
+          type: string
+          example: "INSTAGRAM"
+        caption:
+          type: string
+        attachedImageUrls:
+          type: array
+          items:
+            type: string
+            format: uri
+        status:
+          type: string
+          enum:
+            - SUBMITTED
+            - UNDER_REVIEW
+            - APPROVED
+            - REJECTED
+            - REVISION_REQUESTED
+          example: "SUBMITTED"
+          description: |
+            - SUBMITTED: 제출 완료, 검수 대기
+            - UNDER_REVIEW: 운영자 검수 중
+            - APPROVED: 검수 승인 (포인트 지급됨)
+            - REJECTED: 검수 반려 (재제출 가능)
+            - REVISION_REQUESTED: 수정 요청
+        feedback:
+          type: string
+          nullable: true
+          example: null
+        qualityScore:
+          type: integer
+          nullable: true
+          example: null
+        reviewedAt:
+          type: string
+          format: date-time
+          nullable: true
+        reviewedBy:
+          type: string
+          format: uuid
+          nullable: true
+          description: 검수한 운영자 ID
+        submittedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # ─────────────────────────────────────────────────
+    # 포인트/정산 스키마
+    # ─────────────────────────────────────────────────
+    PointTransactionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "bb0e8400-e29b-41d4-a716-446655440006"
+        participantId:
+          type: string
+          format: uuid
+          example: "660e8400-e29b-41d4-a716-446655440001"
+        type:
+          type: string
+          enum:
+            - EARN
+            - WITHDRAW
+            - REFUND
+            - DEDUCT
+          example: "EARN"
+        amount:
+          type: integer
+          example: 5000
+        balanceAfter:
+          type: integer
+          example: 17000
+          description: 거래 후 잔액
+        description:
+          type: string
+          example: "[미션 완료] 홍대 모카카페 방문 인스타그램 리뷰 미션"
+        referenceId:
+          type: string
+          format: uuid
+          nullable: true
+          example: "990e8400-e29b-41d
