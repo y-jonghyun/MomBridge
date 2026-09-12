@@ -6,6 +6,7 @@ import operatorRoutes from '../modules/operator/operator.routes';
 import participantRoutes from '../modules/participant/participant.routes';
 import clientRoutes from '../modules/client/client.routes';
 import communityRoutes from '../modules/community/community.routes';
+import notificationRoutes from '../modules/notifications/notifications.routes';
 
 const router = Router();
 
@@ -16,5 +17,6 @@ router.use('/operator', operatorRoutes);
 router.use('/participant', participantRoutes);
 router.use('/client', clientRoutes);
 router.use('/community', communityRoutes);
+router.use('/notifications', notificationRoutes);
 
 export default router;

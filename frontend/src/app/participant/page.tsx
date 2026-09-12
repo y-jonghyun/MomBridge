@@ -1,5 +1,5 @@
 ﻿'use client';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
@@ -39,6 +39,20 @@ export default function ParticipantPage() {
   const [submitForm, setSubmitForm] = useState({ description: '', snsPostUrl: '' });
   const [submittingContent, setSubmittingContent] = useState(false);
   const [submittedMissionIds, setSubmittedMissionIds] = useState<Set<string>>(new Set());
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setShowNotifDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => { setHydrated(true); }, []);
 
@@ -47,7 +61,24 @@ export default function ParticipantPage() {
     if (!user) { router.push('/login'); return; }
     if (user.role !== 'PARTICIPANT' && user.role !== 'OPERATOR') { router.push('/'); return; }
     loadMissions(missionFilter);
+    loadNotifications();
   }, [user, hydrated]);
+
+  async function loadNotifications() {
+    try {
+      const r = await api.get('/notifications');
+      setNotifications(r.data.data.notifications);
+      setUnreadCount(r.data.data.unreadCount);
+    } catch { }
+  }
+
+  async function markAllRead() {
+    try {
+      await api.patch('/notifications/read-all');
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+      setUnreadCount(0);
+    } catch { }
+  }
 
   async function loadMissions(f: typeof missionFilter) {
     setLoading(true);
@@ -193,6 +224,43 @@ export default function ParticipantPage() {
         </div>
         <div className="flex items-center gap-2 sm:gap-4 shrink-0">
           <span className="text-xs sm:text-sm text-gray-500 hidden sm:block">{user.name}님</span>
+          {/* 알림 벨 */}
+          <div className="relative" ref={notifRef}>
+            <button
+              onClick={() => { setShowNotifDropdown(v => !v); if (!showNotifDropdown) loadNotifications(); }}
+              className="relative p-1.5 text-gray-400 hover:text-slate-700 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+              {unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-0.5">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+            {/* 알림 드롭다운 */}
+            {showNotifDropdown && (
+              <div className="absolute right-0 top-9 w-80 bg-white rounded-2xl shadow-xl border border-stone-200 z-50 overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 border-b">
+                  <span className="font-semibold text-sm text-gray-900">알림</span>
+                  {unreadCount > 0 && (
+                    <button onClick={markAllRead} className="text-xs text-slate-500 hover:text-slate-700">전체 읽음</button>
+                  )}
+                </div>
+                <div className="max-h-80 overflow-y-auto divide-y">
+                  {notifications.length === 0 ? (
+                    <div className="py-10 text-center text-sm text-gray-400">알림이 없습니다</div>
+                  ) : notifications.map(n => (
+                    <div key={n.id} className={`px-4 py-3 ${n.isRead ? 'bg-white' : 'bg-slate-50'}`}>
+                      <p className={`text-sm font-medium ${n.isRead ? 'text-gray-600' : 'text-gray-900'}`}>{n.title}</p>
+                      <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{n.body}</p>
+                      <p className="text-[11px] text-gray-300 mt-1">{new Date(n.createdAt).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
           <button onClick={() => { clearAuth(); router.push('/login'); }} className="text-xs sm:text-sm text-gray-400 hover:text-red-500 whitespace-nowrap">로그아웃</button>
         </div>
       </header>

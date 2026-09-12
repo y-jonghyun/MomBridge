@@ -79,18 +79,50 @@ router.patch('/:id/review', authenticate, requireRole('OPERATOR'), async (req: R
       },
     });
 
-    // 승인 시 정산 레코드 생성
-    if (req.body.status === 'APPROVED') {
-      const mission = await prisma.mission.findUnique({ where: { id: submission.missionId } });
-      if (mission) {
-        const fee = Number(mission.rewardAmount) * 0.1;
-        await prisma.payout.create({
+    // 승인 시 정산 레코드 생성 + 알림
+    const mission = await prisma.mission.findUnique({ where: { id: submission.missionId } });
+    if (req.body.status === 'APPROVED' && mission) {
+      const fee = Number(mission.rewardAmount) * 0.1;
+      await prisma.payout.create({
+        data: {
+          submissionId: submission.id,
+          participantId: submission.participantId,
+          amount: mission.rewardAmount,
+          platformFee: fee,
+          netAmount: Number(mission.rewardAmount) - fee,
+        },
+      });
+    }
+    // 참여자 userId 조회 후 알림 전송
+    const participantUser = await prisma.participantProfile.findUnique({
+      where: { id: submission.participantId },
+      select: { userId: true },
+    });
+    if (participantUser && mission) {
+      const statusMap: Record<string, { title: string; body: string }> = {
+        APPROVED: {
+          title: '콘텐츠가 승인됐습니다! 💰',
+          body: `[${mission.title}] 제출한 콘텐츠가 승인됐습니다. 정산이 곧 처리됩니다.`,
+        },
+        REJECTED: {
+          title: '콘텐츠 반려 안내',
+          body: `[${mission.title}] 제출한 콘텐츠가 반려됐습니다. 사유: ${req.body.rejectionReason ?? '없음'}`,
+        },
+        REVISION: {
+          title: '콘텐츠 수정 요청',
+          body: `[${mission.title}] 수정 요청이 있습니다. 메모: ${req.body.reviewNote ?? '없음'}`,
+        },
+      };
+      const notifData = statusMap[req.body.status];
+      if (notifData) {
+        await prisma.notification.create({
           data: {
-            submissionId: submission.id,
-            participantId: submission.participantId,
-            amount: mission.rewardAmount,
-            platformFee: fee,
-            netAmount: Number(mission.rewardAmount) - fee,
+            userId: participantUser.userId,
+            type: 'SUBMISSION_FEEDBACK',
+            title: notifData.title,
+            body: notifData.body,
+            resourceId: submission.id,
+            resourceType: 'submission',
           },
         });
       }
