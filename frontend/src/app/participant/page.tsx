@@ -35,6 +35,10 @@ export default function ParticipantPage() {
   const [showWriteModal, setShowWriteModal] = useState(false);
   const [writeForm, setWriteForm] = useState({ category: '체험후기', title: '', content: '' });
   const [submittingPost, setSubmittingPost] = useState(false);
+  const [submitModal, setSubmitModal] = useState<any>(null);
+  const [submitForm, setSubmitForm] = useState({ description: '', snsPostUrl: '' });
+  const [submittingContent, setSubmittingContent] = useState(false);
+  const [submittedMissionIds, setSubmittedMissionIds] = useState<Set<string>>(new Set());
 
   useEffect(() => { setHydrated(true); }, []);
 
@@ -65,8 +69,12 @@ export default function ParticipantPage() {
     setLoading(true);
     try {
       if (t === 'my-applications') {
-        const r = await api.get('/participant/applications');
-        setApplications(r.data.data);
+        const [appR, subR] = await Promise.all([
+          api.get('/participant/applications'),
+          api.get('/submissions/my'),
+        ]);
+        setApplications(appR.data.data);
+        setSubmittedMissionIds(new Set(subR.data.data.map((s: any) => s.missionId)));
       }
       if (t === 'my-submissions') {
         const r = await api.get('/submissions/my');
@@ -105,6 +113,21 @@ export default function ParticipantPage() {
     } catch (err: any) {
       alert(err?.response?.data?.error?.message ?? '작성 실패');
     } finally { setSubmittingPost(false); }
+  }
+
+  async function handleSubmitContent(e: React.FormEvent) {
+    e.preventDefault();
+    if (!submitModal) return;
+    setSubmittingContent(true);
+    try {
+      await api.post('/submissions', { missionId: submitModal.missionId, ...submitForm });
+      setSubmittedMissionIds(prev => new Set([...prev, submitModal.missionId]));
+      setSubmitModal(null);
+      setSubmitForm({ description: '', snsPostUrl: '' });
+      alert('제출 완료! 운영자 검수 후 정산됩니다.');
+    } catch (err: any) {
+      alert(err?.response?.data?.error?.message ?? '제출에 실패했습니다');
+    } finally { setSubmittingContent(false); }
   }
 
   async function applyMission(missionId: string, message: string) {
@@ -337,18 +360,35 @@ export default function ParticipantPage() {
         {tab === 'my-applications' && !loading && (
           <div className="space-y-3">
             {applications.map(a => (
-              <div key={a.id} className="bg-white rounded-2xl p-5 shadow-sm flex items-center justify-between">
-                <div>
-                  <p className="font-semibold text-gray-900">{a.mission?.title}</p>
-                  <p className="text-sm text-gray-500 mt-1">지원일: {new Date(a.createdAt).toLocaleDateString('ko-KR')}</p>
-                  {a.rejectionReason && <p className="text-sm text-red-500 mt-1">반려 사유: {a.rejectionReason}</p>}
+              <div key={a.id} className="bg-white rounded-2xl p-5 shadow-sm">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 min-w-0 mr-3">
+                    <p className="font-semibold text-gray-900">{a.mission?.title}</p>
+                    <p className="text-sm text-gray-500 mt-1">지원일: {new Date(a.createdAt).toLocaleDateString('ko-KR')}</p>
+                    {a.rejectionReason && <p className="text-sm text-red-500 mt-1">반려 사유: {a.rejectionReason}</p>}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className={`px-3 py-1.5 rounded-full text-sm font-medium ${STATUS_COLOR[a.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                      {STATUS_LABEL[a.status] ?? a.status}
+                    </span>
+                    <p className="text-sm font-bold text-purple-600 mt-1">{Number(a.mission?.rewardAmount).toLocaleString()}원</p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className={`px-3 py-1.5 rounded-full text-sm font-medium ${STATUS_COLOR[a.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                    {STATUS_LABEL[a.status] ?? a.status}
-                  </span>
-                  <p className="text-sm font-bold text-purple-600 mt-1">{Number(a.mission?.rewardAmount).toLocaleString()}원</p>
-                </div>
+                {a.status === 'APPROVED' && (
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    {submittedMissionIds.has(a.missionId) ? (
+                      <div className="flex items-center gap-2 text-sm text-green-600 font-medium">
+                        <span>✓ 콘텐츠 제출 완료</span>
+                        <span className="text-xs text-gray-400">— 운영자 검수 중</span>
+                      </div>
+                    ) : (
+                      <button onClick={() => setSubmitModal(a)}
+                        className="w-full py-2.5 bg-purple-600 text-white text-sm font-bold rounded-xl hover:bg-purple-700">
+                        📤 콘텐츠 제출하기
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
             {applications.length === 0 && <div className="text-center py-20 text-gray-400 bg-white rounded-2xl">지원한 미션이 없습니다</div>}
@@ -472,6 +512,47 @@ export default function ParticipantPage() {
           </div>
         )}
       </div>
+
+      {/* 콘텐츠 제출 모달 */}
+      {submitModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <div>
+                <h2 className="text-base font-bold text-gray-900">콘텐츠 제출</h2>
+                <p className="text-xs text-gray-400 mt-0.5">{submitModal.mission?.title}</p>
+              </div>
+              <button onClick={() => setSubmitModal(null)} className="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
+            </div>
+            <form onSubmit={handleSubmitContent} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">활동 내용 *</label>
+                <textarea required rows={4}
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none resize-none"
+                  value={submitForm.description}
+                  onChange={e => setSubmitForm(f => ({ ...f, description: e.target.value }))}
+                  placeholder="미션 수행 내용을 작성해주세요" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">SNS 게시물 URL (선택)</label>
+                <input
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                  value={submitForm.snsPostUrl}
+                  onChange={e => setSubmitForm(f => ({ ...f, snsPostUrl: e.target.value }))}
+                  placeholder="https://www.instagram.com/p/..." />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setSubmitModal(null)}
+                  className="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">취소</button>
+                <button type="submit" disabled={submittingContent}
+                  className="px-6 py-2 bg-purple-600 text-white rounded-lg text-sm font-bold hover:bg-purple-700 disabled:opacity-50">
+                  {submittingContent ? '제출 중...' : '제출하기'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* 글쓰기 모달 */}
       {showWriteModal && (
