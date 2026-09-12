@@ -12,7 +12,7 @@ export default function Home() {
       </nav>
 
       <section className="max-w-4xl mx-auto px-5 py-16 sm:py-24 text-center">
-        <span className="inline-block text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-full mb-5 tracking-wide">하이퍼로컬 미션 매칭 플랫폼</span>
+        <span className="inline-block text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-100 px-3 py-1 rounded-full mb-5 tracking-wide">하이퍼로컬 미션 매칭 플랫폼</span>
         <h2 className="text-2xl sm:text-5xl font-bold text-slate-900 mb-5 leading-snug tracking-tight">
           지역 소상공인과 주민을<br />연결하는 <span className="text-slate-800">맘브릿지</span>
         </h2>
@@ -33,7 +33,7 @@ export default function Home() {
         <div className="max-w-4xl mx-auto px-5 grid grid-cols-1 sm:grid-cols-3 gap-5">
           {[
             { icon: '🏪', title: '소상공인 (고객사)', desc: '홍보 미션 등록 → 진성 콘텐츠 확보', color: 'bg-amber-50 border-amber-100' },
-            { icon: '👤', title: '지역 주민 (참여자)', desc: '미션 수행 → 인증 제출 → 보상 수령', color: 'bg-indigo-50 border-indigo-100' },
+            { icon: '👤', title: '지역 주민 (참여자)', desc: '미션 수행 → 인증 제출 → 보상 수령', color: 'bg-slate-50 border-slate-100' },
             { icon: '⚙️', title: '운영자', desc: '미션 관리 · 검수 · 정산 처리', color: 'bg-stone-50 border-stone-200' },
           ].map((item) => (
             <div key={item.title} className={`rounded-2xl p-6 border flex sm:flex-col items-center sm:text-center gap-4 sm:gap-0 ${item.color}`}>
@@ -58,7 +58,7 @@ export default function Home() {
             { step: '05', label: '검수·정산', icon: '✅' },
           ].map((s, i) => (
             <div key={s.step} className="bg-white rounded-xl p-4 text-center border border-stone-200 shadow-sm relative">
-              <span className="text-xs font-bold text-indigo-400 block mb-1">{s.step}</span>
+              <span className="text-xs font-bold text-slate-400 block mb-1">{s.step}</span>
               <span className="text-2xl block mb-1">{s.icon}</span>
               <span className="text-xs font-semibold text-slate-700">{s.label}</span>
               {i < 4 && <span className="hidden sm:block absolute -right-2 top-1/2 -translate-y-1/2 text-stone-300 text-lg font-bold z-10">›</span>}

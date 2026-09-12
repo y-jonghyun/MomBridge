@@ -22,7 +22,7 @@ export default function MissionsPage() {
     api.get('/missions').then(({ data }) => setMissions(data.data.missions)).finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-4 border-slate-500 border-t-transparent rounded-full animate-spin" /></div>;
 
   return (
     <div className="min-h-screen bg-stone-50">
@@ -30,7 +30,7 @@ export default function MissionsPage() {
         <Link href="/" className="text-xl font-bold text-slate-800">맘브릿지</Link>
         <div className="flex gap-3">
           <Link href="/login" className="text-sm text-gray-600 hover:text-gray-900">로그인</Link>
-          <Link href="/register" className="text-sm bg-indigo-700 text-white px-4 py-2 rounded-lg">가입</Link>
+          <Link href="/register" className="text-sm bg-slate-700 text-white px-4 py-2 rounded-lg">가입</Link>
         </div>
       </nav>
 
@@ -46,10 +46,10 @@ export default function MissionsPage() {
             {missions.map((m) => (
               <Link key={m.id} href={`/missions/${m.id}`} className="bg-white rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
                 <div className="flex items-start justify-between mb-3">
-                  <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full">
+                  <span className="text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded-full">
                     {CATEGORY_LABELS[m.category] ?? m.category}
                   </span>
-                  <span className="text-sm font-bold text-indigo-600">
+                  <span className="text-sm font-bold text-slate-600">
                     {Number(m.rewardAmount).toLocaleString()}원
                   </span>
                 </div>

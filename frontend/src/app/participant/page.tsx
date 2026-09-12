@@ -15,7 +15,7 @@ const STATUS_LABEL: Record<string, string> = {
 const STATUS_COLOR: Record<string, string> = {
   PENDING: 'bg-yellow-100 text-yellow-700', APPROVED: 'bg-green-100 text-green-700',
   REJECTED: 'bg-red-100 text-red-600', SUBMITTED: 'bg-blue-100 text-blue-700',
-  COMPLETED: 'bg-indigo-100 text-indigo-700',
+  COMPLETED: 'bg-slate-100 text-slate-700',
 };
 
 export default function ParticipantPage() {
@@ -185,10 +185,10 @@ export default function ParticipantPage() {
     <div className="min-h-screen bg-stone-50">
       <header className="bg-white border-b px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <h1 className="text-base sm:text-xl font-bold text-indigo-700 whitespace-nowrap shrink-0">맘브릿지</h1>
+          <h1 className="text-base sm:text-xl font-bold text-slate-700 whitespace-nowrap shrink-0">맘브릿지</h1>
           <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium whitespace-nowrap shrink-0">참여자</span>
           {user.role === 'OPERATOR' && (
-            <Link href="/operator" className="text-xs text-gray-400 hover:text-indigo-600 border border-gray-200 px-2 py-1 rounded-full whitespace-nowrap shrink-0">← 운영자</Link>
+            <Link href="/operator" className="text-xs text-gray-400 hover:text-slate-600 border border-gray-200 px-2 py-1 rounded-full whitespace-nowrap shrink-0">← 운영자</Link>
           )}
         </div>
         <div className="flex items-center gap-2 sm:gap-4 shrink-0">
@@ -202,7 +202,7 @@ export default function ParticipantPage() {
         <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-6">
           <div className="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-5 shadow-sm text-center">
             <p className="text-xs sm:text-sm text-gray-500 mb-1">누적 수익</p>
-            <p className="text-base sm:text-2xl font-bold text-indigo-600">{totalEarned.toLocaleString()}원</p>
+            <p className="text-base sm:text-2xl font-bold text-slate-600">{totalEarned.toLocaleString()}원</p>
           </div>
           <div className="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-5 shadow-sm text-center">
             <p className="text-xs sm:text-sm text-gray-500 mb-1">정산 대기</p>
@@ -219,7 +219,7 @@ export default function ParticipantPage() {
           <div className="flex gap-1 bg-white rounded-xl p-1 shadow-sm mx-3 sm:mx-0 min-w-max sm:min-w-0">
             {tabs.map(t => (
               <button key={t.key} onClick={() => { setTab(t.key); if (t.key === 'missions') loadMissions(missionFilter); else loadTab(t.key); }}
-                className={`flex-shrink-0 sm:flex-1 px-3 sm:px-2 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${tab === t.key ? 'bg-indigo-700 text-white' : 'text-gray-600 hover:bg-stone-50'}`}>
+                className={`flex-shrink-0 sm:flex-1 px-3 sm:px-2 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${tab === t.key ? 'bg-slate-700 text-white' : 'text-gray-600 hover:bg-stone-50'}`}>
                 {t.label}
               </button>
             ))}
@@ -254,8 +254,8 @@ export default function ParticipantPage() {
             <form onSubmit={e => { e.preventDefault(); const nf = { ...missionFilter, keyword: searchInput }; setMissionFilter(nf); loadMissions(nf); }} className="flex">
               <input value={searchInput} onChange={e => setSearchInput(e.target.value)}
                 placeholder="미션 검색..."
-                className="flex-1 border rounded-l-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-              <button type="submit" className="px-3 py-2 bg-indigo-700 text-white rounded-r-lg text-sm">🔍</button>
+                className="flex-1 border rounded-l-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500" />
+              <button type="submit" className="px-3 py-2 bg-slate-700 text-white rounded-r-lg text-sm">🔍</button>
             </form>
             <div className="grid grid-cols-3 gap-2">
               <select value={missionFilter.category}
@@ -316,9 +316,9 @@ export default function ParticipantPage() {
               const pct = Math.min(100, Math.round(((m.currentCount ?? 0) / m.maxParticipants) * 100));
               return (
                 <Link key={m.id} href={`/missions/${m.id}`}
-                  className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all border border-gray-100 hover:border-indigo-200">
+                  className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all border border-gray-100 hover:border-slate-200">
                   {/* 카드 상단 컬러 배너 */}
-                  <div className="h-2 bg-gradient-to-r from-indigo-300 to-slate-300" />
+                  <div className="h-2 bg-gradient-to-r from-stone-300 to-slate-400" />
                   <div className="p-5">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-1.5">
@@ -327,7 +327,7 @@ export default function ParticipantPage() {
                         </span>
                         {dday >= 0 && dday <= 3 && <span className="text-xs bg-red-50 text-red-500 px-2 py-0.5 rounded-full font-bold">D-{dday || 'Day'}</span>}
                       </div>
-                      <span className="text-lg font-extrabold text-indigo-600">{Number(m.rewardAmount).toLocaleString()}원</span>
+                      <span className="text-lg font-extrabold text-slate-600">{Number(m.rewardAmount).toLocaleString()}원</span>
                     </div>
                     <h3 className="font-bold text-gray-900 mb-1 text-base leading-snug line-clamp-2">{m.title}</h3>
                     <p className="text-xs text-gray-400 mb-3">{m.clientProfile?.businessName}</p>
@@ -345,7 +345,7 @@ export default function ParticipantPage() {
                         <span className="font-semibold text-gray-600">{m.currentCount ?? 0}/{m.maxParticipants}명</span>
                       </div>
                       <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                        <div className={`h-full rounded-full ${pct >= 90 ? 'bg-red-400' : 'bg-indigo-400'}`} style={{ width: `${pct}%` }} />
+                        <div className={`h-full rounded-full ${pct >= 90 ? 'bg-red-400' : 'bg-slate-400'}`} style={{ width: `${pct}%` }} />
                       </div>
                     </div>
                   </div>
@@ -371,7 +371,7 @@ export default function ParticipantPage() {
                     <span className={`px-3 py-1.5 rounded-full text-sm font-medium ${STATUS_COLOR[a.status] ?? 'bg-gray-100 text-gray-600'}`}>
                       {STATUS_LABEL[a.status] ?? a.status}
                     </span>
-                    <p className="text-sm font-bold text-indigo-600 mt-1">{Number(a.mission?.rewardAmount).toLocaleString()}원</p>
+                    <p className="text-sm font-bold text-slate-600 mt-1">{Number(a.mission?.rewardAmount).toLocaleString()}원</p>
                   </div>
                 </div>
                 {a.status === 'APPROVED' && (
@@ -383,7 +383,7 @@ export default function ParticipantPage() {
                       </div>
                     ) : (
                       <button onClick={() => setSubmitModal(a)}
-                        className="w-full py-2.5 bg-indigo-700 text-white text-sm font-bold rounded-xl hover:bg-indigo-800">
+                        className="w-full py-2.5 bg-slate-700 text-white text-sm font-bold rounded-xl hover:bg-slate-800">
                         📤 콘텐츠 제출하기
                       </button>
                     )}
@@ -448,7 +448,7 @@ export default function ParticipantPage() {
                 {COMM_CATS.map(c => (
                   <button key={c.key}
                     onClick={() => { setCommunityCategory(c.key); loadCommunity(c.key, communitySort); }}
-                    className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${communityCategory === c.key ? 'bg-indigo-700 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                    className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${communityCategory === c.key ? 'bg-slate-700 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
                     {c.label}
                   </button>
                 ))}
@@ -463,20 +463,20 @@ export default function ParticipantPage() {
                   <option value="VIEWS">조회순</option>
                 </select>
                 <button onClick={() => setShowWriteModal(true)}
-                  className="px-4 py-1.5 bg-indigo-700 text-white rounded-lg text-xs font-bold hover:bg-indigo-800">
+                  className="px-4 py-1.5 bg-slate-700 text-white rounded-lg text-xs font-bold hover:bg-slate-800">
                   ✏️ 글쓰기
                 </button>
               </div>
             </div>
 
             {/* 게시글 목록 */}
-            {loading && <div className="flex justify-center py-16"><div className="w-6 h-6 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>}
+            {loading && <div className="flex justify-center py-16"><div className="w-6 h-6 border-4 border-slate-500 border-t-transparent rounded-full animate-spin" /></div>}
             {!loading && (
               <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
                 {/* 모바일: 카드형 */}
                 <div className="sm:hidden divide-y">
                   {communityPosts.map(p => (
-                    <Link key={p.id} href={`/community/${p.id}`} className="flex items-start gap-3 px-4 py-3 hover:bg-indigo-50 transition-colors">
+                    <Link key={p.id} href={`/community/${p.id}`} className="flex items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
                       <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full shrink-0 mt-0.5 min-w-[56px] text-center">{p.category}</span>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-gray-900 line-clamp-2">{p.title}</p>
@@ -493,11 +493,11 @@ export default function ParticipantPage() {
                   </div>
                   {communityPosts.map(p => (
                     <Link key={p.id} href={`/community/${p.id}`}
-                      className="grid grid-cols-[90px_1fr_72px_64px_48px_48px] gap-2 px-4 py-3 border-b last:border-0 hover:bg-indigo-50 transition-colors items-center group">
+                      className="grid grid-cols-[90px_1fr_72px_64px_48px_48px] gap-2 px-4 py-3 border-b last:border-0 hover:bg-slate-50 transition-colors items-center group">
                       <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full truncate">{p.category}</span>
                       <div className="min-w-0">
-                        <span className="text-sm font-medium text-gray-900 group-hover:text-indigo-700 line-clamp-1">{p.title}</span>
-                        {p._count?.comments > 0 && <span className="text-xs text-indigo-400 ml-1">[{p._count.comments}]</span>}
+                        <span className="text-sm font-medium text-gray-900 group-hover:text-slate-700 line-clamp-1">{p.title}</span>
+                        {p._count?.comments > 0 && <span className="text-xs text-slate-400 ml-1">[{p._count.comments}]</span>}
                       </div>
                       <span className="text-xs text-gray-500 truncate">{p.user?.name}</span>
                       <span className="text-xs text-gray-400">{commTimeAgo(p.createdAt)}</span>
@@ -528,7 +528,7 @@ export default function ParticipantPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">활동 내용 *</label>
                 <textarea required rows={4}
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none resize-none"
                   value={submitForm.description}
                   onChange={e => setSubmitForm(f => ({ ...f, description: e.target.value }))}
                   placeholder="미션 수행 내용을 작성해주세요" />
@@ -536,7 +536,7 @@ export default function ParticipantPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">SNS 게시물 URL (선택)</label>
                 <input
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
                   value={submitForm.snsPostUrl}
                   onChange={e => setSubmitForm(f => ({ ...f, snsPostUrl: e.target.value }))}
                   placeholder="https://www.instagram.com/p/..." />
@@ -545,7 +545,7 @@ export default function ParticipantPage() {
                 <button type="button" onClick={() => setSubmitModal(null)}
                   className="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-stone-50">취소</button>
                 <button type="submit" disabled={submittingContent}
-                  className="px-6 py-2 bg-indigo-700 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 disabled:opacity-50">
+                  className="px-6 py-2 bg-slate-700 text-white rounded-lg text-sm font-bold hover:bg-slate-700 disabled:opacity-50">
                   {submittingContent ? '제출 중...' : '제출하기'}
                 </button>
               </div>
@@ -566,7 +566,7 @@ export default function ParticipantPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">카테고리</label>
-                  <select required className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  <select required className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
                     value={writeForm.category} onChange={e => setWriteForm(f => ({ ...f, category: e.target.value }))}>
                     {COMM_CATS.filter(c => c.key !== 'ALL').map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
                   </select>
@@ -578,17 +578,17 @@ export default function ParticipantPage() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">제목</label>
-                <input required className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                <input required className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
                   value={writeForm.title} onChange={e => setWriteForm(f => ({ ...f, title: e.target.value }))} placeholder="제목을 입력하세요" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">내용</label>
-                <textarea required rows={7} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none"
+                <textarea required rows={7} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none resize-none"
                   value={writeForm.content} onChange={e => setWriteForm(f => ({ ...f, content: e.target.value }))} placeholder="내용을 입력하세요" />
               </div>
               <div className="flex justify-end gap-2">
                 <button type="button" onClick={() => setShowWriteModal(false)} className="px-4 py-2 border rounded-lg text-sm text-gray-500 hover:bg-stone-50">취소</button>
-                <button type="submit" disabled={submittingPost} className="px-6 py-2 bg-indigo-700 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 disabled:opacity-50">
+                <button type="submit" disabled={submittingPost} className="px-6 py-2 bg-slate-700 text-white rounded-lg text-sm font-bold hover:bg-slate-700 disabled:opacity-50">
                   {submittingPost ? '등록 중...' : '등록'}
                 </button>
               </div>

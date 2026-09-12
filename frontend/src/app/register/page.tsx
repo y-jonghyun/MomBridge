@@ -56,7 +56,7 @@ function RegisterForm() {
                 <input
                   type={key === 'password' ? 'password' : key === 'email' ? 'email' : 'text'}
                   required
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
                   value={form[key as keyof typeof form] as string}
                   onChange={(e) => setForm({ ...form, [key]: e.target.value })}
                 />
@@ -65,12 +65,12 @@ function RegisterForm() {
           })}
           {error && <p className="text-red-500 text-sm">{error}</p>}
           <button type="submit" disabled={loading}
-            className="w-full bg-indigo-700 text-white rounded-lg py-2 font-semibold hover:bg-indigo-700 disabled:opacity-50">
+            className="w-full bg-slate-700 text-white rounded-lg py-2 font-semibold hover:bg-slate-700 disabled:opacity-50">
             {loading ? '처리 중...' : '가입하기'}
           </button>
         </form>
         <p className="text-center text-sm text-gray-500 mt-4">
-          이미 계정이 있으신가요? <Link href="/login" className="text-indigo-600 font-medium">로그인</Link>
+          이미 계정이 있으신가요? <Link href="/login" className="text-slate-600 font-medium">로그인</Link>
         </p>
       </div>
     </div>

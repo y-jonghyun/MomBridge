@@ -6,7 +6,7 @@ import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 
 const ROLE_BADGE: Record<string, string> = {
-  OPERATOR: 'bg-indigo-100 text-indigo-700',
+  OPERATOR: 'bg-slate-100 text-slate-700',
   PARTICIPANT: 'bg-blue-50 text-blue-600',
   CLIENT: 'bg-orange-50 text-orange-600',
 };
@@ -81,7 +81,7 @@ export default function CommunityPostPage() {
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-stone-50">
-      <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      <div className="w-8 h-8 border-4 border-slate-500 border-t-transparent rounded-full animate-spin" />
     </div>
   );
   if (!post) return (
@@ -116,7 +116,7 @@ export default function CommunityPostPage() {
             {/* 작성자 + 메타 정보 */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold text-sm">
+                <div className="w-9 h-9 bg-slate-100 rounded-full flex items-center justify-center text-slate-700 font-bold text-sm">
                   {post.user?.name?.[0]}
                 </div>
                 <div>
@@ -163,7 +163,7 @@ export default function CommunityPostPage() {
         {/* 댓글 목록 */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-5 py-3.5 border-b bg-stone-50">
-            <h3 className="text-sm font-bold text-gray-800">댓글 <span className="text-indigo-600">{post.comments?.length ?? 0}</span></h3>
+            <h3 className="text-sm font-bold text-gray-800">댓글 <span className="text-slate-600">{post.comments?.length ?? 0}</span></h3>
           </div>
 
           {(post.comments ?? []).length === 0 && (
@@ -195,22 +195,22 @@ export default function CommunityPostPage() {
           {/* 댓글 작성 */}
           {user ? (
             <form onSubmit={handleComment} className="p-4 border-t bg-stone-50 flex gap-3">
-              <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold text-xs shrink-0">
+              <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-slate-700 font-bold text-xs shrink-0">
                 {user.name[0]}
               </div>
               <div className="flex-1 flex gap-2">
                 <input value={comment} onChange={e => setComment(e.target.value)}
-                  className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
                   placeholder="댓글을 입력하세요" />
                 <button type="submit" disabled={submittingComment || !comment.trim()}
-                  className="px-4 py-2 bg-indigo-700 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 shrink-0">
+                  className="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-semibold hover:bg-slate-700 disabled:opacity-50 shrink-0">
                   {submittingComment ? '...' : '등록'}
                 </button>
               </div>
             </form>
           ) : (
             <div className="p-4 border-t text-center">
-              <Link href="/login" className="text-sm text-indigo-600 font-semibold hover:underline">로그인 후 댓글 작성</Link>
+              <Link href="/login" className="text-sm text-slate-600 font-semibold hover:underline">로그인 후 댓글 작성</Link>
             </div>
           )}
         </div>

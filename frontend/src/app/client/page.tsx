@@ -84,10 +84,10 @@ export default function ClientPage() {
     <div className="min-h-screen bg-stone-50">
       <header className="bg-white border-b px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <h1 className="text-base sm:text-xl font-bold text-indigo-700 whitespace-nowrap shrink-0">맘브릿지</h1>
+          <h1 className="text-base sm:text-xl font-bold text-slate-700 whitespace-nowrap shrink-0">맘브릿지</h1>
           <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium whitespace-nowrap shrink-0">고객사</span>
           {user.role === 'OPERATOR' && (
-            <Link href="/operator" className="text-xs text-gray-400 hover:text-indigo-600 border border-gray-200 px-2 py-1 rounded-full whitespace-nowrap shrink-0">← 운영자</Link>
+            <Link href="/operator" className="text-xs text-gray-400 hover:text-slate-600 border border-gray-200 px-2 py-1 rounded-full whitespace-nowrap shrink-0">← 운영자</Link>
           )}
         </div>
         <div className="flex items-center gap-2 sm:gap-4 shrink-0">
@@ -100,7 +100,7 @@ export default function ClientPage() {
         <div className="flex gap-1 bg-white rounded-xl p-1 shadow-sm mb-6">
           {([['my-missions', '내 미션 목록'], ['create', '미션 등록'], ['results', '결과 리포트']] as const).map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
-              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${tab === key ? 'bg-indigo-700 text-white' : 'text-gray-600 hover:bg-stone-50'}`}>
+              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${tab === key ? 'bg-slate-700 text-white' : 'text-gray-600 hover:bg-stone-50'}`}>
               {label}
             </button>
           ))}
@@ -109,7 +109,7 @@ export default function ClientPage() {
         {/* 내 미션 목록 */}
         {tab === 'my-missions' && (
           <div className="space-y-3">
-            {loading && <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>}
+            {loading && <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-slate-500 border-t-transparent rounded-full animate-spin" /></div>}
             {!loading && missions.map(m => (
               <div key={m.id} className="bg-white rounded-2xl p-5 shadow-sm">
                 <div className="flex items-start justify-between">
@@ -126,14 +126,14 @@ export default function ClientPage() {
                       <span>마감 {new Date(m.endDate).toLocaleDateString('ko-KR')}</span>
                     </div>
                   </div>
-                  <button onClick={() => loadMissionDetail(m)} className="ml-4 px-3 py-1.5 text-sm text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50">결과보기</button>
+                  <button onClick={() => loadMissionDetail(m)} className="ml-4 px-3 py-1.5 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">결과보기</button>
                 </div>
               </div>
             ))}
             {!loading && missions.length === 0 && (
               <div className="text-center py-20 bg-white rounded-2xl text-gray-400">
                 <p className="mb-4">등록한 미션이 없습니다</p>
-                <button onClick={() => setTab('create')} className="px-6 py-2 bg-indigo-700 text-white rounded-xl text-sm font-semibold">첫 미션 등록하기</button>
+                <button onClick={() => setTab('create')} className="px-6 py-2 bg-slate-700 text-white rounded-xl text-sm font-semibold">첫 미션 등록하기</button>
               </div>
             )}
           </div>
@@ -146,12 +146,12 @@ export default function ClientPage() {
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">미션 제목 *</label>
-                <input required className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                <input required className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
                   value={form.title} onChange={e => f('title', e.target.value)} placeholder="예: 우리 카페 방문 후 인스타 업로드" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">미션 설명 *</label>
-                <textarea required rows={4} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none"
+                <textarea required rows={4} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none resize-none"
                   value={form.description} onChange={e => f('description', e.target.value)} placeholder="미션 내용을 자세히 설명해주세요" />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -165,43 +165,43 @@ export default function ClientPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">1인 보상금액 (원) *</label>
-                  <input required type="number" min="1000" className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  <input required type="number" min="1000" className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
                     value={form.rewardAmount} onChange={e => f('rewardAmount', e.target.value)} placeholder="예: 30000" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">모집 인원 *</label>
-                  <input required type="number" min="1" className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  <input required type="number" min="1" className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
                     value={form.maxParticipants} onChange={e => f('maxParticipants', e.target.value)} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">지역 (시) *</label>
-                  <input required className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  <input required className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
                     value={form.regionSi} onChange={e => f('regionSi', e.target.value)} placeholder="예: 서울시" />
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">지역 (구) *</label>
-                <input required className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                <input required className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
                   value={form.regionGu} onChange={e => f('regionGu', e.target.value)} placeholder="예: 마포구" />
               </div>
               <div className="grid grid-cols-3 gap-4">
                 {([['startDate', '시작일 *'], ['endDate', '종료일 *'], ['submissionDeadline', '제출 마감일 *']] as const).map(([k, l]) => (
                   <div key={k}>
                     <label className="block text-sm font-medium text-gray-700 mb-1">{l}</label>
-                    <input required type="date" className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    <input required type="date" className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
                       value={form[k]} onChange={e => f(k, e.target.value)} />
                   </div>
                 ))}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">수행 조건 (선택)</label>
-                <textarea rows={2} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none"
+                <textarea rows={2} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none resize-none"
                   value={form.requirements} onChange={e => f('requirements', e.target.value)} placeholder="예: 인스타그램 팔로워 500명 이상, 게시물 24시간 이상 유지" />
               </div>
               <button type="submit" disabled={submitting}
-                className="w-full bg-indigo-700 text-white rounded-xl py-3 font-semibold hover:bg-indigo-700 disabled:opacity-50">
+                className="w-full bg-slate-700 text-white rounded-xl py-3 font-semibold hover:bg-slate-700 disabled:opacity-50">
                 {submitting ? '등록 중...' : '미션 등록하기'}
               </button>
             </form>
@@ -228,7 +228,7 @@ export default function ClientPage() {
                       {[
                         { label: '총 지원자', value: missionDetail.applications.length, color: 'text-blue-600' },
                         { label: '승인된 지원', value: missionDetail.applications.filter(a => a.status === 'APPROVED').length, color: 'text-green-600' },
-                        { label: '콘텐츠 제출', value: missionDetail.submissions.length, color: 'text-indigo-600' },
+                        { label: '콘텐츠 제출', value: missionDetail.submissions.length, color: 'text-slate-600' },
                       ].map(s => (
                         <div key={s.label} className="bg-white rounded-2xl p-4 shadow-sm text-center">
                           <p className="text-sm text-gray-500 mb-1">{s.label}</p>

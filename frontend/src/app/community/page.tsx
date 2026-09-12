@@ -15,7 +15,7 @@ const CATEGORIES = [
 ];
 
 const ROLE_BADGE: Record<string, string> = {
-  OPERATOR: 'bg-indigo-100 text-indigo-700',
+  OPERATOR: 'bg-slate-100 text-slate-700',
   PARTICIPANT: 'bg-blue-50 text-blue-600',
   CLIENT: 'bg-orange-50 text-orange-600',
 };
@@ -121,12 +121,12 @@ export default function CommunityPage() {
           <div className="flex items-center gap-3">
             {user && (
               <button onClick={() => setShowWrite(true)}
-                className="px-4 py-1.5 bg-indigo-700 text-white rounded-lg text-sm font-semibold hover:bg-indigo-800">
+                className="px-4 py-1.5 bg-slate-700 text-white rounded-lg text-sm font-semibold hover:bg-slate-800">
                 ✏️ 글 작성
               </button>
             )}
             {!user && (
-              <Link href="/login" className="text-sm text-indigo-600 font-semibold">로그인</Link>
+              <Link href="/login" className="text-sm text-slate-600 font-semibold">로그인</Link>
             )}
           </div>
         </div>
@@ -135,7 +135,7 @@ export default function CommunityPage() {
         <div className="max-w-5xl mx-auto px-4 flex gap-1 pb-0 overflow-x-auto">
           {CATEGORIES.map(c => (
             <button key={c.key} onClick={() => { setCategory(c.key); loadPosts(1, c.key, sort, keyword); }}
-              className={`shrink-0 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${category === c.key ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+              className={`shrink-0 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${category === c.key ? 'border-slate-600 text-slate-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
               {c.label}
             </button>
           ))}
@@ -152,7 +152,7 @@ export default function CommunityPage() {
             <div className="flex bg-white border rounded-lg overflow-hidden shadow-sm">
               {(['LIST', 'BEST', 'MY'] as const).map(t => (
                 <button key={t} onClick={() => setTab(t)}
-                  className={`px-4 py-2 text-sm font-medium transition-colors ${tab === t ? 'bg-indigo-700 text-white' : 'text-gray-500 hover:bg-stone-50'}`}>
+                  className={`px-4 py-2 text-sm font-medium transition-colors ${tab === t ? 'bg-slate-700 text-white' : 'text-gray-500 hover:bg-stone-50'}`}>
                   {t === 'LIST' ? '전체' : t === 'BEST' ? '🔥 BEST' : '내 글'}
                 </button>
               ))}
@@ -162,9 +162,9 @@ export default function CommunityPage() {
               <input
                 value={searchInput} onChange={e => setSearchInput(e.target.value)}
                 placeholder="게시글 검색..."
-                className="flex-1 border rounded-l-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 min-w-0"
+                className="flex-1 border rounded-l-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 min-w-0"
               />
-              <button type="submit" className="px-3 py-2 bg-indigo-700 text-white rounded-r-lg text-sm hover:bg-indigo-800">🔍</button>
+              <button type="submit" className="px-3 py-2 bg-slate-700 text-white rounded-r-lg text-sm hover:bg-slate-800">🔍</button>
             </form>
 
             <select value={sort} onChange={e => { setSort(e.target.value as SortKey); loadPosts(1, category, e.target.value as SortKey, keyword); }}
@@ -180,7 +180,7 @@ export default function CommunityPage() {
             <div className="space-y-3">
               {bestPosts.map((p, i) => (
                 <Link key={p.id} href={`/community/${p.id}`}
-                  className="bg-white rounded-xl shadow-sm p-4 flex gap-4 items-start hover:shadow-md transition-all border border-gray-100 hover:border-indigo-200 block">
+                  className="bg-white rounded-xl shadow-sm p-4 flex gap-4 items-start hover:shadow-md transition-all border border-gray-100 hover:border-slate-200 block">
                   <div className={`text-2xl font-black w-8 text-center shrink-0 ${i === 0 ? 'text-yellow-500' : i === 1 ? 'text-gray-400' : i === 2 ? 'text-orange-400' : 'text-gray-300'}`}>
                     {i + 1}
                   </div>
@@ -207,7 +207,7 @@ export default function CommunityPage() {
           {tab === 'MY' && !user && (
             <div className="text-center py-20 bg-white rounded-xl text-gray-400">
               <p className="mb-3">로그인 후 내 글을 확인할 수 있습니다</p>
-              <Link href="/login" className="px-5 py-2 bg-indigo-700 text-white rounded-lg text-sm font-semibold">로그인</Link>
+              <Link href="/login" className="px-5 py-2 bg-slate-700 text-white rounded-lg text-sm font-semibold">로그인</Link>
             </div>
           )}
 
@@ -216,14 +216,14 @@ export default function CommunityPage() {
             <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
               {loading && (
                 <div className="flex justify-center py-16">
-                  <div className="w-6 h-6 border-indigo-500 border-t-transparent rounded-full animate-spin border-4" />
+                  <div className="w-6 h-6 border-slate-500 border-t-transparent rounded-full animate-spin border-4" />
                 </div>
               )}
               {/* 모바일: 카드형 */}
               {!loading && (
                 <div className="lg:hidden divide-y">
                   {(tab === 'LIST' ? posts : myPosts).map(p => (
-                    <Link key={p.id} href={`/community/${p.id}`} className="flex items-start gap-3 px-4 py-3 hover:bg-indigo-50">
+                    <Link key={p.id} href={`/community/${p.id}`} className="flex items-start gap-3 px-4 py-3 hover:bg-slate-50">
                       <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full shrink-0 mt-0.5 min-w-[56px] text-center">{p.category}</span>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-gray-900 line-clamp-2">{p.title}</p>
@@ -244,11 +244,11 @@ export default function CommunityPage() {
                   </div>
                   {(tab === 'LIST' ? posts : myPosts).map(p => (
                     <Link key={p.id} href={`/community/${p.id}`}
-                      className="grid grid-cols-[80px_1fr_80px_70px_60px_60px] gap-2 px-4 py-3 border-b last:border-0 hover:bg-indigo-50 transition-colors items-center group">
+                      className="grid grid-cols-[80px_1fr_80px_70px_60px_60px] gap-2 px-4 py-3 border-b last:border-0 hover:bg-slate-50 transition-colors items-center group">
                       <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full truncate">{p.category}</span>
                       <div className="min-w-0">
-                        <span className="text-sm font-medium text-gray-900 group-hover:text-indigo-700 line-clamp-1">{p.title}</span>
-                        {p._count?.comments > 0 && <span className="text-xs text-indigo-500 ml-1.5">[{p._count.comments}]</span>}
+                        <span className="text-sm font-medium text-gray-900 group-hover:text-slate-700 line-clamp-1">{p.title}</span>
+                        {p._count?.comments > 0 && <span className="text-xs text-slate-500 ml-1.5">[{p._count.comments}]</span>}
                       </div>
                       <span className="text-xs text-gray-500 truncate">{p.user?.name}</span>
                       <span className="text-xs text-gray-400">{timeAgo(p.createdAt)}</span>
@@ -269,7 +269,7 @@ export default function CommunityPage() {
             <div className="flex justify-center gap-1 mt-4">
               {Array.from({ length: Math.ceil(total / 15) }, (_, i) => i + 1).map(p => (
                 <button key={p} onClick={() => loadPosts(p, category, sort, keyword)}
-                  className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${page === p ? 'bg-indigo-700 text-white' : 'bg-white text-gray-600 hover:bg-stone-50 border'}`}>
+                  className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${page === p ? 'bg-slate-700 text-white' : 'bg-white text-gray-600 hover:bg-stone-50 border'}`}>
                   {p}
                 </button>
               ))}
@@ -283,7 +283,7 @@ export default function CommunityPage() {
           {user ? (
             <div className="bg-white rounded-xl shadow-sm p-4">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-9 h-9 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold text-sm">
+                <div className="w-9 h-9 bg-slate-100 rounded-full flex items-center justify-center text-slate-700 font-bold text-sm">
                   {user.name[0]}
                 </div>
                 <div>
@@ -292,14 +292,14 @@ export default function CommunityPage() {
                 </div>
               </div>
               <button onClick={() => setShowWrite(true)}
-                className="w-full py-2.5 bg-indigo-700 text-white rounded-lg text-sm font-bold hover:bg-indigo-800">
+                className="w-full py-2.5 bg-slate-700 text-white rounded-lg text-sm font-bold hover:bg-slate-800">
                 ✏️ 글 작성하기
               </button>
             </div>
           ) : (
             <div className="bg-white rounded-xl shadow-sm p-4 text-center">
               <p className="text-sm text-gray-500 mb-3">로그인하고 커뮤니티에 참여하세요!</p>
-              <Link href="/login" className="block w-full py-2.5 bg-indigo-700 text-white rounded-lg text-sm font-bold hover:bg-indigo-800">로그인</Link>
+              <Link href="/login" className="block w-full py-2.5 bg-slate-700 text-white rounded-lg text-sm font-bold hover:bg-slate-800">로그인</Link>
             </div>
           )}
 
@@ -312,7 +312,7 @@ export default function CommunityPage() {
               {bestPosts.slice(0, 5).map((p, i) => (
                 <Link key={p.id} href={`/community/${p.id}`} className="flex gap-2 items-start group">
                   <span className={`text-xs font-black w-4 shrink-0 ${i < 3 ? 'text-orange-500' : 'text-gray-300'}`}>{i + 1}</span>
-                  <p className="text-xs text-gray-700 group-hover:text-indigo-600 line-clamp-2 flex-1">{p.title}</p>
+                  <p className="text-xs text-gray-700 group-hover:text-slate-600 line-clamp-2 flex-1">{p.title}</p>
                 </Link>
               ))}
               {bestPosts.length === 0 && <p className="text-xs text-gray-300">아직 게시글이 없습니다</p>}
@@ -325,7 +325,7 @@ export default function CommunityPage() {
             <div className="space-y-1.5">
               {CATEGORIES.filter(c => c.key !== 'ALL').map(c => (
                 <button key={c.key} onClick={() => { setCategory(c.key); setTab('LIST'); loadPosts(1, c.key, sort, keyword); }}
-                  className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition-colors ${category === c.key ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-600 hover:bg-stone-50'}`}>
+                  className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition-colors ${category === c.key ? 'bg-slate-50 text-slate-700 font-semibold' : 'text-gray-600 hover:bg-stone-50'}`}>
                   {c.label}
                 </button>
               ))}
@@ -346,7 +346,7 @@ export default function CommunityPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">카테고리 *</label>
-                  <select required className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  <select required className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
                     value={writeForm.category} onChange={e => setWriteForm(f => ({ ...f, category: e.target.value }))}>
                     {CATEGORIES.filter(c => c.key !== 'ALL').map(c => (
                       <option key={c.key} value={c.key}>{c.label}</option>
@@ -360,13 +360,13 @@ export default function CommunityPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">제목 *</label>
-                <input required className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                <input required className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
                   value={writeForm.title} onChange={e => setWriteForm(f => ({ ...f, title: e.target.value }))}
                   placeholder="제목을 입력하세요" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">내용 *</label>
-                <textarea required rows={8} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none"
+                <textarea required rows={8} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none resize-none"
                   value={writeForm.content} onChange={e => setWriteForm(f => ({ ...f, content: e.target.value }))}
                   placeholder="내용을 입력하세요" />
               </div>
@@ -374,7 +374,7 @@ export default function CommunityPage() {
                 <button type="button" onClick={() => setShowWrite(false)}
                   className="px-5 py-2.5 border rounded-lg text-sm text-gray-600 hover:bg-stone-50">취소</button>
                 <button type="submit" disabled={submitting}
-                  className="px-6 py-2.5 bg-indigo-700 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 disabled:opacity-50">
+                  className="px-6 py-2.5 bg-slate-700 text-white rounded-lg text-sm font-bold hover:bg-slate-700 disabled:opacity-50">
                   {submitting ? '등록 중...' : '등록하기'}
                 </button>
               </div>

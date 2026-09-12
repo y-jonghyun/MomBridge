@@ -94,7 +94,7 @@ export default function OperatorDashboard() {
       <header className="bg-white border-b px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-bold text-slate-800">맘브릿지</h1>
-          <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full font-medium">운영자</span>
+          <span className="text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded-full font-medium">운영자</span>
         </div>
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-500">{user.name}</span>
@@ -107,7 +107,7 @@ export default function OperatorDashboard() {
         <div className="flex min-w-max">
           {tabs.map(t => (
             <button key={t.key} onClick={() => loadTab(t.key)}
-              className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${tab === t.key ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500'}`}>
+              className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${tab === t.key ? 'border-slate-600 text-slate-700' : 'border-transparent text-gray-500'}`}>
               {t.label}
               {!!t.badge && <span className="bg-red-500 text-white text-xs rounded-full px-1.5 min-w-[18px] text-center">{t.badge}</span>}
             </button>
@@ -128,7 +128,7 @@ export default function OperatorDashboard() {
           <div className="flex-1">
             {tabs.map(t => (
               <button key={t.key} onClick={() => loadTab(t.key)}
-                className={`w-full flex items-center justify-between px-5 py-3 text-sm font-medium transition-colors ${tab === t.key ? 'bg-indigo-50 text-indigo-700 border-r-2 border-indigo-600' : 'text-gray-600 hover:bg-stone-50'}`}>
+                className={`w-full flex items-center justify-between px-5 py-3 text-sm font-medium transition-colors ${tab === t.key ? 'bg-slate-50 text-slate-700 border-r-2 border-slate-600' : 'text-gray-600 hover:bg-stone-50'}`}>
                 {t.label}
                 {!!t.badge && <span className="bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center">{t.badge}</span>}
               </button>
@@ -149,7 +149,7 @@ export default function OperatorDashboard() {
 
         {/* 메인 콘텐츠 */}
         <main className="flex-1 p-3 sm:p-6 min-w-0">
-          {loading && <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>}
+          {loading && <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-slate-500 border-t-transparent rounded-full animate-spin" /></div>}
 
           {/* 개요 */}
           {tab === 'overview' && stats && (
@@ -158,7 +158,7 @@ export default function OperatorDashboard() {
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
                   { label: '전체 회원', value: stats.totalUsers, color: 'text-blue-600' },
-                  { label: '전체 미션', value: stats.totalMissions, color: 'text-indigo-600' },
+                  { label: '전체 미션', value: stats.totalMissions, color: 'text-slate-600' },
                   { label: '지원서 대기', value: stats.pendingApplications, color: 'text-yellow-600' },
                   { label: '검수 대기', value: stats.pendingSubmissions, color: 'text-orange-600' },
                   { label: '정산 대기', value: stats.pendingPayouts, color: 'text-red-600' },
@@ -277,7 +277,7 @@ export default function OperatorDashboard() {
                         <p className="text-sm text-gray-500 mt-1">{a.participant?.user?.name} ({a.participant?.user?.email})</p>
                         {a.message && <p className="text-sm text-gray-700 mt-2 bg-stone-50 rounded-lg p-2">{a.message}</p>}
                       </div>
-                      <span className="text-sm font-bold text-indigo-600">{Number(a.mission?.rewardAmount).toLocaleString()}원</span>
+                      <span className="text-sm font-bold text-slate-600">{Number(a.mission?.rewardAmount).toLocaleString()}원</span>
                     </div>
                     <div className="flex gap-2 mt-4">
                       <button onClick={() => reviewApplication(a.id, 'APPROVED')} className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700">승인</button>
@@ -340,7 +340,7 @@ export default function OperatorDashboard() {
                         <span className="text-gray-400 line-through">{Number(p.amount).toLocaleString()}원</span>
                         <span className="font-bold text-green-600">{Number(p.netAmount).toLocaleString()}원</span>
                       </div>
-                      <button onClick={() => processPayout(p.id)} className="px-3 py-1.5 bg-indigo-700 text-white text-xs rounded-lg">지급 완료</button>
+                      <button onClick={() => processPayout(p.id)} className="px-3 py-1.5 bg-slate-700 text-white text-xs rounded-lg">지급 완료</button>
                     </div>
                   </div>
                 ))}
@@ -365,7 +365,7 @@ export default function OperatorDashboard() {
                           <td className="px-4 py-3 text-red-500">-{Number(p.platformFee).toLocaleString()}원</td>
                           <td className="px-4 py-3 font-bold text-green-600">{Number(p.netAmount).toLocaleString()}원</td>
                           <td className="px-4 py-3">
-                            <button onClick={() => processPayout(p.id)} className="px-3 py-1.5 bg-indigo-700 text-white text-xs rounded-lg hover:bg-indigo-800">지급 완료 처리</button>
+                            <button onClick={() => processPayout(p.id)} className="px-3 py-1.5 bg-slate-700 text-white text-xs rounded-lg hover:bg-slate-800">지급 완료 처리</button>
                           </td>
                         </tr>
                       ))}
