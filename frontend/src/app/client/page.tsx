@@ -87,7 +87,7 @@ export default function ClientPage() {
           <h1 className="text-base sm:text-xl font-bold text-purple-700 whitespace-nowrap shrink-0">맘브릿지</h1>
           <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium whitespace-nowrap shrink-0">고객사</span>
           {user.role === 'OPERATOR' && (
-            <Link href="/operator" className="hidden sm:inline text-xs text-gray-400 hover:text-purple-600 border border-gray-200 px-2 py-1 rounded-full whitespace-nowrap">← 운영자로</Link>
+            <Link href="/operator" className="text-xs text-gray-400 hover:text-purple-600 border border-gray-200 px-2 py-1 rounded-full whitespace-nowrap shrink-0">← 운영자</Link>
           )}
         </div>
         <div className="flex items-center gap-2 sm:gap-4 shrink-0">
