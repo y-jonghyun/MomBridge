@@ -121,7 +121,7 @@ export default function ParticipantPage() {
     setSubmittingContent(true);
     try {
       await api.post('/submissions', { missionId: submitModal.missionId, ...submitForm });
-      setSubmittedMissionIds(prev => new Set([...prev, submitModal.missionId]));
+      setSubmittedMissionIds(prev => { const s = new Set(prev); s.add(submitModal.missionId); return s; });
       setSubmitModal(null);
       setSubmitForm({ description: '', snsPostUrl: '' });
       alert('제출 완료! 운영자 검수 후 정산됩니다.');
