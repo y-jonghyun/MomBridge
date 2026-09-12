@@ -142,7 +142,21 @@ export default function ParticipantPage() {
   const [missionFilter, setMissionFilter] = useState({ category: '', regionSi: '', sort: 'NEWEST', keyword: '' });
   const [searchInput, setSearchInput] = useState('');
 
-  if (!hydrated || !user) return null;
+  if (!hydrated || !user) return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="bg-white border-b px-4 py-3 flex items-center justify-between">
+        <div className="h-6 w-24 bg-gray-200 rounded animate-pulse" />
+        <div className="h-5 w-16 bg-gray-200 rounded animate-pulse" />
+      </div>
+      <div className="max-w-5xl mx-auto px-3 py-4 space-y-4">
+        <div className="grid grid-cols-3 gap-2">
+          {[1,2,3].map(i => <div key={i} className="bg-white rounded-xl p-4 h-20 animate-pulse bg-gray-100" />)}
+        </div>
+        <div className="bg-white rounded-xl h-12 animate-pulse" />
+        {[1,2,3].map(i => <div key={i} className="bg-white rounded-2xl h-48 animate-pulse" />)}
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -189,7 +203,27 @@ export default function ParticipantPage() {
           </div>
         </div>
 
-        {loading && <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" /></div>}
+        {loading && (
+          <div className="space-y-3">
+            {[1,2,3].map(i => (
+              <div key={i} className="bg-white rounded-2xl p-5 shadow-sm animate-pulse">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="space-y-2 flex-1">
+                    <div className="h-4 bg-gray-200 rounded w-3/4" />
+                    <div className="h-3 bg-gray-100 rounded w-1/2" />
+                  </div>
+                  <div className="h-6 w-16 bg-gray-200 rounded-full ml-4" />
+                </div>
+                <div className="h-3 bg-gray-100 rounded w-full mb-2" />
+                <div className="h-3 bg-gray-100 rounded w-5/6" />
+                <div className="flex gap-2 mt-4">
+                  <div className="h-6 w-20 bg-gray-100 rounded-lg" />
+                  <div className="h-6 w-20 bg-gray-100 rounded-lg" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* 미션 탐색 필터 */}
         {tab === 'missions' && !loading && (

@@ -14,6 +14,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
+      <head>
+        <link rel="preconnect" href="https://mombridge-backend.onrender.com" />
+        <link rel="dns-prefetch" href="https://mombridge-backend.onrender.com" />
+      </head>
       <body className="min-h-screen bg-gray-50 antialiased">{children}</body>
     </html>
   );
