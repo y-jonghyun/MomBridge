@@ -402,17 +402,19 @@ export default function ParticipantPage() {
         {tab === 'community' && (
           <div>
             {/* 카테고리 필터 + 글쓰기 */}
-            <div className="bg-white rounded-xl shadow-sm mb-4 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex gap-1.5 flex-wrap">
+            <div className="bg-white rounded-xl shadow-sm mb-4 px-4 py-3 space-y-2">
+              {/* 1행: 카테고리 가로 스크롤 */}
+              <div className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-hide">
                 {COMM_CATS.map(c => (
                   <button key={c.key}
                     onClick={() => { setCommunityCategory(c.key); loadCommunity(c.key, communitySort); }}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${communityCategory === c.key ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                    className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${communityCategory === c.key ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
                     {c.label}
                   </button>
                 ))}
               </div>
-              <div className="flex items-center gap-2">
+              {/* 2행: 정렬 + 글쓰기 */}
+              <div className="flex items-center justify-between">
                 <select value={communitySort}
                   onChange={e => { setCommunitySort(e.target.value); loadCommunity(communityCategory, e.target.value); }}
                   className="border rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none">
