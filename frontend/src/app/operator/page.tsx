@@ -119,9 +119,6 @@ export default function OperatorDashboard() {
           <Link href="/client" className="flex items-center gap-1 px-4 py-3 text-xs font-medium whitespace-nowrap text-orange-600 border-b-2 border-transparent">
             <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full">고객사</span>
           </Link>
-          <Link href="/community" className="flex items-center gap-1 px-4 py-3 text-xs font-medium whitespace-nowrap text-green-600 border-b-2 border-transparent">
-            <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">커뮤니티</span>
-          </Link>
         </div>
       </div>
 
@@ -146,10 +143,6 @@ export default function OperatorDashboard() {
             <Link href="/client" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 rounded-lg hover:bg-orange-50 hover:text-orange-700">
               <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full">고객사</span>
               고객사 화면
-            </Link>
-            <Link href="/community" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 rounded-lg hover:bg-green-50 hover:text-green-700">
-              <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">커뮤니티</span>
-              커뮤니티
             </Link>
           </div>
         </aside>
