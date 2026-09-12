@@ -395,7 +395,7 @@ export default function ParticipantPage() {
                 <div className="sm:hidden divide-y">
                   {communityPosts.map(p => (
                     <Link key={p.id} href={`/community/${p.id}`} className="flex items-start gap-3 px-4 py-3 hover:bg-purple-50 transition-colors">
-                      <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full shrink-0 mt-0.5">{p.category}</span>
+                      <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full shrink-0 mt-0.5 min-w-[56px] text-center">{p.category}</span>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-gray-900 line-clamp-2">{p.title}</p>
                         <p className="text-xs text-gray-400 mt-1">{p.user?.name} · {commTimeAgo(p.createdAt)} · 👁 {p.viewCount} · ❤️ {p.likeCount}</p>

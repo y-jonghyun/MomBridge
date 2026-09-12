@@ -204,39 +204,69 @@ export default function OperatorDashboard() {
           {tab === 'missions' && !loading && (
             <div>
               <h2 className="text-xl font-bold text-gray-900 mb-4">미션 관리 ({missions.length}건)</h2>
-              <div className="bg-white rounded-2xl shadow-sm overflow-hidden overflow-x-auto">
-                <table className="w-full text-sm min-w-[600px]">
-                  <thead className="bg-gray-50 border-b">
-                    <tr>{['미션명', '고객사', '상태', '지원/제출', '보상', '작업'].map(h => <th key={h} className="text-left px-4 py-3 font-medium text-gray-600">{h}</th>)}</tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {missions.map(m => (
-                      <tr key={m.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 font-medium text-gray-900 max-w-xs truncate">{m.title}</td>
-                        <td className="px-4 py-3 text-gray-500">{m.clientProfile?.businessName}</td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${MISSION_STATUS_COLOR[m.status] ?? 'bg-gray-100'}`}>
-                            {MISSION_STATUS_LABEL[m.status] ?? m.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-gray-500">{m._count?.applications} / {m._count?.submissions}</td>
-                        <td className="px-4 py-3 text-gray-900 font-medium">{Number(m.rewardAmount).toLocaleString()}원</td>
-                        <td className="px-4 py-3">
-                          <select
-                            value={m.status}
-                            onChange={e => updateMissionStatus(m.id, e.target.value)}
-                            className="text-xs border rounded px-2 py-1 text-gray-700"
-                          >
-                            {['DRAFT', 'OPEN', 'IN_PROGRESS', 'REVIEWING', 'CLOSED'].map(s => (
-                              <option key={s} value={s}>{MISSION_STATUS_LABEL[s]}</option>
-                            ))}
-                          </select>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {missions.length === 0 && <div className="text-center py-12 text-gray-400">미션이 없습니다</div>}
+              {/* 모바일 카드형 */}
+              <div className="sm:hidden space-y-3">
+                {missions.map(m => (
+                  <div key={m.id} className="bg-white rounded-xl border p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-900 text-sm line-clamp-2">{m.title}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{m.clientProfile?.businessName}</p>
+                      </div>
+                      <span className={`shrink-0 px-2 py-1 rounded-full text-xs font-medium ${MISSION_STATUS_COLOR[m.status] ?? 'bg-gray-100'}`}>
+                        {MISSION_STATUS_LABEL[m.status] ?? m.status}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-gray-400 space-x-2">
+                        <span>지원 {m._count?.applications}건</span>
+                        <span>제출 {m._count?.submissions}건</span>
+                        <span className="text-gray-700 font-medium">{Number(m.rewardAmount).toLocaleString()}원</span>
+                      </div>
+                      <select value={m.status} onChange={e => updateMissionStatus(m.id, e.target.value)}
+                        className="text-xs border rounded px-2 py-1 text-gray-700">
+                        {['DRAFT', 'OPEN', 'IN_PROGRESS', 'REVIEWING', 'CLOSED'].map(s => (
+                          <option key={s} value={s}>{MISSION_STATUS_LABEL[s]}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                ))}
+                {missions.length === 0 && <div className="text-center py-12 text-gray-400 bg-white rounded-2xl">미션이 없습니다</div>}
+              </div>
+              {/* 데스크탑 테이블형 */}
+              <div className="hidden sm:block bg-white rounded-2xl shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm min-w-[600px]">
+                    <thead className="bg-gray-50 border-b">
+                      <tr>{['미션명', '고객사', '상태', '지원/제출', '보상', '작업'].map(h => <th key={h} className="text-left px-4 py-3 font-medium text-gray-600">{h}</th>)}</tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {missions.map(m => (
+                        <tr key={m.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 font-medium text-gray-900 max-w-xs truncate">{m.title}</td>
+                          <td className="px-4 py-3 text-gray-500">{m.clientProfile?.businessName}</td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${MISSION_STATUS_COLOR[m.status] ?? 'bg-gray-100'}`}>
+                              {MISSION_STATUS_LABEL[m.status] ?? m.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-gray-500">{m._count?.applications} / {m._count?.submissions}</td>
+                          <td className="px-4 py-3 text-gray-900 font-medium">{Number(m.rewardAmount).toLocaleString()}원</td>
+                          <td className="px-4 py-3">
+                            <select value={m.status} onChange={e => updateMissionStatus(m.id, e.target.value)}
+                              className="text-xs border rounded px-2 py-1 text-gray-700">
+                              {['DRAFT', 'OPEN', 'IN_PROGRESS', 'REVIEWING', 'CLOSED'].map(s => (
+                                <option key={s} value={s}>{MISSION_STATUS_LABEL[s]}</option>
+                              ))}
+                            </select>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {missions.length === 0 && <div className="text-center py-12 text-gray-400">미션이 없습니다</div>}
+                </div>
               </div>
             </div>
           )}
@@ -303,30 +333,53 @@ export default function OperatorDashboard() {
           {tab === 'payouts' && !loading && (
             <div>
               <h2 className="text-xl font-bold text-gray-900 mb-4">정산 대기 ({payouts.length}건)</h2>
-              <div className="bg-white rounded-2xl shadow-sm overflow-hidden overflow-x-auto">
-                <table className="w-full text-sm min-w-[600px]">
-                  <thead className="bg-gray-50 border-b">
-                    <tr>{['참여자', '미션', '지급액', '수수료', '실지급', '작업'].map(h => <th key={h} className="text-left px-4 py-3 font-medium text-gray-600">{h}</th>)}</tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {payouts.map(p => (
-                      <tr key={p.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3">
-                          <p className="font-medium text-gray-900">{p.participant?.user?.name}</p>
-                          <p className="text-xs text-gray-400">{p.participant?.user?.email}</p>
-                        </td>
-                        <td className="px-4 py-3 text-gray-600 max-w-xs truncate">{p.submission?.mission?.title}</td>
-                        <td className="px-4 py-3 font-medium">{Number(p.amount).toLocaleString()}원</td>
-                        <td className="px-4 py-3 text-red-500">-{Number(p.platformFee).toLocaleString()}원</td>
-                        <td className="px-4 py-3 font-bold text-green-600">{Number(p.netAmount).toLocaleString()}원</td>
-                        <td className="px-4 py-3">
-                          <button onClick={() => processPayout(p.id)} className="px-3 py-1.5 bg-purple-600 text-white text-xs rounded-lg hover:bg-purple-700">지급 완료 처리</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {payouts.length === 0 && <div className="text-center py-12 text-gray-400">대기 중인 정산이 없습니다</div>}
+              {/* 모바일 카드형 */}
+              <div className="sm:hidden space-y-3">
+                {payouts.map(p => (
+                  <div key={p.id} className="bg-white rounded-xl border p-4 shadow-sm">
+                    <div className="mb-2">
+                      <p className="font-semibold text-gray-900 text-sm">{p.participant?.user?.name}</p>
+                      <p className="text-xs text-gray-400">{p.participant?.user?.email}</p>
+                      <p className="text-xs text-gray-500 mt-1 line-clamp-1">{p.submission?.mission?.title}</p>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm space-x-2">
+                        <span className="text-gray-400 line-through">{Number(p.amount).toLocaleString()}원</span>
+                        <span className="font-bold text-green-600">{Number(p.netAmount).toLocaleString()}원</span>
+                      </div>
+                      <button onClick={() => processPayout(p.id)} className="px-3 py-1.5 bg-purple-600 text-white text-xs rounded-lg">지급 완료</button>
+                    </div>
+                  </div>
+                ))}
+                {payouts.length === 0 && <div className="text-center py-12 text-gray-400 bg-white rounded-2xl">대기 중인 정산이 없습니다</div>}
+              </div>
+              {/* 데스크탑 테이블형 */}
+              <div className="hidden sm:block bg-white rounded-2xl shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm min-w-[600px]">
+                    <thead className="bg-gray-50 border-b">
+                      <tr>{['참여자', '미션', '지급액', '수수료', '실지급', '작업'].map(h => <th key={h} className="text-left px-4 py-3 font-medium text-gray-600">{h}</th>)}</tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {payouts.map(p => (
+                        <tr key={p.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3">
+                            <p className="font-medium text-gray-900">{p.participant?.user?.name}</p>
+                            <p className="text-xs text-gray-400">{p.participant?.user?.email}</p>
+                          </td>
+                          <td className="px-4 py-3 text-gray-600 max-w-xs truncate">{p.submission?.mission?.title}</td>
+                          <td className="px-4 py-3 font-medium">{Number(p.amount).toLocaleString()}원</td>
+                          <td className="px-4 py-3 text-red-500">-{Number(p.platformFee).toLocaleString()}원</td>
+                          <td className="px-4 py-3 font-bold text-green-600">{Number(p.netAmount).toLocaleString()}원</td>
+                          <td className="px-4 py-3">
+                            <button onClick={() => processPayout(p.id)} className="px-3 py-1.5 bg-purple-600 text-white text-xs rounded-lg hover:bg-purple-700">지급 완료 처리</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {payouts.length === 0 && <div className="text-center py-12 text-gray-400">대기 중인 정산이 없습니다</div>}
+                </div>
               </div>
             </div>
           )}
@@ -335,41 +388,70 @@ export default function OperatorDashboard() {
           {tab === 'users' && !loading && (
             <div>
               <h2 className="text-xl font-bold text-gray-900 mb-4">회원 관리 ({users.length}명)</h2>
-              <div className="bg-white rounded-2xl shadow-sm overflow-hidden overflow-x-auto">
-                <table className="w-full text-sm min-w-[600px]">
-                  <thead className="bg-gray-50 border-b">
-                    <tr>{['이름/이메일', '역할', '상태', '가입일', '최근 로그인', '작업'].map(h => <th key={h} className="text-left px-4 py-3 font-medium text-gray-600">{h}</th>)}</tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {users.map(u => (
-                      <tr key={u.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3">
-                          <p className="font-medium text-gray-900">{u.name}</p>
-                          <p className="text-xs text-gray-400">{u.email}</p>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">{ROLE_LABEL[u.role] ?? u.role}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${u.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+              {/* 모바일 카드형 */}
+              <div className="sm:hidden space-y-3">
+                {users.map(u => (
+                  <div key={u.id} className="bg-white rounded-xl border p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-900 text-sm">{u.name}</p>
+                        <p className="text-xs text-gray-400 truncate">{u.email}</p>
+                        <div className="flex gap-1.5 mt-1.5">
+                          <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs">{ROLE_LABEL[u.role] ?? u.role}</span>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${u.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
                             {u.isActive ? '활성' : '비활성'}
                           </span>
-                        </td>
-                        <td className="px-4 py-3 text-gray-500">{new Date(u.createdAt).toLocaleDateString('ko-KR')}</td>
-                        <td className="px-4 py-3 text-gray-500">{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString('ko-KR') : '-'}</td>
-                        <td className="px-4 py-3">
-                          {u.id !== user.id && (
-                            <button onClick={() => toggleUserActive(u.id, u.isActive)}
-                              className={`px-3 py-1.5 text-xs rounded-lg text-white ${u.isActive ? 'bg-red-500 hover:bg-red-600' : 'bg-green-600 hover:bg-green-700'}`}>
-                              {u.isActive ? '비활성화' : '활성화'}
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {users.length === 0 && <div className="text-center py-12 text-gray-400">회원이 없습니다</div>}
+                        </div>
+                      </div>
+                      {u.id !== user.id && (
+                        <button onClick={() => toggleUserActive(u.id, u.isActive)}
+                          className={`shrink-0 px-3 py-1.5 text-xs rounded-lg text-white ${u.isActive ? 'bg-red-500' : 'bg-green-600'}`}>
+                          {u.isActive ? '비활성화' : '활성화'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {users.length === 0 && <div className="text-center py-12 text-gray-400 bg-white rounded-2xl">회원이 없습니다</div>}
+              </div>
+              {/* 데스크탑 테이블형 */}
+              <div className="hidden sm:block bg-white rounded-2xl shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm min-w-[600px]">
+                    <thead className="bg-gray-50 border-b">
+                      <tr>{['이름/이메일', '역할', '상태', '가입일', '최근 로그인', '작업'].map(h => <th key={h} className="text-left px-4 py-3 font-medium text-gray-600">{h}</th>)}</tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {users.map(u => (
+                        <tr key={u.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3">
+                            <p className="font-medium text-gray-900">{u.name}</p>
+                            <p className="text-xs text-gray-400">{u.email}</p>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">{ROLE_LABEL[u.role] ?? u.role}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${u.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                              {u.isActive ? '활성' : '비활성'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-gray-500">{new Date(u.createdAt).toLocaleDateString('ko-KR')}</td>
+                          <td className="px-4 py-3 text-gray-500">{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString('ko-KR') : '-'}</td>
+                          <td className="px-4 py-3">
+                            {u.id !== user.id && (
+                              <button onClick={() => toggleUserActive(u.id, u.isActive)}
+                                className={`px-3 py-1.5 text-xs rounded-lg text-white ${u.isActive ? 'bg-red-500 hover:bg-red-600' : 'bg-green-600 hover:bg-green-700'}`}>
+                                {u.isActive ? '비활성화' : '활성화'}
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {users.length === 0 && <div className="text-center py-12 text-gray-400">회원이 없습니다</div>}
+                </div>
               </div>
             </div>
           )}
