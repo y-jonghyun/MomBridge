@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -6,7 +6,7 @@ import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 
 const ROLE_BADGE: Record<string, string> = {
-  OPERATOR: 'bg-purple-100 text-purple-700',
+  OPERATOR: 'bg-indigo-100 text-indigo-700',
   PARTICIPANT: 'bg-blue-50 text-blue-600',
   CLIENT: 'bg-orange-50 text-orange-600',
 };
@@ -80,25 +80,25 @@ export default function CommunityPostPage() {
   }
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
+    <div className="min-h-screen flex items-center justify-center bg-stone-50">
+      <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
     </div>
   );
   if (!post) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-400">게시글을 찾을 수 없습니다</div>
+    <div className="min-h-screen flex items-center justify-center bg-stone-50 text-gray-400">게시글을 찾을 수 없습니다</div>
   );
 
   const isOwner = user?.id === post.user?.id;
   const isOperator = user?.role === 'OPERATOR';
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-stone-50">
       {/* 헤더 */}
       <nav className="bg-white border-b sticky top-0 z-20 shadow-sm">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
           <Link href="/community" className="text-gray-400 hover:text-gray-700 text-sm">← 목록</Link>
           <span className="text-gray-200">|</span>
-          <h1 className="text-base font-bold text-purple-700">맘브릿지 커뮤니티</h1>
+          <h1 className="text-base font-bold text-slate-800">맘브릿지 커뮤니티</h1>
         </div>
       </nav>
 
@@ -116,7 +116,7 @@ export default function CommunityPostPage() {
             {/* 작성자 + 메타 정보 */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 bg-purple-100 rounded-full flex items-center justify-center text-purple-700 font-bold text-sm">
+                <div className="w-9 h-9 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold text-sm">
                   {post.user?.name?.[0]}
                 </div>
                 <div>
@@ -151,7 +151,7 @@ export default function CommunityPostPage() {
           {/* 좋아요 */}
           <div className="px-6 pb-5 flex items-center gap-4">
             <button onClick={handleLike}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-full border text-sm font-semibold transition-all ${liked ? 'bg-red-50 border-red-200 text-red-500' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-full border text-sm font-semibold transition-all ${liked ? 'bg-red-50 border-red-200 text-red-500' : 'border-gray-200 text-gray-500 hover:bg-stone-50'}`}>
               <span>{liked ? '❤️' : '🤍'}</span>
               <span>좋아요</span>
               <span className="font-bold">{likeCount}</span>
@@ -162,8 +162,8 @@ export default function CommunityPostPage() {
 
         {/* 댓글 목록 */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-5 py-3.5 border-b bg-gray-50">
-            <h3 className="text-sm font-bold text-gray-800">댓글 <span className="text-purple-600">{post.comments?.length ?? 0}</span></h3>
+          <div className="px-5 py-3.5 border-b bg-stone-50">
+            <h3 className="text-sm font-bold text-gray-800">댓글 <span className="text-indigo-600">{post.comments?.length ?? 0}</span></h3>
           </div>
 
           {(post.comments ?? []).length === 0 && (
@@ -194,30 +194,30 @@ export default function CommunityPostPage() {
 
           {/* 댓글 작성 */}
           {user ? (
-            <form onSubmit={handleComment} className="p-4 border-t bg-gray-50 flex gap-3">
-              <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-700 font-bold text-xs shrink-0">
+            <form onSubmit={handleComment} className="p-4 border-t bg-stone-50 flex gap-3">
+              <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold text-xs shrink-0">
                 {user.name[0]}
               </div>
               <div className="flex-1 flex gap-2">
                 <input value={comment} onChange={e => setComment(e.target.value)}
-                  className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   placeholder="댓글을 입력하세요" />
                 <button type="submit" disabled={submittingComment || !comment.trim()}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 disabled:opacity-50 shrink-0">
+                  className="px-4 py-2 bg-indigo-700 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 shrink-0">
                   {submittingComment ? '...' : '등록'}
                 </button>
               </div>
             </form>
           ) : (
             <div className="p-4 border-t text-center">
-              <Link href="/login" className="text-sm text-purple-600 font-semibold hover:underline">로그인 후 댓글 작성</Link>
+              <Link href="/login" className="text-sm text-indigo-600 font-semibold hover:underline">로그인 후 댓글 작성</Link>
             </div>
           )}
         </div>
 
         {/* 목록으로 */}
         <div className="flex justify-center">
-          <Link href="/community" className="px-6 py-2.5 border rounded-lg text-sm text-gray-600 bg-white hover:bg-gray-50 font-medium">← 목록으로</Link>
+          <Link href="/community" className="px-6 py-2.5 border rounded-lg text-sm text-gray-600 bg-white hover:bg-stone-50 font-medium">← 목록으로</Link>
         </div>
       </div>
     </div>

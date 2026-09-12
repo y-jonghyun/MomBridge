@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -89,12 +89,12 @@ export default function OperatorDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-stone-50">
       {/* 헤더 */}
       <header className="bg-white border-b px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h1 className="text-xl font-bold text-purple-700">맘브릿지</h1>
-          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-medium">운영자</span>
+          <h1 className="text-xl font-bold text-slate-800">맘브릿지</h1>
+          <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full font-medium">운영자</span>
         </div>
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-500">{user.name}</span>
@@ -107,7 +107,7 @@ export default function OperatorDashboard() {
         <div className="flex min-w-max">
           {tabs.map(t => (
             <button key={t.key} onClick={() => loadTab(t.key)}
-              className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${tab === t.key ? 'border-purple-600 text-purple-700' : 'border-transparent text-gray-500'}`}>
+              className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${tab === t.key ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500'}`}>
               {t.label}
               {!!t.badge && <span className="bg-red-500 text-white text-xs rounded-full px-1.5 min-w-[18px] text-center">{t.badge}</span>}
             </button>
@@ -128,7 +128,7 @@ export default function OperatorDashboard() {
           <div className="flex-1">
             {tabs.map(t => (
               <button key={t.key} onClick={() => loadTab(t.key)}
-                className={`w-full flex items-center justify-between px-5 py-3 text-sm font-medium transition-colors ${tab === t.key ? 'bg-purple-50 text-purple-700 border-r-2 border-purple-600' : 'text-gray-600 hover:bg-gray-50'}`}>
+                className={`w-full flex items-center justify-between px-5 py-3 text-sm font-medium transition-colors ${tab === t.key ? 'bg-indigo-50 text-indigo-700 border-r-2 border-indigo-600' : 'text-gray-600 hover:bg-stone-50'}`}>
                 {t.label}
                 {!!t.badge && <span className="bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center">{t.badge}</span>}
               </button>
@@ -149,7 +149,7 @@ export default function OperatorDashboard() {
 
         {/* 메인 콘텐츠 */}
         <main className="flex-1 p-3 sm:p-6 min-w-0">
-          {loading && <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" /></div>}
+          {loading && <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>}
 
           {/* 개요 */}
           {tab === 'overview' && stats && (
@@ -158,7 +158,7 @@ export default function OperatorDashboard() {
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
                   { label: '전체 회원', value: stats.totalUsers, color: 'text-blue-600' },
-                  { label: '전체 미션', value: stats.totalMissions, color: 'text-purple-600' },
+                  { label: '전체 미션', value: stats.totalMissions, color: 'text-indigo-600' },
                   { label: '지원서 대기', value: stats.pendingApplications, color: 'text-yellow-600' },
                   { label: '검수 대기', value: stats.pendingSubmissions, color: 'text-orange-600' },
                   { label: '정산 대기', value: stats.pendingPayouts, color: 'text-red-600' },
@@ -231,12 +231,12 @@ export default function OperatorDashboard() {
               <div className="hidden sm:block bg-white rounded-2xl shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm min-w-[600px]">
-                    <thead className="bg-gray-50 border-b">
+                    <thead className="bg-stone-50 border-b">
                       <tr>{['미션명', '고객사', '상태', '지원/제출', '보상', '작업'].map(h => <th key={h} className="text-left px-4 py-3 font-medium text-gray-600">{h}</th>)}</tr>
                     </thead>
                     <tbody className="divide-y">
                       {missions.map(m => (
-                        <tr key={m.id} className="hover:bg-gray-50">
+                        <tr key={m.id} className="hover:bg-stone-50">
                           <td className="px-4 py-3 font-medium text-gray-900 max-w-xs truncate">{m.title}</td>
                           <td className="px-4 py-3 text-gray-500">{m.clientProfile?.businessName}</td>
                           <td className="px-4 py-3">
@@ -275,9 +275,9 @@ export default function OperatorDashboard() {
                       <div>
                         <p className="font-semibold text-gray-900">{a.mission?.title}</p>
                         <p className="text-sm text-gray-500 mt-1">{a.participant?.user?.name} ({a.participant?.user?.email})</p>
-                        {a.message && <p className="text-sm text-gray-700 mt-2 bg-gray-50 rounded-lg p-2">{a.message}</p>}
+                        {a.message && <p className="text-sm text-gray-700 mt-2 bg-stone-50 rounded-lg p-2">{a.message}</p>}
                       </div>
-                      <span className="text-sm font-bold text-purple-600">{Number(a.mission?.rewardAmount).toLocaleString()}원</span>
+                      <span className="text-sm font-bold text-indigo-600">{Number(a.mission?.rewardAmount).toLocaleString()}원</span>
                     </div>
                     <div className="flex gap-2 mt-4">
                       <button onClick={() => reviewApplication(a.id, 'APPROVED')} className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700">승인</button>
@@ -304,7 +304,7 @@ export default function OperatorDashboard() {
                       </div>
                       <span className="text-xs text-gray-400">{new Date(s.submittedAt).toLocaleDateString('ko-KR')}</span>
                     </div>
-                    {s.description && <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3 mb-3">{s.description}</p>}
+                    {s.description && <p className="text-sm text-gray-700 bg-stone-50 rounded-lg p-3 mb-3">{s.description}</p>}
                     {s.snsPostUrl && <a href={s.snsPostUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-500 underline block mb-3">SNS 링크 보기 →</a>}
                     {s.mediaUrls?.length > 0 && (
                       <div className="flex gap-2 mb-3 flex-wrap">
@@ -340,7 +340,7 @@ export default function OperatorDashboard() {
                         <span className="text-gray-400 line-through">{Number(p.amount).toLocaleString()}원</span>
                         <span className="font-bold text-green-600">{Number(p.netAmount).toLocaleString()}원</span>
                       </div>
-                      <button onClick={() => processPayout(p.id)} className="px-3 py-1.5 bg-purple-600 text-white text-xs rounded-lg">지급 완료</button>
+                      <button onClick={() => processPayout(p.id)} className="px-3 py-1.5 bg-indigo-700 text-white text-xs rounded-lg">지급 완료</button>
                     </div>
                   </div>
                 ))}
@@ -350,12 +350,12 @@ export default function OperatorDashboard() {
               <div className="hidden sm:block bg-white rounded-2xl shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm min-w-[600px]">
-                    <thead className="bg-gray-50 border-b">
+                    <thead className="bg-stone-50 border-b">
                       <tr>{['참여자', '미션', '지급액', '수수료', '실지급', '작업'].map(h => <th key={h} className="text-left px-4 py-3 font-medium text-gray-600">{h}</th>)}</tr>
                     </thead>
                     <tbody className="divide-y">
                       {payouts.map(p => (
-                        <tr key={p.id} className="hover:bg-gray-50">
+                        <tr key={p.id} className="hover:bg-stone-50">
                           <td className="px-4 py-3">
                             <p className="font-medium text-gray-900">{p.participant?.user?.name}</p>
                             <p className="text-xs text-gray-400">{p.participant?.user?.email}</p>
@@ -365,7 +365,7 @@ export default function OperatorDashboard() {
                           <td className="px-4 py-3 text-red-500">-{Number(p.platformFee).toLocaleString()}원</td>
                           <td className="px-4 py-3 font-bold text-green-600">{Number(p.netAmount).toLocaleString()}원</td>
                           <td className="px-4 py-3">
-                            <button onClick={() => processPayout(p.id)} className="px-3 py-1.5 bg-purple-600 text-white text-xs rounded-lg hover:bg-purple-700">지급 완료 처리</button>
+                            <button onClick={() => processPayout(p.id)} className="px-3 py-1.5 bg-indigo-700 text-white text-xs rounded-lg hover:bg-indigo-800">지급 완료 처리</button>
                           </td>
                         </tr>
                       ))}
@@ -411,12 +411,12 @@ export default function OperatorDashboard() {
               <div className="hidden sm:block bg-white rounded-2xl shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm min-w-[600px]">
-                    <thead className="bg-gray-50 border-b">
+                    <thead className="bg-stone-50 border-b">
                       <tr>{['이름/이메일', '역할', '상태', '가입일', '최근 로그인', '작업'].map(h => <th key={h} className="text-left px-4 py-3 font-medium text-gray-600">{h}</th>)}</tr>
                     </thead>
                     <tbody className="divide-y">
                       {users.map(u => (
-                        <tr key={u.id} className="hover:bg-gray-50">
+                        <tr key={u.id} className="hover:bg-stone-50">
                           <td className="px-4 py-3">
                             <p className="font-medium text-gray-900">{u.name}</p>
                             <p className="text-xs text-gray-400">{u.email}</p>
