@@ -57,8 +57,11 @@ export default function ParticipantPage() {
     } catch { } finally { setLoading(false); }
   }
 
-  const loadTab = useCallback(async (t: Tab) => {
+  const loadedTabs = useState<Set<Tab>>(() => new Set<Tab>())[0];
+
+  const loadTab = useCallback(async (t: Tab, force = false) => {
     setTab(t);
+    if (!force && loadedTabs.has(t)) return;
     setLoading(true);
     try {
       if (t === 'my-applications') {
@@ -77,8 +80,9 @@ export default function ParticipantPage() {
         const r = await api.get('/community/posts?limit=20&sort=NEWEST');
         setCommunityPosts(r.data.data.posts);
       }
+      loadedTabs.add(t);
     } catch { } finally { setLoading(false); }
-  }, []);
+  }, [loadedTabs]);
 
   async function loadCommunity(cat = communityCategory, sort = communitySort) {
     setLoading(true);
@@ -189,56 +193,58 @@ export default function ParticipantPage() {
 
         {/* 미션 탐색 필터 */}
         {tab === 'missions' && !loading && (
-          <div className="bg-white rounded-xl shadow-sm p-4 mb-4 flex flex-wrap gap-3 items-center">
-            <form onSubmit={e => { e.preventDefault(); const nf = { ...missionFilter, keyword: searchInput }; setMissionFilter(nf); loadMissions(nf); }} className="flex flex-1 min-w-[200px]">
+          <div className="bg-white rounded-xl shadow-sm p-4 mb-4 space-y-2">
+            <form onSubmit={e => { e.preventDefault(); const nf = { ...missionFilter, keyword: searchInput }; setMissionFilter(nf); loadMissions(nf); }} className="flex">
               <input value={searchInput} onChange={e => setSearchInput(e.target.value)}
                 placeholder="미션 검색..."
                 className="flex-1 border rounded-l-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
               <button type="submit" className="px-3 py-2 bg-purple-600 text-white rounded-r-lg text-sm">🔍</button>
             </form>
-            <select value={missionFilter.category}
-              onChange={e => { const nf = { ...missionFilter, category: e.target.value }; setMissionFilter(nf); loadMissions(nf); }}
-              className="border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none">
-              <option value="">전체 유형</option>
-              <option value="SNS">📸 SNS</option>
-              <option value="VISIT">📍 방문형</option>
-              <option value="REVIEW">✍️ 리뷰</option>
-              <option value="VIDEO">🎬 영상</option>
-            </select>
-            <select value={missionFilter.regionSi}
-              onChange={e => { const nf = { ...missionFilter, regionSi: e.target.value }; setMissionFilter(nf); loadMissions(nf); }}
-              className="border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none">
-              <option value="">전체 지역</option>
-              <optgroup label="특별·광역시">
-                <option value="서울시">서울특별시</option>
-                <option value="부산시">부산광역시</option>
-                <option value="대구시">대구광역시</option>
-                <option value="인천시">인천광역시</option>
-                <option value="광주시">광주광역시</option>
-                <option value="대전시">대전광역시</option>
-                <option value="울산시">울산광역시</option>
-                <option value="세종시">세종특별자치시</option>
-              </optgroup>
-              <optgroup label="도">
-                <option value="경기도">경기도</option>
-                <option value="강원도">강원특별자치도</option>
-                <option value="충청북도">충청북도</option>
-                <option value="충청남도">충청남도</option>
-                <option value="전북도">전북특별자치도</option>
-                <option value="전라남도">전라남도</option>
-                <option value="경상북도">경상북도</option>
-                <option value="경상남도">경상남도</option>
-                <option value="제주도">제주특별자치도</option>
-              </optgroup>
-            </select>
-            <select value={missionFilter.sort}
-              onChange={e => { const nf = { ...missionFilter, sort: e.target.value }; setMissionFilter(nf); loadMissions(nf); }}
-              className="border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none">
-              <option value="NEWEST">최신순</option>
-              <option value="DEADLINE">마감임박순</option>
-              <option value="REWARD">보상높은순</option>
-              <option value="POPULAR">인기순</option>
-            </select>
+            <div className="grid grid-cols-3 gap-2">
+              <select value={missionFilter.category}
+                onChange={e => { const nf = { ...missionFilter, category: e.target.value }; setMissionFilter(nf); loadMissions(nf); }}
+                className="border rounded-lg px-2 py-2 text-xs sm:text-sm bg-white focus:outline-none w-full">
+                <option value="">전체 유형</option>
+                <option value="SNS">SNS</option>
+                <option value="VISIT">방문형</option>
+                <option value="REVIEW">리뷰</option>
+                <option value="VIDEO">영상</option>
+              </select>
+              <select value={missionFilter.regionSi}
+                onChange={e => { const nf = { ...missionFilter, regionSi: e.target.value }; setMissionFilter(nf); loadMissions(nf); }}
+                className="border rounded-lg px-2 py-2 text-xs sm:text-sm bg-white focus:outline-none w-full">
+                <option value="">전체 지역</option>
+                <optgroup label="특별·광역시">
+                  <option value="서울시">서울</option>
+                  <option value="부산시">부산</option>
+                  <option value="대구시">대구</option>
+                  <option value="인천시">인천</option>
+                  <option value="광주시">광주</option>
+                  <option value="대전시">대전</option>
+                  <option value="울산시">울산</option>
+                  <option value="세종시">세종</option>
+                </optgroup>
+                <optgroup label="도">
+                  <option value="경기도">경기</option>
+                  <option value="강원도">강원</option>
+                  <option value="충청북도">충북</option>
+                  <option value="충청남도">충남</option>
+                  <option value="전북도">전북</option>
+                  <option value="전라남도">전남</option>
+                  <option value="경상북도">경북</option>
+                  <option value="경상남도">경남</option>
+                  <option value="제주도">제주</option>
+                </optgroup>
+              </select>
+              <select value={missionFilter.sort}
+                onChange={e => { const nf = { ...missionFilter, sort: e.target.value }; setMissionFilter(nf); loadMissions(nf); }}
+                className="border rounded-lg px-2 py-2 text-xs sm:text-sm bg-white focus:outline-none w-full">
+                <option value="NEWEST">최신순</option>
+                <option value="DEADLINE">마감임박</option>
+                <option value="REWARD">보상높은순</option>
+                <option value="POPULAR">인기순</option>
+              </select>
+            </div>
           </div>
         )}
 
