@@ -142,17 +142,17 @@ export default function ParticipantPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h1 className="text-lg sm:text-xl font-bold text-purple-700">맘브릿지</h1>
-          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">참여자</span>
+      <header className="bg-white border-b px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <h1 className="text-base sm:text-xl font-bold text-purple-700 whitespace-nowrap shrink-0">맘브릿지</h1>
+          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium whitespace-nowrap shrink-0">참여자</span>
           {user.role === 'OPERATOR' && (
-            <Link href="/operator" className="hidden sm:inline text-xs text-gray-400 hover:text-purple-600 border border-gray-200 px-2 py-1 rounded-full">← 운영자로</Link>
+            <Link href="/operator" className="hidden sm:inline text-xs text-gray-400 hover:text-purple-600 border border-gray-200 px-2 py-1 rounded-full whitespace-nowrap">← 운영자로</Link>
           )}
         </div>
-        <div className="flex items-center gap-2 sm:gap-4">
-          <span className="text-xs sm:text-sm text-gray-500 hidden xs:block">{user.name}님</span>
-          <button onClick={() => { clearAuth(); router.push('/login'); }} className="text-xs sm:text-sm text-gray-400 hover:text-red-500">로그아웃</button>
+        <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+          <span className="text-xs sm:text-sm text-gray-500 hidden sm:block">{user.name}님</span>
+          <button onClick={() => { clearAuth(); router.push('/login'); }} className="text-xs sm:text-sm text-gray-400 hover:text-red-500 whitespace-nowrap">로그아웃</button>
         </div>
       </header>
 

@@ -102,16 +102,26 @@ export default function OperatorDashboard() {
         </div>
       </header>
 
+      {/* 모바일 탭 (sm 미만) */}
+      <div className="sm:hidden bg-white border-b overflow-x-auto">
+        <div className="flex min-w-max">
+          {tabs.map(t => (
+            <button key={t.key} onClick={() => loadTab(t.key)}
+              className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${tab === t.key ? 'border-purple-600 text-purple-700' : 'border-transparent text-gray-500'}`}>
+              {t.label}
+              {!!t.badge && <span className="bg-red-500 text-white text-xs rounded-full px-1.5 min-w-[18px] text-center">{t.badge}</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="flex">
-        {/* 사이드바 */}
-        <aside className="w-52 min-h-[calc(100vh-65px)] bg-white border-r py-4 flex flex-col">
+        {/* 사이드바 (데스크탑만) */}
+        <aside className="hidden sm:flex w-52 min-h-[calc(100vh-65px)] bg-white border-r py-4 flex-col">
           <div className="flex-1">
             {tabs.map(t => (
-              <button
-                key={t.key}
-                onClick={() => loadTab(t.key)}
-                className={`w-full flex items-center justify-between px-5 py-3 text-sm font-medium transition-colors ${tab === t.key ? 'bg-purple-50 text-purple-700 border-r-2 border-purple-600' : 'text-gray-600 hover:bg-gray-50'}`}
-              >
+              <button key={t.key} onClick={() => loadTab(t.key)}
+                className={`w-full flex items-center justify-between px-5 py-3 text-sm font-medium transition-colors ${tab === t.key ? 'bg-purple-50 text-purple-700 border-r-2 border-purple-600' : 'text-gray-600 hover:bg-gray-50'}`}>
                 {t.label}
                 {!!t.badge && <span className="bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center">{t.badge}</span>}
               </button>
@@ -135,7 +145,7 @@ export default function OperatorDashboard() {
         </aside>
 
         {/* 메인 콘텐츠 */}
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-3 sm:p-6 min-w-0">
           {loading && <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" /></div>}
 
           {/* 개요 */}
