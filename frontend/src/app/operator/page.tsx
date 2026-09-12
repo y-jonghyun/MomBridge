@@ -112,6 +112,16 @@ export default function OperatorDashboard() {
               {!!t.badge && <span className="bg-red-500 text-white text-xs rounded-full px-1.5 min-w-[18px] text-center">{t.badge}</span>}
             </button>
           ))}
+          <div className="w-px bg-gray-200 my-2" />
+          <Link href="/participant" className="flex items-center gap-1 px-4 py-3 text-xs font-medium whitespace-nowrap text-blue-600 border-b-2 border-transparent">
+            <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">참여자</span>
+          </Link>
+          <Link href="/client" className="flex items-center gap-1 px-4 py-3 text-xs font-medium whitespace-nowrap text-orange-600 border-b-2 border-transparent">
+            <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full">고객사</span>
+          </Link>
+          <Link href="/community" className="flex items-center gap-1 px-4 py-3 text-xs font-medium whitespace-nowrap text-green-600 border-b-2 border-transparent">
+            <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">커뮤니티</span>
+          </Link>
         </div>
       </div>
 
