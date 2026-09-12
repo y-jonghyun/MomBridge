@@ -84,16 +84,16 @@ export default function MissionDetailPage() {
   const missionIcons = MISSION_ICONS[mission.category] ?? MISSION_ICONS['SNS'];
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 pb-20 lg:pb-0">
       {/* 네비게이션 */}
-      <nav className="bg-white border-b px-6 py-3 flex items-center gap-3 sticky top-0 z-20 shadow-sm">
+      <nav className="bg-white border-b px-4 sm:px-6 py-3 flex items-center gap-3 sticky top-0 z-20 shadow-sm">
         <Link href={backHref} className="text-gray-400 hover:text-gray-700 text-sm flex items-center gap-1">← 목록</Link>
         <span className="text-gray-200">|</span>
         <h1 className="text-base font-bold text-purple-700">맘브릿지</h1>
       </nav>
 
       {/* 타이틀 헤더 바 */}
-      <div className="bg-white border-b px-6 py-4">
+      <div className="bg-white border-b px-4 sm:px-6 py-4">
         <div className="max-w-5xl mx-auto">
           <div className="flex items-start gap-3 flex-wrap mb-2">
             <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${CATEGORY_COLOR[mission.category] ?? 'bg-gray-100 text-gray-600'}`}>
@@ -110,7 +110,7 @@ export default function MissionDetailPage() {
       </div>
 
       {/* 메인 2컬럼 레이아웃 */}
-      <div className="max-w-5xl mx-auto px-4 py-5 flex gap-5 items-start">
+      <div className="max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-5 flex gap-5 items-start">
 
         {/* ── 왼쪽 메인 컬럼 ── */}
         <div className="flex-1 min-w-0 space-y-4">
@@ -261,8 +261,8 @@ export default function MissionDetailPage() {
           </div>
         </div>
 
-        {/* ── 오른쪽 사이드바 (sticky) ── */}
-        <div className="w-72 shrink-0 sticky top-16 space-y-4">
+        {/* ── 오른쪽 사이드바 (sticky, 데스크탑만) ── */}
+        <div className="hidden lg:block w-72 shrink-0 sticky top-16 space-y-4">
 
           {/* 체험단 일정 */}
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -352,6 +352,45 @@ export default function MissionDetailPage() {
             <div className="bg-gray-100 rounded-lg py-4 px-3">
               <p className="text-gray-400 text-xs">당첨된 이후 확인 가능</p>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── 모바일 하단 신청 바 ── */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg px-4 py-3 z-30">
+        <div className="flex items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-gray-400">보상금액</p>
+            <p className="text-base font-bold text-purple-600">{Number(mission.rewardAmount).toLocaleString()}원</p>
+          </div>
+          <div className="shrink-0 w-44">
+            {user?.role === 'PARTICIPANT' && isOpen && !isFull && !applied && (
+              <button onClick={handleApply} disabled={applying}
+                className="w-full bg-purple-600 text-white rounded-xl py-2.5 font-bold text-sm hover:bg-purple-700 disabled:opacity-50">
+                {applying ? '신청 중...' : '신청하기'}
+              </button>
+            )}
+            {applied && (
+              <div className="w-full bg-green-50 border border-green-200 rounded-xl py-2.5 text-center">
+                <p className="text-green-700 font-bold text-sm">✓ 신청 완료!</p>
+              </div>
+            )}
+            {user?.role === 'PARTICIPANT' && (isFull || !isOpen) && (
+              <button disabled className="w-full bg-gray-200 text-gray-400 rounded-xl py-2.5 font-bold text-sm">
+                {isFull ? '모집 마감' : '모집 종료'}
+              </button>
+            )}
+            {!user && (
+              <Link href="/login"
+                className="block w-full bg-purple-600 text-white rounded-xl py-2.5 font-bold text-sm text-center hover:bg-purple-700">
+                로그인 후 신청하기
+              </Link>
+            )}
+            {(user?.role === 'CLIENT' || user?.role === 'OPERATOR') && (
+              <button disabled className="w-full bg-gray-100 text-gray-400 rounded-xl py-2.5 font-bold text-sm">
+                {user.role === 'OPERATOR' ? '운영자 계정' : '고객사 계정'}
+              </button>
+            )}
           </div>
         </div>
       </div>

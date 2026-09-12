@@ -214,37 +214,51 @@ export default function CommunityPage() {
           {/* 게시글 목록 테이블 */}
           {(tab === 'LIST' || (tab === 'MY' && user)) && (
             <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
-              {/* 헤더 행 */}
-              <div className="grid grid-cols-[80px_1fr_80px_70px_60px_60px] gap-2 px-4 py-2.5 bg-gray-50 border-b text-xs font-semibold text-gray-500">
-                <span>분류</span><span>제목</span><span>작성자</span><span>작성일</span><span className="text-center">조회</span><span className="text-center">좋아요</span>
-              </div>
-
               {loading && (
                 <div className="flex justify-center py-16">
-                  <div className="w-6 h-6 border-3 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                  <div className="w-6 h-6 border-purple-500 border-t-transparent rounded-full animate-spin border-4" />
                 </div>
               )}
-
-              {!loading && (tab === 'LIST' ? posts : myPosts).map(p => (
-                <Link key={p.id} href={`/community/${p.id}`}
-                  className="grid grid-cols-[80px_1fr_80px_70px_60px_60px] gap-2 px-4 py-3 border-b last:border-0 hover:bg-purple-50 transition-colors items-center group">
-                  <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full truncate">{p.category}</span>
-                  <div className="min-w-0">
-                    <span className="text-sm font-medium text-gray-900 group-hover:text-purple-700 line-clamp-1">{p.title}</span>
-                    {p._count?.comments > 0 && (
-                      <span className="text-xs text-purple-500 ml-1.5">[{p._count.comments}]</span>
-                    )}
+              {/* 모바일: 카드형 */}
+              {!loading && (
+                <div className="lg:hidden divide-y">
+                  {(tab === 'LIST' ? posts : myPosts).map(p => (
+                    <Link key={p.id} href={`/community/${p.id}`} className="flex items-start gap-3 px-4 py-3 hover:bg-purple-50">
+                      <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full shrink-0 mt-0.5">{p.category}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-gray-900 line-clamp-2">{p.title}</p>
+                        <p className="text-xs text-gray-400 mt-1">{p.user?.name} · {timeAgo(p.createdAt)} · 👁 {p.viewCount} · ❤️ {p.likeCount}</p>
+                      </div>
+                    </Link>
+                  ))}
+                  {(tab === 'LIST' ? posts : myPosts).length === 0 && (
+                    <div className="text-center py-16 text-gray-300 text-sm">{tab === 'MY' ? '작성한 글이 없습니다' : '게시글이 없습니다'}</div>
+                  )}
+                </div>
+              )}
+              {/* 데스크탑: 테이블형 */}
+              {!loading && (
+                <div className="hidden lg:block">
+                  <div className="grid grid-cols-[80px_1fr_80px_70px_60px_60px] gap-2 px-4 py-2.5 bg-gray-50 border-b text-xs font-semibold text-gray-500">
+                    <span>분류</span><span>제목</span><span>작성자</span><span>작성일</span><span className="text-center">조회</span><span className="text-center">좋아요</span>
                   </div>
-                  <span className="text-xs text-gray-500 truncate">{p.user?.name}</span>
-                  <span className="text-xs text-gray-400">{timeAgo(p.createdAt)}</span>
-                  <span className="text-xs text-gray-400 text-center">{p.viewCount}</span>
-                  <span className="text-xs text-red-400 text-center">❤️ {p.likeCount}</span>
-                </Link>
-              ))}
-
-              {!loading && (tab === 'LIST' ? posts : myPosts).length === 0 && (
-                <div className="text-center py-16 text-gray-300 text-sm">
-                  {tab === 'MY' ? '작성한 글이 없습니다' : '게시글이 없습니다'}
+                  {(tab === 'LIST' ? posts : myPosts).map(p => (
+                    <Link key={p.id} href={`/community/${p.id}`}
+                      className="grid grid-cols-[80px_1fr_80px_70px_60px_60px] gap-2 px-4 py-3 border-b last:border-0 hover:bg-purple-50 transition-colors items-center group">
+                      <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full truncate">{p.category}</span>
+                      <div className="min-w-0">
+                        <span className="text-sm font-medium text-gray-900 group-hover:text-purple-700 line-clamp-1">{p.title}</span>
+                        {p._count?.comments > 0 && <span className="text-xs text-purple-500 ml-1.5">[{p._count.comments}]</span>}
+                      </div>
+                      <span className="text-xs text-gray-500 truncate">{p.user?.name}</span>
+                      <span className="text-xs text-gray-400">{timeAgo(p.createdAt)}</span>
+                      <span className="text-xs text-gray-400 text-center">{p.viewCount}</span>
+                      <span className="text-xs text-red-400 text-center">❤️ {p.likeCount}</span>
+                    </Link>
+                  ))}
+                  {(tab === 'LIST' ? posts : myPosts).length === 0 && (
+                    <div className="text-center py-16 text-gray-300 text-sm">{tab === 'MY' ? '작성한 글이 없습니다' : '게시글이 없습니다'}</div>
+                  )}
                 </div>
               )}
             </div>
@@ -263,8 +277,8 @@ export default function CommunityPage() {
           )}
         </div>
 
-        {/* ── 오른쪽 사이드바 ── */}
-        <div className="w-64 shrink-0 space-y-4">
+        {/* ── 오른쪽 사이드바 (데스크탑만) ── */}
+        <div className="hidden lg:block w-64 shrink-0 space-y-4">
           {/* 글 작성 CTA */}
           {user ? (
             <div className="bg-white rounded-xl shadow-sm p-4">
