@@ -91,7 +91,7 @@ export default function OperatorDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* 헤더 */}
-      <header className="bg-white border-b px-6 py-4 flex items-center justify-between">
+      <header className="bg-white border-b px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-bold text-purple-700">맘브릿지</h1>
           <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-medium">운영자</span>
@@ -184,8 +184,8 @@ export default function OperatorDashboard() {
           {tab === 'missions' && !loading && (
             <div>
               <h2 className="text-xl font-bold text-gray-900 mb-4">미션 관리 ({missions.length}건)</h2>
-              <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-                <table className="w-full text-sm">
+              <div className="bg-white rounded-2xl shadow-sm overflow-hidden overflow-x-auto">
+                <table className="w-full text-sm min-w-[600px]">
                   <thead className="bg-gray-50 border-b">
                     <tr>{['미션명', '고객사', '상태', '지원/제출', '보상', '작업'].map(h => <th key={h} className="text-left px-4 py-3 font-medium text-gray-600">{h}</th>)}</tr>
                   </thead>
@@ -283,8 +283,8 @@ export default function OperatorDashboard() {
           {tab === 'payouts' && !loading && (
             <div>
               <h2 className="text-xl font-bold text-gray-900 mb-4">정산 대기 ({payouts.length}건)</h2>
-              <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-                <table className="w-full text-sm">
+              <div className="bg-white rounded-2xl shadow-sm overflow-hidden overflow-x-auto">
+                <table className="w-full text-sm min-w-[600px]">
                   <thead className="bg-gray-50 border-b">
                     <tr>{['참여자', '미션', '지급액', '수수료', '실지급', '작업'].map(h => <th key={h} className="text-left px-4 py-3 font-medium text-gray-600">{h}</th>)}</tr>
                   </thead>
@@ -315,8 +315,8 @@ export default function OperatorDashboard() {
           {tab === 'users' && !loading && (
             <div>
               <h2 className="text-xl font-bold text-gray-900 mb-4">회원 관리 ({users.length}명)</h2>
-              <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-                <table className="w-full text-sm">
+              <div className="bg-white rounded-2xl shadow-sm overflow-hidden overflow-x-auto">
+                <table className="w-full text-sm min-w-[600px]">
                   <thead className="bg-gray-50 border-b">
                     <tr>{['이름/이메일', '역할', '상태', '가입일', '최근 로그인', '작업'].map(h => <th key={h} className="text-left px-4 py-3 font-medium text-gray-600">{h}</th>)}</tr>
                   </thead>

@@ -82,7 +82,7 @@ export default function ClientPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b px-6 py-4 flex items-center justify-between">
+      <header className="bg-white border-b px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-bold text-purple-700">맘브릿지</h1>
           <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full font-medium">고객사</span>
@@ -96,7 +96,7 @@ export default function ClientPage() {
         </div>
       </header>
 
-      <div className="max-w-4xl mx-auto px-6 py-6">
+      <div className="max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
         <div className="flex gap-1 bg-white rounded-xl p-1 shadow-sm mb-6">
           {([['my-missions', '내 미션 목록'], ['create', '미션 등록'], ['results', '결과 리포트']] as const).map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}

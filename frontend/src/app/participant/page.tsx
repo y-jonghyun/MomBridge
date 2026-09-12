@@ -142,45 +142,47 @@ export default function ParticipantPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-bold text-purple-700">맘브릿지</h1>
-          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">참여자</span>
+      <header className="bg-white border-b px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <h1 className="text-lg sm:text-xl font-bold text-purple-700">맘브릿지</h1>
+          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">참여자</span>
           {user.role === 'OPERATOR' && (
-            <Link href="/operator" className="text-xs text-gray-400 hover:text-purple-600 border border-gray-200 px-2 py-1 rounded-full">← 운영자로 돌아가기</Link>
+            <Link href="/operator" className="hidden sm:inline text-xs text-gray-400 hover:text-purple-600 border border-gray-200 px-2 py-1 rounded-full">← 운영자로</Link>
           )}
         </div>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-500">{user.name}님</span>
-          <button onClick={() => { clearAuth(); router.push('/login'); }} className="text-sm text-gray-400 hover:text-red-500">로그아웃</button>
+        <div className="flex items-center gap-2 sm:gap-4">
+          <span className="text-xs sm:text-sm text-gray-500 hidden xs:block">{user.name}님</span>
+          <button onClick={() => { clearAuth(); router.push('/login'); }} className="text-xs sm:text-sm text-gray-400 hover:text-red-500">로그아웃</button>
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto px-6 py-6">
+      <div className="max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
         {/* 수익 요약 */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="bg-white rounded-2xl p-5 shadow-sm text-center">
-            <p className="text-sm text-gray-500 mb-1">누적 수익</p>
-            <p className="text-2xl font-bold text-purple-600">{totalEarned.toLocaleString()}원</p>
+        <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-6">
+          <div className="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-5 shadow-sm text-center">
+            <p className="text-xs sm:text-sm text-gray-500 mb-1">누적 수익</p>
+            <p className="text-base sm:text-2xl font-bold text-purple-600">{totalEarned.toLocaleString()}원</p>
           </div>
-          <div className="bg-white rounded-2xl p-5 shadow-sm text-center">
-            <p className="text-sm text-gray-500 mb-1">정산 대기</p>
-            <p className="text-2xl font-bold text-yellow-500">{pendingEarned.toLocaleString()}원</p>
+          <div className="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-5 shadow-sm text-center">
+            <p className="text-xs sm:text-sm text-gray-500 mb-1">정산 대기</p>
+            <p className="text-base sm:text-2xl font-bold text-yellow-500">{pendingEarned.toLocaleString()}원</p>
           </div>
-          <div className="bg-white rounded-2xl p-5 shadow-sm text-center">
-            <p className="text-sm text-gray-500 mb-1">완료 미션</p>
-            <p className="text-2xl font-bold text-green-600">{earnings.filter(e => e.status === 'COMPLETED').length}건</p>
+          <div className="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-5 shadow-sm text-center">
+            <p className="text-xs sm:text-sm text-gray-500 mb-1">완료 미션</p>
+            <p className="text-base sm:text-2xl font-bold text-green-600">{earnings.filter(e => e.status === 'COMPLETED').length}건</p>
           </div>
         </div>
 
         {/* 탭 */}
-        <div className="flex gap-1 bg-white rounded-xl p-1 shadow-sm mb-6">
-          {tabs.map(t => (
-            <button key={t.key} onClick={() => { setTab(t.key); if (t.key === 'missions') loadMissions(missionFilter); else loadTab(t.key); }}
-              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${tab === t.key ? 'bg-purple-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
-              {t.label}
-            </button>
-          ))}
+        <div className="overflow-x-auto -mx-3 sm:mx-0 mb-4 sm:mb-6">
+          <div className="flex gap-1 bg-white rounded-xl p-1 shadow-sm mx-3 sm:mx-0 min-w-max sm:min-w-0">
+            {tabs.map(t => (
+              <button key={t.key} onClick={() => { setTab(t.key); if (t.key === 'missions') loadMissions(missionFilter); else loadTab(t.key); }}
+                className={`flex-shrink-0 sm:flex-1 px-3 sm:px-2 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${tab === t.key ? 'bg-purple-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {loading && <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" /></div>}
@@ -389,26 +391,40 @@ export default function ParticipantPage() {
             {loading && <div className="flex justify-center py-16"><div className="w-6 h-6 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" /></div>}
             {!loading && (
               <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
-                <div className="grid grid-cols-[90px_1fr_72px_64px_48px_48px] gap-2 px-4 py-2.5 bg-gray-50 border-b text-xs font-semibold text-gray-500">
-                  <span>분류</span><span>제목</span><span>작성자</span><span>작성일</span><span className="text-center">조회</span><span className="text-center">좋아요</span>
+                {/* 모바일: 카드형 */}
+                <div className="sm:hidden divide-y">
+                  {communityPosts.map(p => (
+                    <Link key={p.id} href={`/community/${p.id}`} className="flex items-start gap-3 px-4 py-3 hover:bg-purple-50 transition-colors">
+                      <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full shrink-0 mt-0.5">{p.category}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-gray-900 line-clamp-2">{p.title}</p>
+                        <p className="text-xs text-gray-400 mt-1">{p.user?.name} · {commTimeAgo(p.createdAt)} · 👁 {p.viewCount} · ❤️ {p.likeCount}</p>
+                      </div>
+                    </Link>
+                  ))}
+                  {communityPosts.length === 0 && <div className="text-center py-16 text-gray-300 text-sm">게시글이 없습니다</div>}
                 </div>
-                {communityPosts.map(p => (
-                  <Link key={p.id} href={`/community/${p.id}`}
-                    className="grid grid-cols-[90px_1fr_72px_64px_48px_48px] gap-2 px-4 py-3 border-b last:border-0 hover:bg-purple-50 transition-colors items-center group">
-                    <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full truncate">{p.category}</span>
-                    <div className="min-w-0">
-                      <span className="text-sm font-medium text-gray-900 group-hover:text-purple-700 line-clamp-1">{p.title}</span>
-                      {p._count?.comments > 0 && <span className="text-xs text-purple-400 ml-1">[{p._count.comments}]</span>}
-                    </div>
-                    <span className="text-xs text-gray-500 truncate">{p.user?.name}</span>
-                    <span className="text-xs text-gray-400">{commTimeAgo(p.createdAt)}</span>
-                    <span className="text-xs text-gray-400 text-center">{p.viewCount}</span>
-                    <span className="text-xs text-red-400 text-center">❤️{p.likeCount}</span>
-                  </Link>
-                ))}
-                {communityPosts.length === 0 && (
-                  <div className="text-center py-16 text-gray-300 text-sm">게시글이 없습니다</div>
-                )}
+                {/* 데스크탑: 테이블형 */}
+                <div className="hidden sm:block">
+                  <div className="grid grid-cols-[90px_1fr_72px_64px_48px_48px] gap-2 px-4 py-2.5 bg-gray-50 border-b text-xs font-semibold text-gray-500">
+                    <span>분류</span><span>제목</span><span>작성자</span><span>작성일</span><span className="text-center">조회</span><span className="text-center">좋아요</span>
+                  </div>
+                  {communityPosts.map(p => (
+                    <Link key={p.id} href={`/community/${p.id}`}
+                      className="grid grid-cols-[90px_1fr_72px_64px_48px_48px] gap-2 px-4 py-3 border-b last:border-0 hover:bg-purple-50 transition-colors items-center group">
+                      <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full truncate">{p.category}</span>
+                      <div className="min-w-0">
+                        <span className="text-sm font-medium text-gray-900 group-hover:text-purple-700 line-clamp-1">{p.title}</span>
+                        {p._count?.comments > 0 && <span className="text-xs text-purple-400 ml-1">[{p._count.comments}]</span>}
+                      </div>
+                      <span className="text-xs text-gray-500 truncate">{p.user?.name}</span>
+                      <span className="text-xs text-gray-400">{commTimeAgo(p.createdAt)}</span>
+                      <span className="text-xs text-gray-400 text-center">{p.viewCount}</span>
+                      <span className="text-xs text-red-400 text-center">❤️{p.likeCount}</span>
+                    </Link>
+                  ))}
+                  {communityPosts.length === 0 && <div className="text-center py-16 text-gray-300 text-sm">게시글이 없습니다</div>}
+                </div>
               </div>
             )}
           </div>
