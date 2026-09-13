@@ -170,4 +170,18 @@ router.patch('/users/:id/active', async (req: Request, res: Response, next: Next
   } catch (e) { next(e); }
 });
 
+// 고객사 프로필 목록 (미션 대행 등록용)
+router.get('/clients', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const clients = await prisma.clientProfile.findMany({
+      orderBy: { businessName: 'asc' },
+      select: {
+        id: true, businessName: true, category: true, contactPhone: true,
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
+    res.json({ success: true, data: clients });
+  } catch (e) { next(e); }
+});
+
 export default router;

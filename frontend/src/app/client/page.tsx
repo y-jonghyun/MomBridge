@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useCallback, Suspense } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
@@ -17,6 +17,35 @@ const defaultForm = {
   startDate: '', endDate: '', submissionDeadline: '',
   requirements: '',
 };
+
+type TossIntent =
+  | { type: 'create'; form: typeof defaultForm }
+  | { type: 'pay'; missionId: string; amount: number };
+
+async function initiateToss(clientKey: string, intent: TossIntent, orderName: string, customerName: string, totalAmount: number) {
+  const orderId = `MB-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  sessionStorage.setItem('tossIntent', JSON.stringify(intent));
+
+  if (!(window as any).TossPayments) {
+    await new Promise<void>((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://js.tosspayments.com/v1/payment';
+      s.onload = () => resolve();
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
+  const tossPayments = (window as any).TossPayments(clientKey);
+  await tossPayments.requestPayment('카드', {
+    amount: totalAmount,
+    orderId,
+    orderName,
+    customerName,
+    successUrl: `${window.location.origin}/client`,
+    failUrl: `${window.location.origin}/client`,
+  });
+}
 
 function ClientPageContent() {
   const router = useRouter();
@@ -39,27 +68,33 @@ function ClientPageContent() {
     if (!user) { router.push('/login'); return; }
     if (user.role !== 'CLIENT' && user.role !== 'OPERATOR') { router.push('/'); return; }
 
-    // Toss payment return: failure
+    // Toss failure return
     const paymentCode = searchParams.get('code');
     if (paymentCode) {
       const message = searchParams.get('message') ?? '결제가 취소됐습니다.';
       alert(message);
-      sessionStorage.removeItem('pendingMissionForm');
+      sessionStorage.removeItem('tossIntent');
       router.replace('/client');
-      setTab('create');
+      setTab('my-missions');
       return;
     }
 
-    // Toss payment return: success
+    // Toss success return
     const paymentKey = searchParams.get('paymentKey');
     const orderId = searchParams.get('orderId');
     const amount = searchParams.get('amount');
     if (paymentKey && orderId && amount) {
-      const saved = sessionStorage.getItem('pendingMissionForm');
+      const saved = sessionStorage.getItem('tossIntent');
       if (saved) {
-        sessionStorage.removeItem('pendingMissionForm');
-        setTab('create');
-        completeMissionCreation(paymentKey, orderId, Number(amount), JSON.parse(saved));
+        sessionStorage.removeItem('tossIntent');
+        const intent: TossIntent = JSON.parse(saved);
+        if (intent.type === 'create') {
+          setTab('create');
+          handleCreateComplete(paymentKey, orderId, Number(amount), intent.form);
+        } else if (intent.type === 'pay') {
+          setTab('my-missions');
+          handlePayComplete(paymentKey, orderId, Number(amount), intent.missionId);
+        }
         return;
       }
     }
@@ -75,16 +110,14 @@ function ClientPageContent() {
     } catch { /* 에러 무시 */ } finally { setLoading(false); }
   }
 
-  async function completeMissionCreation(paymentKey: string, orderId: string, amount: number, formData: typeof defaultForm) {
+  async function handleCreateComplete(paymentKey: string, orderId: string, amount: number, formData: typeof defaultForm) {
     setSubmitting(true);
     try {
       await api.post('/missions/pay-and-create', {
         ...formData,
         rewardAmount: Number(formData.rewardAmount),
         maxParticipants: Number(formData.maxParticipants),
-        paymentKey,
-        orderId,
-        amount,
+        paymentKey, orderId, amount,
       });
       alert('미션이 등록됐습니다. 운영자 승인 후 오픈됩니다.');
       setForm(defaultForm);
@@ -96,11 +129,22 @@ function ClientPageContent() {
     } finally { setSubmitting(false); }
   }
 
+  async function handlePayComplete(paymentKey: string, orderId: string, amount: number, missionId: string) {
+    setSubmitting(true);
+    try {
+      await api.patch(`/missions/${missionId}/pay`, { paymentKey, orderId, amount });
+      alert('결제가 완료됐습니다. 미션이 활성화 대기 중입니다.');
+      router.replace('/client');
+      loadMissions();
+    } catch (err: any) {
+      alert(err?.response?.data?.error?.message ?? '결제 처리에 실패했습니다.');
+    } finally { setSubmitting(false); }
+  }
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
 
-    // OPERATOR path: direct creation, no payment
     if (user?.role === 'OPERATOR') {
       try {
         await api.post('/missions', {
@@ -118,7 +162,6 @@ function ClientPageContent() {
       return;
     }
 
-    // CLIENT path: Toss payment redirect
     const clientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY;
     if (!clientKey) {
       alert('결제 설정이 없습니다. 관리자에게 문의하세요.');
@@ -127,34 +170,33 @@ function ClientPageContent() {
     }
 
     const totalAmount = Number(form.rewardAmount) * Number(form.maxParticipants);
-    const orderId = `MB-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-    sessionStorage.setItem('pendingMissionForm', JSON.stringify(form));
-
     try {
-      if (!(window as any).TossPayments) {
-        await new Promise<void>((resolve, reject) => {
-          const s = document.createElement('script');
-          s.src = 'https://js.tosspayments.com/v1/payment';
-          s.onload = () => resolve();
-          s.onerror = reject;
-          document.head.appendChild(s);
-        });
-      }
-      const tossPayments = (window as any).TossPayments(clientKey);
-      await tossPayments.requestPayment('카드', {
-        amount: totalAmount,
-        orderId,
-        orderName: form.title || '맘브릿지 미션 등록',
-        customerName: user?.name ?? '고객사',
-        successUrl: `${window.location.origin}/client`,
-        failUrl: `${window.location.origin}/client`,
-      });
+      await initiateToss(clientKey, { type: 'create', form }, form.title || '맘브릿지 미션 등록', user?.name ?? '고객사', totalAmount);
     } catch (err: any) {
-      sessionStorage.removeItem('pendingMissionForm');
-      if (err?.code !== 'USER_CANCEL') {
-        alert(err?.message ?? '결제 진행 중 오류가 발생했습니다.');
-      }
+      sessionStorage.removeItem('tossIntent');
+      if (err?.code !== 'USER_CANCEL') alert(err?.message ?? '결제 진행 중 오류가 발생했습니다.');
       setSubmitting(false);
+    }
+  }
+
+  async function handlePayExistingMission(mission: any) {
+    const clientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY;
+    if (!clientKey) {
+      alert('결제 설정이 없습니다. 관리자에게 문의하세요.');
+      return;
+    }
+    const totalAmount = Number(mission.rewardAmount) * Number(mission.maxParticipants);
+    try {
+      await initiateToss(
+        clientKey,
+        { type: 'pay', missionId: mission.id, amount: totalAmount },
+        mission.title,
+        user?.name ?? '고객사',
+        totalAmount,
+      );
+    } catch (err: any) {
+      sessionStorage.removeItem('tossIntent');
+      if (err?.code !== 'USER_CANCEL') alert(err?.message ?? '결제 진행 중 오류가 발생했습니다.');
     }
   }
 
@@ -169,9 +211,9 @@ function ClientPageContent() {
   }
 
   const f = (k: keyof typeof form, v: string) => setForm(prev => ({ ...prev, [k]: v }));
-
   const totalAmount = Number(form.rewardAmount || 0) * Number(form.maxParticipants || 0);
   const isClient = user?.role === 'CLIENT';
+  const pendingPaymentMissions = missions.filter(m => m.paymentStatus === 'PENDING');
 
   if (!hydrated || !user) return null;
 
@@ -192,6 +234,31 @@ function ClientPageContent() {
       </header>
 
       <div className="max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
+
+        {/* 결제 대기 중인 미션 알림 배너 */}
+        {pendingPaymentMissions.length > 0 && tab === 'my-missions' && (
+          <div className="mb-4 bg-amber-50 border border-amber-200 rounded-2xl p-4">
+            <p className="text-sm font-semibold text-amber-800 mb-2">결제 대기 중인 미션이 {pendingPaymentMissions.length}건 있습니다</p>
+            <div className="space-y-2">
+              {pendingPaymentMissions.map(m => (
+                <div key={m.id} className="flex items-center justify-between bg-white rounded-xl px-4 py-3 border border-amber-100">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{m.title}</p>
+                    <p className="text-xs text-gray-500">
+                      총 결제금액: {(Number(m.rewardAmount) * m.maxParticipants).toLocaleString()}원
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handlePayExistingMission(m)}
+                    className="px-4 py-2 bg-amber-500 text-white text-sm font-semibold rounded-xl hover:bg-amber-600 transition-colors">
+                    결제하기
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="flex gap-1 bg-white rounded-xl p-1 shadow-sm mb-6">
           {([['my-missions', '내 미션 목록'], ['create', '미션 등록'], ['results', '결과 리포트']] as const).map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
@@ -205,7 +272,7 @@ function ClientPageContent() {
         {tab === 'my-missions' && (
           <div className="space-y-3">
             {loading && <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-slate-500 border-t-transparent rounded-full animate-spin" /></div>}
-            {!loading && missions.map(m => (
+            {!loading && missions.filter(m => m.paymentStatus !== 'PENDING').map(m => (
               <div key={m.id} className="bg-white rounded-2xl p-5 shadow-sm">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -225,7 +292,7 @@ function ClientPageContent() {
                 </div>
               </div>
             ))}
-            {!loading && missions.length === 0 && (
+            {!loading && missions.filter(m => m.paymentStatus !== 'PENDING').length === 0 && pendingPaymentMissions.length === 0 && (
               <div className="text-center py-20 bg-white rounded-2xl text-gray-400">
                 <p className="mb-4">등록한 미션이 없습니다</p>
                 <button onClick={() => setTab('create')} className="px-6 py-2 bg-slate-700 text-white rounded-xl text-sm font-semibold">첫 미션 등록하기</button>
@@ -239,9 +306,7 @@ function ClientPageContent() {
           <div className="bg-white rounded-2xl shadow-sm p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-bold text-gray-900">미션 등록</h2>
-              {isClient && (
-                <span className="text-xs text-gray-400 bg-stone-100 px-3 py-1 rounded-full">결제 후 등록</span>
-              )}
+              {isClient && <span className="text-xs text-gray-400 bg-stone-100 px-3 py-1 rounded-full">결제 후 등록</span>}
             </div>
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
@@ -300,8 +365,6 @@ function ClientPageContent() {
                 <textarea rows={2} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none resize-none"
                   value={form.requirements} onChange={e => f('requirements', e.target.value)} placeholder="예: 인스타그램 팔로워 500명 이상, 게시물 24시간 이상 유지" />
               </div>
-
-              {/* 결제 금액 요약 (CLIENT 전용) */}
               {isClient && form.rewardAmount && form.maxParticipants && (
                 <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
                   <div className="flex justify-between text-sm text-gray-600 mb-1">
@@ -319,7 +382,6 @@ function ClientPageContent() {
                   <p className="text-xs text-gray-400 mt-2">토스페이먼츠를 통해 안전하게 결제됩니다</p>
                 </div>
               )}
-
               <button type="submit" disabled={submitting}
                 className="w-full bg-slate-700 text-white rounded-xl py-3 font-semibold hover:bg-slate-800 disabled:opacity-50 transition-colors">
                 {submitting

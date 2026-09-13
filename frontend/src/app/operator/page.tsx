@@ -5,7 +5,7 @@ import Link from 'next/link';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 
-type Tab = 'overview' | 'missions' | 'applications' | 'submissions' | 'payouts' | 'users';
+type Tab = 'overview' | 'missions' | 'applications' | 'submissions' | 'payouts' | 'users' | 'register-mission';
 
 const MISSION_STATUS_LABEL: Record<string, string> = { DRAFT: '임시저장', OPEN: '모집중', IN_PROGRESS: '진행중', REVIEWING: '검수중', CLOSED: '종료' };
 const MISSION_STATUS_COLOR: Record<string, string> = { DRAFT: 'bg-gray-100 text-gray-600', OPEN: 'bg-green-100 text-green-700', IN_PROGRESS: 'bg-blue-100 text-blue-700', REVIEWING: 'bg-yellow-100 text-yellow-700', CLOSED: 'bg-red-100 text-red-600' };
@@ -22,7 +22,15 @@ export default function OperatorDashboard() {
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [payouts, setPayouts] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
+  const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [registerForm, setRegisterForm] = useState({
+    clientProfileId: '', title: '', description: '', category: 'SNS',
+    rewardAmount: '', maxParticipants: '5', regionSi: '', regionGu: '',
+    startDate: '', endDate: '', submissionDeadline: '', requirements: '',
+    sendPaymentLink: false,
+  });
+  const [registerSubmitting, setRegisterSubmitting] = useState(false);
 
   useEffect(() => {
     if (!user) { router.push('/login'); return; }
@@ -44,6 +52,7 @@ export default function OperatorDashboard() {
       if (t === 'submissions') { const r = await api.get('/submissions/pending'); setSubmissions(r.data.data); }
       if (t === 'payouts') { const r = await api.get('/operator/payouts?status=PENDING'); setPayouts(r.data.data); }
       if (t === 'users') { const r = await api.get('/operator/users'); setUsers(r.data.data); }
+      if (t === 'register-mission') { const r = await api.get('/operator/clients'); setClients(r.data.data); }
     } finally { setLoading(false); }
   }, []);
 
@@ -77,11 +86,41 @@ export default function OperatorDashboard() {
     setUsers(prev => prev.map(u => u.id === id ? { ...u, isActive: !current } : u));
   }
 
+  async function handleRegisterMission(e: React.FormEvent) {
+    e.preventDefault();
+    setRegisterSubmitting(true);
+    try {
+      const { sendPaymentLink, ...missionData } = registerForm;
+      await api.post('/missions', {
+        ...missionData,
+        rewardAmount: Number(missionData.rewardAmount),
+        maxParticipants: Number(missionData.maxParticipants),
+        sendPaymentLink,
+      });
+      const msg = sendPaymentLink
+        ? '미션이 등록됐습니다. 고객사에게 결제 링크를 발송했습니다.'
+        : '미션이 등록됐습니다 (결제 면제).';
+      alert(msg);
+      setRegisterForm({
+        clientProfileId: '', title: '', description: '', category: 'SNS',
+        rewardAmount: '', maxParticipants: '5', regionSi: '', regionGu: '',
+        startDate: '', endDate: '', submissionDeadline: '', requirements: '',
+        sendPaymentLink: false,
+      });
+    } catch (err: any) {
+      alert(err?.response?.data?.error?.message ?? '등록에 실패했습니다');
+    } finally { setRegisterSubmitting(false); }
+  }
+
+  const rf = (k: keyof typeof registerForm, v: string | boolean) =>
+    setRegisterForm(prev => ({ ...prev, [k]: v }));
+
   if (!user) return null;
 
   const tabs: { key: Tab; label: string; badge?: number }[] = [
     { key: 'overview', label: '개요' },
     { key: 'missions', label: '미션 관리' },
+    { key: 'register-mission', label: '미션 대행 등록' },
     { key: 'applications', label: '지원서 승인', badge: stats?.pendingApplications },
     { key: 'submissions', label: '콘텐츠 검수', badge: stats?.pendingSubmissions },
     { key: 'payouts', label: '정산 처리', badge: stats?.pendingPayouts },
@@ -373,6 +412,127 @@ export default function OperatorDashboard() {
                   </table>
                   {payouts.length === 0 && <div className="text-center py-12 text-gray-400">대기 중인 정산이 없습니다</div>}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* 미션 대행 등록 */}
+          {tab === 'register-mission' && !loading && (
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">고객사 대신 미션 등록</h2>
+              <p className="text-sm text-gray-500 mb-6">고객사를 선택하고 미션을 대신 등록합니다. 결제 링크를 발송하면 고객사에게 SMS/카카오톡으로 전송됩니다.</p>
+              <div className="bg-white rounded-2xl shadow-sm p-6">
+                <form onSubmit={handleRegisterMission} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">고객사 선택 *</label>
+                    <select required className="w-full border rounded-lg px-3 py-2 text-sm"
+                      value={registerForm.clientProfileId} onChange={e => rf('clientProfileId', e.target.value)}>
+                      <option value="">고객사를 선택하세요</option>
+                      {clients.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.businessName} ({c.user?.email}){c.contactPhone ? ` · ${c.contactPhone}` : ' · 연락처 없음'}
+                        </option>
+                      ))}
+                    </select>
+                    {clients.length === 0 && <p className="text-xs text-amber-600 mt-1">등록된 고객사가 없습니다. 먼저 CLIENT 계정을 만들어야 합니다.</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">미션 제목 *</label>
+                    <input required className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
+                      value={registerForm.title} onChange={e => rf('title', e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">미션 설명 *</label>
+                    <textarea required rows={3} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none resize-none"
+                      value={registerForm.description} onChange={e => rf('description', e.target.value)} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">미션 유형 *</label>
+                      <select required className="w-full border rounded-lg px-3 py-2 text-sm" value={registerForm.category} onChange={e => rf('category', e.target.value)}>
+                        {[['SNS', 'SNS 게시'], ['VISIT', '방문 인증'], ['REVIEW', '리뷰 작성'], ['VIDEO', '영상 제작']].map(([v, l]) => (
+                          <option key={v} value={v}>{l}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">1인 보상금액 (원) *</label>
+                      <input required type="number" min="1000" className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
+                        value={registerForm.rewardAmount} onChange={e => rf('rewardAmount', e.target.value)} placeholder="예: 30000" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">모집 인원 *</label>
+                      <input required type="number" min="1" className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
+                        value={registerForm.maxParticipants} onChange={e => rf('maxParticipants', e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">지역 (시) *</label>
+                      <input required className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
+                        value={registerForm.regionSi} onChange={e => rf('regionSi', e.target.value)} placeholder="예: 서울시" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">지역 (구) *</label>
+                    <input required className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
+                      value={registerForm.regionGu} onChange={e => rf('regionGu', e.target.value)} placeholder="예: 마포구" />
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    {([['startDate', '시작일 *'], ['endDate', '종료일 *'], ['submissionDeadline', '제출 마감일 *']] as const).map(([k, l]) => (
+                      <div key={k}>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">{l}</label>
+                        <input required type="date" className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
+                          value={registerForm[k]} onChange={e => rf(k, e.target.value)} />
+                      </div>
+                    ))}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">수행 조건 (선택)</label>
+                    <textarea rows={2} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none resize-none"
+                      value={registerForm.requirements} onChange={e => rf('requirements', e.target.value)} />
+                  </div>
+
+                  {/* 결제 옵션 */}
+                  <div className="bg-stone-50 rounded-xl p-4 border">
+                    <p className="text-sm font-medium text-gray-700 mb-3">결제 처리</p>
+                    <div className="space-y-2">
+                      <label className="flex items-start gap-3 cursor-pointer">
+                        <input type="radio" name="paymentOption" className="mt-0.5"
+                          checked={!registerForm.sendPaymentLink}
+                          onChange={() => rf('sendPaymentLink', false)} />
+                        <div>
+                          <p className="text-sm font-medium text-gray-800">결제 면제 (WAIVED)</p>
+                          <p className="text-xs text-gray-500">운영자 테스트, 프로모션 등 결제 없이 바로 등록</p>
+                        </div>
+                      </label>
+                      <label className="flex items-start gap-3 cursor-pointer">
+                        <input type="radio" name="paymentOption" className="mt-0.5"
+                          checked={registerForm.sendPaymentLink}
+                          onChange={() => rf('sendPaymentLink', true)} />
+                        <div>
+                          <p className="text-sm font-medium text-gray-800">결제 링크 발송 (SMS/카카오톡)</p>
+                          <p className="text-xs text-gray-500">
+                            고객사 연락처로 결제 링크를 발송합니다.
+                            {registerForm.clientProfileId && clients.find(c => c.id === registerForm.clientProfileId)?.contactPhone
+                              ? ` 수신: ${clients.find(c => c.id === registerForm.clientProfileId)?.contactPhone}`
+                              : ' (연락처가 없으면 발송되지 않습니다)'}
+                          </p>
+                        </div>
+                      </label>
+                    </div>
+                    {registerForm.sendPaymentLink && registerForm.rewardAmount && registerForm.maxParticipants && (
+                      <div className="mt-3 pt-3 border-t text-sm text-gray-600">
+                        결제 요청 금액: <strong>{(Number(registerForm.rewardAmount) * Number(registerForm.maxParticipants)).toLocaleString()}원</strong>
+                      </div>
+                    )}
+                  </div>
+
+                  <button type="submit" disabled={registerSubmitting}
+                    className="w-full bg-slate-700 text-white rounded-xl py-3 font-semibold hover:bg-slate-800 disabled:opacity-50 transition-colors">
+                    {registerSubmitting ? '등록 중...' : registerForm.sendPaymentLink ? '미션 등록 + 결제 링크 발송' : '미션 등록 (결제 면제)'}
+                  </button>
+                </form>
               </div>
             </div>
           )}
