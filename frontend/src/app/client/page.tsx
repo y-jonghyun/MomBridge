@@ -145,23 +145,6 @@ function ClientPageContent() {
     e.preventDefault();
     setSubmitting(true);
 
-    if (user?.role === 'OPERATOR') {
-      try {
-        await api.post('/missions', {
-          ...form,
-          rewardAmount: Number(form.rewardAmount),
-          maxParticipants: Number(form.maxParticipants),
-        });
-        alert('미션이 등록됐습니다. 운영자 승인 후 오픈됩니다.');
-        setForm(defaultForm);
-        setTab('my-missions');
-        loadMissions();
-      } catch (err: any) {
-        alert(err?.response?.data?.error?.message ?? '등록에 실패했습니다');
-      } finally { setSubmitting(false); }
-      return;
-    }
-
     const clientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY;
     if (!clientKey) {
       alert('결제 설정이 없습니다. 관리자에게 문의하세요.');
@@ -212,7 +195,6 @@ function ClientPageContent() {
 
   const f = (k: keyof typeof form, v: string) => setForm(prev => ({ ...prev, [k]: v }));
   const totalAmount = Number(form.rewardAmount || 0) * Number(form.maxParticipants || 0);
-  const isClient = user?.role === 'CLIENT';
   const pendingPaymentMissions = missions.filter(m => m.paymentStatus === 'PENDING');
 
   if (!hydrated || !user) return null;
@@ -306,7 +288,7 @@ function ClientPageContent() {
           <div className="bg-white rounded-2xl shadow-sm p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-bold text-gray-900">미션 등록</h2>
-              {isClient && <span className="text-xs text-gray-400 bg-stone-100 px-3 py-1 rounded-full">결제 후 등록</span>}
+              <span className="text-xs text-gray-400 bg-stone-100 px-3 py-1 rounded-full">결제 후 등록</span>
             </div>
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
@@ -365,7 +347,7 @@ function ClientPageContent() {
                 <textarea rows={2} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none resize-none"
                   value={form.requirements} onChange={e => f('requirements', e.target.value)} placeholder="예: 인스타그램 팔로워 500명 이상, 게시물 24시간 이상 유지" />
               </div>
-              {isClient && form.rewardAmount && form.maxParticipants && (
+              {form.rewardAmount && form.maxParticipants && (
                 <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
                   <div className="flex justify-between text-sm text-gray-600 mb-1">
                     <span>1인 보상금액</span>
@@ -386,9 +368,7 @@ function ClientPageContent() {
                 className="w-full bg-slate-700 text-white rounded-xl py-3 font-semibold hover:bg-slate-800 disabled:opacity-50 transition-colors">
                 {submitting
                   ? '처리 중...'
-                  : isClient
-                    ? `${totalAmount > 0 ? `${totalAmount.toLocaleString()}원 ` : ''}결제하고 등록하기`
-                    : '미션 등록하기 (결제 면제)'}
+                  : `${totalAmount > 0 ? `${totalAmount.toLocaleString()}원 ` : ''}결제하고 등록하기`}
               </button>
             </form>
           </div>
