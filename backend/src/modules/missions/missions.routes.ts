@@ -74,9 +74,16 @@ router.post('/', authenticate, requireRole('OPERATOR'), async (req: Request, res
     const sendPaymentLink: boolean = !!req.body.sendPaymentLink;
     const { clientProfileId: _a, sendPaymentLink: _b, paymentKey: _c, orderId: _d, totalAmount: _e, ...missionData } = req.body;
 
+    const toDate = (v: any) => v ? new Date(v) : undefined;
+
     const mission = await prisma.mission.create({
       data: {
         ...missionData,
+        rewardAmount: Number(missionData.rewardAmount),
+        maxParticipants: Number(missionData.maxParticipants),
+        startDate: toDate(missionData.startDate)!,
+        endDate: toDate(missionData.endDate)!,
+        submissionDeadline: toDate(missionData.submissionDeadline)!,
         clientProfileId,
         status: 'DRAFT',
         paymentStatus: sendPaymentLink ? 'PENDING' : 'WAIVED',
@@ -139,6 +146,9 @@ router.post('/pay-and-create', authenticate, requireRole('CLIENT'), async (req: 
         ...missionData,
         rewardAmount: Number(missionData.rewardAmount),
         maxParticipants: Number(missionData.maxParticipants),
+        startDate: new Date(missionData.startDate),
+        endDate: new Date(missionData.endDate),
+        submissionDeadline: new Date(missionData.submissionDeadline),
         clientProfileId: clientProfile.id,
         status: 'DRAFT',
         paymentStatus: 'PAID',
