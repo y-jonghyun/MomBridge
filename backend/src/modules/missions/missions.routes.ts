@@ -59,20 +59,74 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   } catch (e) { next(e); }
 });
 
-// 미션 생성 (CLIENT, OPERATOR)
-router.post('/', authenticate, requireRole('CLIENT', 'OPERATOR'), async (req: Request, res: Response, next: NextFunction) => {
+// 미션 생성 — OPERATOR만 허용 (결제 면제, 대신 등록)
+router.post('/', authenticate, requireRole('OPERATOR'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = req.user!;
-    const clientProfile = await prisma.clientProfile.findUnique({ where: { userId: user.sub } });
-    if (!clientProfile) throw new AppError('PROFILE_REQUIRED', 403, '고객사 프로필이 필요합니다');
+    // 운영자가 대신 등록할 때: clientProfileId를 body로 받거나 운영자 본인 프로필 사용
+    let clientProfileId: string = req.body.clientProfileId;
+    if (!clientProfileId) {
+      const ownProfile = await prisma.clientProfile.findUnique({ where: { userId: user.sub } });
+      if (!ownProfile) throw new AppError('PROFILE_REQUIRED', 403, 'clientProfileId가 필요합니다');
+      clientProfileId = ownProfile.id;
+    }
 
+    const { clientProfileId: _ignore, paymentKey, orderId, totalAmount, ...missionData } = req.body;
     const mission = await prisma.mission.create({
       data: {
-        ...req.body,
-        clientProfileId: clientProfile.id,
+        ...missionData,
+        clientProfileId,
         status: 'DRAFT',
+        paymentStatus: 'WAIVED',
       },
     });
+    res.status(201).json({ success: true, data: mission });
+  } catch (e) { next(e); }
+});
+
+// 결제 후 미션 생성 — CLIENT 전용 (토스페이먼츠 결제 확인)
+router.post('/pay-and-create', authenticate, requireRole('CLIENT'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { paymentKey, orderId, amount, ...missionData } = req.body;
+
+    // 1. 토스페이먼츠 결제 확인
+    const tossSecretKey = process.env.TOSS_SECRET_KEY;
+    if (!tossSecretKey) throw new AppError('CONFIG_ERROR', 500, '결제 설정 오류');
+
+    const authHeader = 'Basic ' + Buffer.from(tossSecretKey + ':').toString('base64');
+    const tossRes = await fetch('https://api.tosspayments.com/v1/payments/confirm', {
+      method: 'POST',
+      headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paymentKey, orderId, amount }),
+    });
+
+    if (!tossRes.ok) {
+      const err = await tossRes.json().catch(() => ({}));
+      throw new AppError('PAYMENT_FAILED', 400, (err as any).message ?? '결제 확인에 실패했습니다');
+    }
+
+    const payment = await tossRes.json() as { paymentKey: string; orderId: string; approvedAt: string };
+
+    // 2. 고객사 프로필 조회
+    const clientProfile = await prisma.clientProfile.findUnique({ where: { userId: req.user!.sub } });
+    if (!clientProfile) throw new AppError('PROFILE_REQUIRED', 403, '고객사 프로필이 필요합니다');
+
+    // 3. 미션 생성
+    const mission = await prisma.mission.create({
+      data: {
+        ...missionData,
+        rewardAmount: Number(missionData.rewardAmount),
+        maxParticipants: Number(missionData.maxParticipants),
+        clientProfileId: clientProfile.id,
+        status: 'DRAFT',
+        paymentStatus: 'PAID',
+        paymentKey: payment.paymentKey,
+        orderId: payment.orderId,
+        totalAmount: Number(amount),
+        paidAt: new Date(payment.approvedAt),
+      },
+    });
+
     res.status(201).json({ success: true, data: mission });
   } catch (e) { next(e); }
 });

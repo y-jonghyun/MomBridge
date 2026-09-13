@@ -199,6 +199,11 @@ model Mission {
   thumbnailUrl     String?         @db.VarChar(2048)
   viewCount        Int             @default(0)
   isVisible        Boolean         @default(true)
+  paymentStatus    String          @default("PENDING") @db.Text
+  totalAmount      Decimal?        @db.Decimal(12, 2)
+  paymentKey       String?         @db.VarChar(200)
+  orderId          String?         @db.VarChar(200)
+  paidAt           DateTime?
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
   publishedAt      DateTime?

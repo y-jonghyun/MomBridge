@@ -1,6 +1,6 @@
-﻿'use client';
-import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+'use client';
+import { useEffect, useState, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
@@ -18,8 +18,9 @@ const defaultForm = {
   requirements: '',
 };
 
-export default function ClientPage() {
+function ClientPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const user = useAuthStore((s) => s.user);
   const clearAuth = useAuthStore((s) => s.clearAuth);
   const [hydrated, setHydrated] = useState(false);
@@ -37,6 +38,32 @@ export default function ClientPage() {
     if (!hydrated) return;
     if (!user) { router.push('/login'); return; }
     if (user.role !== 'CLIENT' && user.role !== 'OPERATOR') { router.push('/'); return; }
+
+    // Toss payment return: failure
+    const paymentCode = searchParams.get('code');
+    if (paymentCode) {
+      const message = searchParams.get('message') ?? '결제가 취소됐습니다.';
+      alert(message);
+      sessionStorage.removeItem('pendingMissionForm');
+      router.replace('/client');
+      setTab('create');
+      return;
+    }
+
+    // Toss payment return: success
+    const paymentKey = searchParams.get('paymentKey');
+    const orderId = searchParams.get('orderId');
+    const amount = searchParams.get('amount');
+    if (paymentKey && orderId && amount) {
+      const saved = sessionStorage.getItem('pendingMissionForm');
+      if (saved) {
+        sessionStorage.removeItem('pendingMissionForm');
+        setTab('create');
+        completeMissionCreation(paymentKey, orderId, Number(amount), JSON.parse(saved));
+        return;
+      }
+    }
+
     loadMissions();
   }, [user, hydrated]);
 
@@ -48,22 +75,87 @@ export default function ClientPage() {
     } catch { /* 에러 무시 */ } finally { setLoading(false); }
   }
 
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
+  async function completeMissionCreation(paymentKey: string, orderId: string, amount: number, formData: typeof defaultForm) {
     setSubmitting(true);
     try {
-      await api.post('/missions', {
-        ...form,
-        rewardAmount: Number(form.rewardAmount),
-        maxParticipants: Number(form.maxParticipants),
+      await api.post('/missions/pay-and-create', {
+        ...formData,
+        rewardAmount: Number(formData.rewardAmount),
+        maxParticipants: Number(formData.maxParticipants),
+        paymentKey,
+        orderId,
+        amount,
       });
       alert('미션이 등록됐습니다. 운영자 승인 후 오픈됩니다.');
       setForm(defaultForm);
+      router.replace('/client');
       setTab('my-missions');
       loadMissions();
     } catch (err: any) {
-      alert(err?.response?.data?.error?.message ?? '등록에 실패했습니다');
+      alert(err?.response?.data?.error?.message ?? '미션 등록에 실패했습니다. 결제는 취소 처리됩니다.');
     } finally { setSubmitting(false); }
+  }
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+
+    // OPERATOR path: direct creation, no payment
+    if (user?.role === 'OPERATOR') {
+      try {
+        await api.post('/missions', {
+          ...form,
+          rewardAmount: Number(form.rewardAmount),
+          maxParticipants: Number(form.maxParticipants),
+        });
+        alert('미션이 등록됐습니다. 운영자 승인 후 오픈됩니다.');
+        setForm(defaultForm);
+        setTab('my-missions');
+        loadMissions();
+      } catch (err: any) {
+        alert(err?.response?.data?.error?.message ?? '등록에 실패했습니다');
+      } finally { setSubmitting(false); }
+      return;
+    }
+
+    // CLIENT path: Toss payment redirect
+    const clientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY;
+    if (!clientKey) {
+      alert('결제 설정이 없습니다. 관리자에게 문의하세요.');
+      setSubmitting(false);
+      return;
+    }
+
+    const totalAmount = Number(form.rewardAmount) * Number(form.maxParticipants);
+    const orderId = `MB-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    sessionStorage.setItem('pendingMissionForm', JSON.stringify(form));
+
+    try {
+      if (!(window as any).TossPayments) {
+        await new Promise<void>((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = 'https://js.tosspayments.com/v1/payment';
+          s.onload = () => resolve();
+          s.onerror = reject;
+          document.head.appendChild(s);
+        });
+      }
+      const tossPayments = (window as any).TossPayments(clientKey);
+      await tossPayments.requestPayment('카드', {
+        amount: totalAmount,
+        orderId,
+        orderName: form.title || '맘브릿지 미션 등록',
+        customerName: user?.name ?? '고객사',
+        successUrl: `${window.location.origin}/client`,
+        failUrl: `${window.location.origin}/client`,
+      });
+    } catch (err: any) {
+      sessionStorage.removeItem('pendingMissionForm');
+      if (err?.code !== 'USER_CANCEL') {
+        alert(err?.message ?? '결제 진행 중 오류가 발생했습니다.');
+      }
+      setSubmitting(false);
+    }
   }
 
   async function loadMissionDetail(mission: any) {
@@ -77,6 +169,9 @@ export default function ClientPage() {
   }
 
   const f = (k: keyof typeof form, v: string) => setForm(prev => ({ ...prev, [k]: v }));
+
+  const totalAmount = Number(form.rewardAmount || 0) * Number(form.maxParticipants || 0);
+  const isClient = user?.role === 'CLIENT';
 
   if (!hydrated || !user) return null;
 
@@ -142,7 +237,12 @@ export default function ClientPage() {
         {/* 미션 등록 */}
         {tab === 'create' && (
           <div className="bg-white rounded-2xl shadow-sm p-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-6">미션 등록</h2>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-bold text-gray-900">미션 등록</h2>
+              {isClient && (
+                <span className="text-xs text-gray-400 bg-stone-100 px-3 py-1 rounded-full">결제 후 등록</span>
+              )}
+            </div>
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">미션 제목 *</label>
@@ -200,9 +300,33 @@ export default function ClientPage() {
                 <textarea rows={2} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none resize-none"
                   value={form.requirements} onChange={e => f('requirements', e.target.value)} placeholder="예: 인스타그램 팔로워 500명 이상, 게시물 24시간 이상 유지" />
               </div>
+
+              {/* 결제 금액 요약 (CLIENT 전용) */}
+              {isClient && form.rewardAmount && form.maxParticipants && (
+                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                  <div className="flex justify-between text-sm text-gray-600 mb-1">
+                    <span>1인 보상금액</span>
+                    <span>{Number(form.rewardAmount).toLocaleString()}원</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-gray-600 mb-2">
+                    <span>모집 인원</span>
+                    <span>{form.maxParticipants}명</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-slate-800 text-base border-t pt-2">
+                    <span>총 결제 금액</span>
+                    <span>{totalAmount.toLocaleString()}원</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">토스페이먼츠를 통해 안전하게 결제됩니다</p>
+                </div>
+              )}
+
               <button type="submit" disabled={submitting}
-                className="w-full bg-slate-700 text-white rounded-xl py-3 font-semibold hover:bg-slate-700 disabled:opacity-50">
-                {submitting ? '등록 중...' : '미션 등록하기'}
+                className="w-full bg-slate-700 text-white rounded-xl py-3 font-semibold hover:bg-slate-800 disabled:opacity-50 transition-colors">
+                {submitting
+                  ? '처리 중...'
+                  : isClient
+                    ? `${totalAmount > 0 ? `${totalAmount.toLocaleString()}원 ` : ''}결제하고 등록하기`
+                    : '미션 등록하기 (결제 면제)'}
               </button>
             </form>
           </div>
@@ -261,5 +385,13 @@ export default function ClientPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ClientPage() {
+  return (
+    <Suspense fallback={null}>
+      <ClientPageContent />
+    </Suspense>
   );
 }
