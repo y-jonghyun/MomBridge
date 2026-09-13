@@ -12,7 +12,7 @@ function RegisterForm() {
   const searchParams = useSearchParams();
   const setAuth = useAuthStore((s) => s.setAuth);
   const [form, setForm] = useState({
-    email: '', password: '', name: '',
+    email: '', password: '', name: '', phone: '',
     role: (['PARTICIPANT', 'CLIENT'].includes(searchParams.get('role')?.toUpperCase() ?? '') ? searchParams.get('role')!.toUpperCase() : 'PARTICIPANT') as Role,
   });
   const [error, setError] = useState('');
@@ -63,6 +63,19 @@ function RegisterForm() {
               </div>
             );
           })}
+          {form.role === 'CLIENT' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">연락처 (SMS 수신용)</label>
+              <input
+                type="tel"
+                placeholder="예: 01012345678"
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              />
+              <p className="text-xs text-gray-400 mt-1">운영자가 결제 링크를 SMS로 발송할 때 사용됩니다</p>
+            </div>
+          )}
           {error && <p className="text-red-500 text-sm">{error}</p>}
           <button type="submit" disabled={loading}
             className="w-full bg-slate-700 text-white rounded-lg py-2 font-semibold hover:bg-slate-700 disabled:opacity-50">

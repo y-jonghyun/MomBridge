@@ -14,6 +14,26 @@ async function getOrCreateClientProfile(userId: string, name = '') {
   });
 }
 
+// 내 프로필 조회
+router.get('/profile', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const profile = await getOrCreateClientProfile(req.user!.sub);
+    res.json({ success: true, data: profile });
+  } catch (e) { next(e); }
+});
+
+// 연락처 업데이트
+router.patch('/profile/phone', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const profile = await getOrCreateClientProfile(req.user!.sub);
+    const updated = await prisma.clientProfile.update({
+      where: { id: profile.id },
+      data: { contactPhone: req.body.phone },
+    });
+    res.json({ success: true, data: updated });
+  } catch (e) { next(e); }
+});
+
 // 내 미션 목록
 router.get('/missions', async (req: Request, res: Response, next: NextFunction) => {
   try {

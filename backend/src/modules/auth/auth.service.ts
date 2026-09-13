@@ -13,7 +13,7 @@ function signTokens(userId: string, email: string, role: UserRole) {
 }
 
 export async function register(body: {
-  email: string; password: string; name: string; role: UserRole;
+  email: string; password: string; name: string; role: UserRole; phone?: string;
 }) {
   const exists = await prisma.user.findUnique({ where: { email: body.email } });
   if (exists) throw new AppError('EMAIL_EXISTS', 409, '이미 사용 중인 이메일입니다');
@@ -27,7 +27,12 @@ export async function register(body: {
   if (body.role === 'PARTICIPANT') {
     await prisma.participantProfile.create({ data: { userId: user.id, regionSi: '', regionGu: '' } });
   } else if (body.role === 'CLIENT') {
-    await prisma.clientProfile.create({ data: { userId: user.id, businessName: body.name, category: '', address: '', regionSi: '', regionGu: '' } });
+    await prisma.clientProfile.create({
+      data: {
+        userId: user.id, businessName: body.name, category: '', address: '', regionSi: '', regionGu: '',
+        ...(body.phone ? { contactPhone: body.phone } : {}),
+      },
+    });
   }
 
   const tokens = signTokens(user.id, user.email, user.role as UserRole);

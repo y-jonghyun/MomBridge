@@ -5,7 +5,7 @@ import Link from 'next/link';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 
-type Tab = 'my-missions' | 'create' | 'results';
+type Tab = 'my-missions' | 'create' | 'results' | 'profile';
 
 const STATUS_LABEL: Record<string, string> = { DRAFT: '임시저장', OPEN: '모집중', IN_PROGRESS: '진행중', REVIEWING: '검수중', CLOSED: '종료' };
 const STATUS_COLOR: Record<string, string> = { DRAFT: 'bg-gray-100 text-gray-600', OPEN: 'bg-green-100 text-green-700', IN_PROGRESS: 'bg-blue-100 text-blue-700', REVIEWING: 'bg-yellow-100 text-yellow-700', CLOSED: 'bg-red-100 text-red-600' };
@@ -60,6 +60,8 @@ function ClientPageContent() {
   const [loading, setLoading] = useState(false);
   const [selectedMission, setSelectedMission] = useState<any>(null);
   const [missionDetail, setMissionDetail] = useState<{ applications: any[]; submissions: any[] } | null>(null);
+  const [profileForm, setProfileForm] = useState({ name: '', phone: '', currentPassword: '', newPassword: '' });
+  const [profileSaving, setProfileSaving] = useState(false);
 
   useEffect(() => { setHydrated(true); }, []);
 
@@ -100,7 +102,43 @@ function ClientPageContent() {
     }
 
     loadMissions();
+    loadProfile();
   }, [user, hydrated]);
+
+  async function loadProfile() {
+    try {
+      const [userR, profileR] = await Promise.all([
+        api.get('/auth/me'),
+        api.get('/client/profile'),
+      ]);
+      setProfileForm(prev => ({
+        ...prev,
+        name: userR.data.data.user.name ?? '',
+        phone: profileR.data.data.contactPhone ?? '',
+      }));
+    } catch { /* 무시 */ }
+  }
+
+  async function handleSaveProfile(e: React.FormEvent) {
+    e.preventDefault();
+    setProfileSaving(true);
+    try {
+      const tasks: Promise<any>[] = [];
+      if (profileForm.name.trim()) tasks.push(api.patch('/auth/me/name', { name: profileForm.name }));
+      if (profileForm.phone) tasks.push(api.patch('/client/profile/phone', { phone: profileForm.phone }));
+      if (profileForm.newPassword) {
+        tasks.push(api.patch('/auth/me/password', {
+          currentPassword: profileForm.currentPassword,
+          newPassword: profileForm.newPassword,
+        }));
+      }
+      await Promise.all(tasks);
+      alert('저장됐습니다.');
+      setProfileForm(prev => ({ ...prev, currentPassword: '', newPassword: '' }));
+    } catch (err: any) {
+      alert(err?.response?.data?.error?.message ?? '저장에 실패했습니다');
+    } finally { setProfileSaving(false); }
+  }
 
   async function loadMissions() {
     setLoading(true);
@@ -242,7 +280,7 @@ function ClientPageContent() {
         )}
 
         <div className="flex gap-1 bg-white rounded-xl p-1 shadow-sm mb-6">
-          {([['my-missions', '내 미션 목록'], ['create', '미션 등록'], ['results', '결과 리포트']] as const).map(([key, label]) => (
+          {([['my-missions', '내 미션 목록'], ['create', '미션 등록'], ['results', '결과 리포트'], ['profile', '내 정보']] as const).map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
               className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${tab === key ? 'bg-slate-700 text-white' : 'text-gray-600 hover:bg-stone-50'}`}>
               {label}
@@ -369,6 +407,42 @@ function ClientPageContent() {
                 {submitting
                   ? '처리 중...'
                   : `${totalAmount > 0 ? `${totalAmount.toLocaleString()}원 ` : ''}결제하고 등록하기`}
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* 내 정보 */}
+        {tab === 'profile' && (
+          <div className="bg-white rounded-2xl shadow-sm p-6">
+            <h2 className="text-lg font-bold text-gray-900 mb-6">내 정보 수정</h2>
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">이름</label>
+                <input className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
+                  value={profileForm.name} onChange={e => setProfileForm(p => ({ ...p, name: e.target.value }))} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">연락처 (SMS 수신용)</label>
+                <input type="tel" placeholder="예: 01012345678"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
+                  value={profileForm.phone} onChange={e => setProfileForm(p => ({ ...p, phone: e.target.value }))} />
+                <p className="text-xs text-gray-400 mt-1">운영자가 결제 링크를 발송할 때 사용됩니다</p>
+              </div>
+              <div className="border-t pt-4">
+                <p className="text-sm font-medium text-gray-700 mb-3">비밀번호 변경 (선택)</p>
+                <div className="space-y-3">
+                  <input type="password" placeholder="현재 비밀번호"
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
+                    value={profileForm.currentPassword} onChange={e => setProfileForm(p => ({ ...p, currentPassword: e.target.value }))} />
+                  <input type="password" placeholder="새 비밀번호 (6자 이상)"
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
+                    value={profileForm.newPassword} onChange={e => setProfileForm(p => ({ ...p, newPassword: e.target.value }))} />
+                </div>
+              </div>
+              <button type="submit" disabled={profileSaving}
+                className="w-full bg-slate-700 text-white rounded-xl py-3 font-semibold hover:bg-slate-800 disabled:opacity-50 transition-colors">
+                {profileSaving ? '저장 중...' : '저장하기'}
               </button>
             </form>
           </div>
