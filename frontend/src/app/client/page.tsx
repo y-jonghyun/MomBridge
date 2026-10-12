@@ -243,7 +243,7 @@ function ClientPageContent() {
           <Link href="/" className="font-serif italic text-lg whitespace-nowrap shrink-0">맘브릿지</Link>
           <span className="text-[11px] tracking-widest2 text-muted whitespace-nowrap shrink-0">고객사</span>
           {user.role === 'OPERATOR' && (
-            <Link href="/operator" className="text-[11px] text-muted hover:text-ink border border-line px-2.5 py-1 whitespace-nowrap shrink-0">← 운영자</Link>
+            <Link href="/operator" className="text-[11px] text-muted hover:text-ink bg-white border border-line px-2.5 py-1 whitespace-nowrap shrink-0">← 운영자</Link>
           )}
         </div>
         <div className="flex items-center gap-4 shrink-0">
@@ -256,7 +256,7 @@ function ClientPageContent() {
 
         {/* 결제 대기 중인 미션 알림 배너 */}
         {pendingPaymentMissions.length > 0 && tab === 'my-missions' && (
-          <div className="mb-6 border border-line p-5">
+          <div className="mb-6 bg-white border border-line p-5">
             <p className="text-[13px] mb-3">결제 대기 중인 미션이 {pendingPaymentMissions.length}건 있습니다</p>
             <div className="space-y-2">
               {pendingPaymentMissions.map(m => (
@@ -276,7 +276,7 @@ function ClientPageContent() {
           </div>
         )}
 
-        <div className="flex border border-line mb-8 overflow-x-auto">
+        <div className="flex bg-white border border-line mb-8 overflow-x-auto">
           {([['my-missions', '내 미션 목록'], ['create', '미션 등록'], ['results', '결과 리포트'], ['profile', '내 정보']] as const).map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
               className={`flex-1 py-3 text-[12px] tracking-wide transition-colors whitespace-nowrap px-3 ${tab === key ? 'bg-ink text-cream' : 'text-muted hover:bg-sand'}`}>
@@ -290,12 +290,12 @@ function ClientPageContent() {
           <div className="space-y-4">
             {loading && <div className="flex justify-center py-20"><div className="w-6 h-6 border border-ink border-t-transparent rounded-full animate-spin" /></div>}
             {!loading && missions.filter(m => m.paymentStatus !== 'PENDING').map(m => (
-              <div key={m.id} className="border border-line p-5">
+              <div key={m.id} className="bg-white border border-line p-5">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1.5">
                       <h3 className="text-[14px]">{m.title}</h3>
-                      <span className="text-[11px] text-muted border border-line px-2 py-0.5">{STATUS_LABEL[m.status] ?? m.status}</span>
+                      <span className="text-[11px] text-muted bg-white border border-line px-2 py-0.5">{STATUS_LABEL[m.status] ?? m.status}</span>
                     </div>
                     <p className="text-[13px] text-muted line-clamp-1">{m.description}</p>
                     <div className="flex gap-4 mt-2 text-[11px] text-muted">
@@ -310,7 +310,7 @@ function ClientPageContent() {
               </div>
             ))}
             {!loading && missions.filter(m => m.paymentStatus !== 'PENDING').length === 0 && pendingPaymentMissions.length === 0 && (
-              <div className="text-center py-20 border border-line text-muted">
+              <div className="text-center py-20 bg-white border border-line text-muted">
                 <p className="mb-4 text-[13px]">등록한 미션이 없습니다</p>
                 <button onClick={() => setTab('create')} className="btn-solid">첫 미션 등록하기</button>
               </div>
@@ -320,10 +320,10 @@ function ClientPageContent() {
 
         {/* 미션 등록 */}
         {tab === 'create' && (
-          <div className="border border-line p-6">
+          <div className="bg-white border border-line p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="font-serif italic text-lg">미션 등록</h2>
-              <span className="text-[11px] text-muted border border-line px-3 py-1">결제 후 등록</span>
+              <span className="text-[11px] text-muted bg-white border border-line px-3 py-1">결제 후 등록</span>
             </div>
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
@@ -410,7 +410,7 @@ function ClientPageContent() {
 
         {/* 내 정보 */}
         {tab === 'profile' && (
-          <div className="border border-line p-6">
+          <div className="bg-white border border-line p-6">
             <h2 className="font-serif italic text-lg mb-6">내 정보 수정</h2>
             <form onSubmit={handleSaveProfile} className="space-y-4">
               <div>
@@ -447,19 +447,19 @@ function ClientPageContent() {
         {tab === 'results' && (
           <div>
             {!selectedMission ? (
-              <div className="text-center py-20 text-muted border border-line">미션 목록에서 결과보기를 클릭하세요</div>
+              <div className="text-center py-20 text-muted bg-white border border-line">미션 목록에서 결과보기를 클릭하세요</div>
             ) : (
               <div className="space-y-4">
-                <div className="border border-line p-5">
+                <div className="bg-white border border-line p-5">
                   <h3 className="font-serif italic text-lg mb-1">{selectedMission.title}</h3>
                   <div className="flex gap-4 text-[13px] text-muted">
                     <span>보상 {Number(selectedMission.rewardAmount).toLocaleString()}원</span>
-                    <span className="border border-line px-2 py-0.5 text-[11px]">{STATUS_LABEL[selectedMission.status]}</span>
+                    <span className="bg-white border border-line px-2 py-0.5 text-[11px]">{STATUS_LABEL[selectedMission.status]}</span>
                   </div>
                 </div>
                 {missionDetail && (
                   <>
-                    <div className="grid grid-cols-3 gap-px bg-line border border-line">
+                    <div className="grid grid-cols-3 gap-px bg-line bg-white border border-line">
                       {[
                         { label: '총 지원자', value: missionDetail.applications.length },
                         { label: '승인된 지원', value: missionDetail.applications.filter(a => a.status === 'APPROVED').length },
@@ -472,14 +472,14 @@ function ClientPageContent() {
                       ))}
                     </div>
                     {missionDetail.submissions.length > 0 && (
-                      <div className="border border-line p-5">
+                      <div className="bg-white border border-line p-5">
                         <h4 className="text-[13px] tracking-widest2 text-muted mb-4">제출된 콘텐츠</h4>
                         <div className="space-y-3">
                           {missionDetail.submissions.map((s: any) => (
-                            <div key={s.id} className="border border-line p-3">
+                            <div key={s.id} className="bg-white border border-line p-3">
                               <div className="flex items-center justify-between mb-2">
                                 <p className="text-[13px]">{s.participant?.user?.name}</p>
-                                <span className="text-[11px] text-muted border border-line px-2 py-0.5">{STATUS_LABEL[s.status] ?? s.status}</span>
+                                <span className="text-[11px] text-muted bg-white border border-line px-2 py-0.5">{STATUS_LABEL[s.status] ?? s.status}</span>
                               </div>
                               {s.description && <p className="text-[13px] text-muted">{s.description}</p>}
                               {s.snsPostUrl && <a href={s.snsPostUrl} target="_blank" rel="noreferrer" className="text-[11px] text-ink underline">SNS 링크 →</a>}

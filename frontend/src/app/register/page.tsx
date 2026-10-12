@@ -37,7 +37,7 @@ function RegisterForm() {
     <div className="min-h-screen flex flex-col bg-cream">
       <Header />
       <main className="flex-1 flex items-center justify-center">
-        <div className="w-full max-w-sm mx-auto px-5 py-20 text-center">
+        <div className="w-full max-w-sm mx-auto px-10 py-16 my-10 text-center bg-white">
           <h1 className="font-serif italic text-3xl mb-10">회원가입</h1>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4 text-left">

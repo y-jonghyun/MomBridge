@@ -75,19 +75,19 @@ export default function CommunityPostPage() {
   }
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-cream">
+    <div className="min-h-screen flex items-center justify-center">
       <div className="w-6 h-6 border border-ink border-t-transparent rounded-full animate-spin" />
     </div>
   );
   if (!post) return (
-    <div className="min-h-screen flex items-center justify-center bg-cream text-muted text-sm">게시글을 찾을 수 없습니다</div>
+    <div className="min-h-screen flex items-center justify-center text-muted text-sm">게시글을 찾을 수 없습니다</div>
   );
 
   const isOwner = user?.id === post.user?.id;
   const isOperator = user?.role === 'OPERATOR';
 
   return (
-    <div className="min-h-screen bg-cream">
+    <div className="min-h-screen">
       {/* 헤더 */}
       <header className="bg-cream border-b border-line sticky top-0 z-20">
         <div className="max-w-3xl mx-auto px-5 py-4 flex items-center gap-3">
@@ -100,11 +100,11 @@ export default function CommunityPostPage() {
       <div className="max-w-3xl mx-auto px-5 py-8 space-y-6">
 
         {/* 게시글 본문 */}
-        <div className="border border-line overflow-hidden">
+        <div className="bg-white border border-line overflow-hidden">
           {/* 카테고리 + 제목 */}
           <div className="p-6 border-b border-line">
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-[11px] text-muted border border-line px-2.5 py-1">{post.category}</span>
+              <span className="text-[11px] text-muted bg-white border border-line px-2.5 py-1">{post.category}</span>
             </div>
             <h2 className="text-xl leading-snug mb-5">{post.title}</h2>
 
@@ -130,7 +130,7 @@ export default function CommunityPostPage() {
               </div>
 
               {(isOwner || isOperator) && (
-                <button onClick={handleDeletePost} className="text-[11px] text-muted hover:text-ink border border-line px-2.5 py-1">삭제</button>
+                <button onClick={handleDeletePost} className="text-[11px] text-muted hover:text-ink bg-white border border-line px-2.5 py-1">삭제</button>
               )}
             </div>
           </div>
@@ -152,7 +152,7 @@ export default function CommunityPostPage() {
         </div>
 
         {/* 댓글 목록 */}
-        <div className="border border-line overflow-hidden">
+        <div className="bg-white border border-line overflow-hidden">
           <div className="px-5 py-3.5 border-b border-line bg-sand">
             <h3 className="text-[12px] tracking-widest2 text-muted">댓글 {post.comments?.length ?? 0}</h3>
           </div>
@@ -186,12 +186,12 @@ export default function CommunityPostPage() {
           {/* 댓글 작성 */}
           {user ? (
             <form onSubmit={handleComment} className="p-4 border-t border-line bg-sand flex gap-3">
-              <div className="w-8 h-8 bg-cream rounded-full flex items-center justify-center font-serif italic text-xs shrink-0 border border-line">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center font-serif italic text-xs shrink-0 bg-white border border-line">
                 {user.name[0]}
               </div>
               <div className="flex-1 flex gap-2">
                 <input value={comment} onChange={e => setComment(e.target.value)}
-                  className="flex-1 border border-line bg-cream px-3 py-2 text-[13px] outline-none focus:border-ink"
+                  className="flex-1 bg-white border border-line px-3 py-2 text-[13px] outline-none focus:border-ink"
                   placeholder="댓글을 입력하세요" />
                 <button type="submit" disabled={submittingComment || !comment.trim()} className="btn-outline py-2 px-4 shrink-0 disabled:opacity-50">
                   {submittingComment ? '...' : '등록'}

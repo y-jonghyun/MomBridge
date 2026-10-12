@@ -40,7 +40,7 @@ export default function MissionsPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-14">
             {missions.map((m) => (
-              <Link key={m.id} href={`/missions/${m.id}`} className="group block">
+              <Link key={m.id} href={`/missions/${m.id}`} className="group block bg-white p-4">
                 <div className="aspect-[4/5] bg-sand mb-4 flex items-center justify-center overflow-hidden">
                   <span className="text-[11px] tracking-widest2 text-muted">
                     {CATEGORY_LABELS[m.category] ?? m.category}

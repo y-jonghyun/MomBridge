@@ -103,7 +103,7 @@ export default function CommunityPage() {
   if (!hydrated) return null;
 
   return (
-    <div className="min-h-screen bg-cream">
+    <div className="min-h-screen">
       {/* 헤더 */}
       <header className="bg-cream border-b border-line sticky top-0 z-20">
         <div className="max-w-5xl mx-auto px-5 py-4 flex items-center justify-between">
@@ -143,7 +143,7 @@ export default function CommunityPage() {
 
           {/* 탭 + 검색 + 정렬 */}
           <div className="flex items-center gap-3 mb-6 flex-wrap">
-            <div className="flex border border-line overflow-hidden">
+            <div className="flex bg-white border border-line overflow-hidden">
               {(['LIST', 'BEST', 'MY'] as const).map(t => (
                 <button key={t} onClick={() => setTab(t)}
                   className={`px-4 py-2 text-[12px] tracking-wide transition-colors ${tab === t ? 'bg-ink text-cream' : 'text-muted hover:bg-sand'}`}>
@@ -156,13 +156,13 @@ export default function CommunityPage() {
               <input
                 value={searchInput} onChange={e => setSearchInput(e.target.value)}
                 placeholder="게시글 검색..."
-                className="flex-1 border border-line bg-transparent px-3 py-2 text-[13px] outline-none focus:border-ink min-w-0"
+                className="flex-1 bg-white border border-line px-3 py-2 text-[13px] outline-none focus:border-ink min-w-0"
               />
               <button type="submit" className="px-4 py-2 border border-l-0 border-line text-[12px] hover:bg-sand">검색</button>
             </form>
 
             <select value={sort} onChange={e => { setSort(e.target.value as SortKey); loadPosts(1, category, e.target.value as SortKey, keyword); }}
-              className="border border-line px-3 py-2 text-[12px] outline-none bg-cream">
+              className="bg-white border border-line px-3 py-2 text-[12px] outline-none">
               <option value="NEWEST">최신순</option>
               <option value="POPULAR">인기순</option>
               <option value="VIEWS">조회순</option>
@@ -174,13 +174,13 @@ export default function CommunityPage() {
             <div className="space-y-3">
               {bestPosts.map((p, i) => (
                 <Link key={p.id} href={`/community/${p.id}`}
-                  className="border border-line p-5 flex gap-4 items-start hover:bg-sand/40 transition-colors block">
+                  className="bg-white border border-line p-5 flex gap-4 items-start hover:bg-sand/40 transition-colors block">
                   <div className="font-serif italic text-xl w-8 text-center shrink-0 text-muted">
                     {i + 1}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[11px] text-muted border border-line px-2 py-0.5">{p.category}</span>
+                      <span className="text-[11px] text-muted bg-white border border-line px-2 py-0.5">{p.category}</span>
                     </div>
                     <p className="text-[13px] truncate">{p.title}</p>
                     <p className="text-[12px] text-muted line-clamp-1 mt-0.5">{p.content}</p>
@@ -193,13 +193,13 @@ export default function CommunityPage() {
                   </div>
                 </Link>
               ))}
-              {bestPosts.length === 0 && <div className="text-center py-20 text-muted border border-line">게시글이 없습니다</div>}
+              {bestPosts.length === 0 && <div className="text-center py-20 text-muted bg-white border border-line">게시글이 없습니다</div>}
             </div>
           )}
 
           {/* 내 글 탭 */}
           {tab === 'MY' && !user && (
-            <div className="text-center py-20 border border-line text-muted">
+            <div className="text-center py-20 bg-white border border-line text-muted">
               <p className="mb-4 text-[13px]">로그인 후 내 글을 확인할 수 있습니다</p>
               <Link href="/login" className="btn-solid inline-block">로그인</Link>
             </div>
@@ -207,7 +207,7 @@ export default function CommunityPage() {
 
           {/* 게시글 목록 테이블 */}
           {(tab === 'LIST' || (tab === 'MY' && user)) && (
-            <div className="border border-line overflow-hidden">
+            <div className="bg-white border border-line overflow-hidden">
               {loading && (
                 <div className="flex justify-center py-16">
                   <div className="w-6 h-6 border border-ink border-t-transparent rounded-full animate-spin" />
@@ -218,7 +218,7 @@ export default function CommunityPage() {
                 <div className="lg:hidden divide-y divide-line">
                   {(tab === 'LIST' ? posts : myPosts).map(p => (
                     <Link key={p.id} href={`/community/${p.id}`} className="flex items-start gap-3 px-4 py-3 hover:bg-sand/40">
-                      <span className="text-[11px] text-muted border border-line px-2 py-0.5 shrink-0 mt-0.5 min-w-[56px] text-center">{p.category}</span>
+                      <span className="text-[11px] text-muted bg-white border border-line px-2 py-0.5 shrink-0 mt-0.5 min-w-[56px] text-center">{p.category}</span>
                       <div className="min-w-0 flex-1">
                         <p className="text-[13px] line-clamp-2">{p.title}</p>
                         <p className="text-[11px] text-muted mt-1">{p.user?.name} · {timeAgo(p.createdAt)} · 조회 {p.viewCount} · 좋아요 {p.likeCount}</p>
@@ -275,7 +275,7 @@ export default function CommunityPage() {
         <div className="hidden lg:block w-64 shrink-0 space-y-6">
           {/* 글 작성 CTA */}
           {user ? (
-            <div className="border border-line p-5">
+            <div className="bg-white border border-line p-5">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-9 h-9 bg-sand rounded-full flex items-center justify-center font-serif italic text-sm">
                   {user.name[0]}
@@ -290,14 +290,14 @@ export default function CommunityPage() {
               </button>
             </div>
           ) : (
-            <div className="border border-line p-5 text-center">
+            <div className="bg-white border border-line p-5 text-center">
               <p className="text-[13px] text-muted mb-4">로그인하고 커뮤니티에 참여하세요!</p>
               <Link href="/login" className="btn-solid block w-full">로그인</Link>
             </div>
           )}
 
           {/* BEST 게시글 사이드 위젯 */}
-          <div className="border border-line p-5">
+          <div className="bg-white border border-line p-5">
             <h3 className="text-[12px] tracking-widest2 text-muted mb-4">인기 게시글</h3>
             <div className="space-y-3">
               {bestPosts.slice(0, 5).map((p, i) => (
@@ -311,7 +311,7 @@ export default function CommunityPage() {
           </div>
 
           {/* 카테고리 통계 */}
-          <div className="border border-line p-5">
+          <div className="bg-white border border-line p-5">
             <h3 className="text-[12px] tracking-widest2 text-muted mb-4">카테고리</h3>
             <div className="space-y-1">
               {CATEGORIES.filter(c => c.key !== 'ALL').map(c => (

@@ -37,7 +37,7 @@ export default function Home() {
             { title: '지역 주민 (참여자)', desc: '미션 수행 → 인증 제출 → 보상 수령' },
             { title: '운영자', desc: '미션 관리 · 검수 · 정산 처리' },
           ].map((item) => (
-            <div key={item.title} className="bg-cream py-12 px-6 text-center">
+            <div key={item.title} className="bg-white py-12 px-6 text-center">
               <h3 className="font-serif italic text-lg mb-3">{item.title}</h3>
               <p className="text-[13px] text-muted leading-relaxed">{item.desc}</p>
             </div>
@@ -46,7 +46,7 @@ export default function Home() {
 
         <section className="max-w-4xl mx-auto px-5 py-10 sm:py-16 mb-24">
           <h2 className="section-title">플랫폼 운영 흐름</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-6 sm:gap-3 mt-10">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-6 sm:gap-3 mt-10 bg-white py-10 px-6">
             {[
               { step: '01', label: '수요발굴' },
               { step: '02', label: '미션설계' },

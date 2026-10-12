@@ -91,7 +91,7 @@ export default function MissionDetailPage() {
       <div className="bg-cream border-b border-line px-5 sm:px-10 py-6">
         <div className="max-w-5xl mx-auto">
           <div className="flex items-start gap-3 flex-wrap mb-3">
-            <span className="text-[11px] tracking-widest2 text-muted border border-line px-2.5 py-1">
+            <span className="text-[11px] tracking-widest2 text-muted bg-white border border-line px-2.5 py-1">
               {CATEGORY_LABEL[mission.category]}
             </span>
             {isOpen && dday >= 0 && dday <= 3 && (
@@ -121,7 +121,7 @@ export default function MissionDetailPage() {
           </div>
 
           {/* 참여 스텝 안내 */}
-          <div className="border border-line p-6">
+          <div className="bg-white border border-line p-6">
             <p className="text-[13px] mb-1">해당 체험단은 <span className="italic font-serif">{CATEGORY_LABEL[mission.category]}</span> 체험단입니다.</p>
             <p className="text-[12px] text-muted mb-5">리뷰어가 해당 장소를 방문하여 서비스나 제품을 체험한 뒤, 사진과 후기를 작성합니다.</p>
             <div className="space-y-2.5">
@@ -139,7 +139,7 @@ export default function MissionDetailPage() {
           </div>
 
           {/* 주요 정보 테이블 */}
-          <div className="border border-line overflow-hidden">
+          <div className="bg-white border border-line overflow-hidden">
             <InfoRow label="주최자">{mission.clientProfile?.businessName ?? '-'}</InfoRow>
             <InfoRow label="제공서비스/물품">
               <span>{Number(mission.rewardAmount).toLocaleString()}원</span>
@@ -161,32 +161,32 @@ export default function MissionDetailPage() {
           </div>
 
           {/* 미션 소개 */}
-          <div className="border border-line p-6">
+          <div className="bg-white border border-line p-6">
             <h3 className="text-[13px] tracking-widest2 text-muted mb-3">미션 소개</h3>
             <p className="text-[13px] leading-relaxed whitespace-pre-line">{mission.description}</p>
           </div>
 
           {/* 키워드 / 태그 */}
-          <div className="border border-line p-6">
+          <div className="bg-white border border-line p-6">
             <h3 className="text-[13px] tracking-widest2 text-muted mb-3">키워드 정보</h3>
             <div className="flex flex-wrap gap-2">
               {[mission.regionSi, mission.regionGu, CATEGORY_LABEL[mission.category], mission.clientProfile?.businessName]
                 .filter(Boolean).map((kw: string) => (
-                  <span key={kw} className="text-[11px] border border-line px-3 py-1.5 text-muted">{kw}</span>
+                  <span key={kw} className="text-[11px] bg-white border border-line px-3 py-1.5 text-muted">{kw}</span>
                 ))}
               {mission.category === 'SNS' && ['#맘브릿지', '#체험단'].map(t => (
-                <span key={t} className="text-[11px] border border-line px-3 py-1.5">{t}</span>
+                <span key={t} className="text-[11px] bg-white border border-line px-3 py-1.5">{t}</span>
               ))}
             </div>
           </div>
 
           {/* 체험단 미션 아이콘 */}
-          <div className="border border-line p-6">
+          <div className="bg-white border border-line p-6">
             <h3 className="text-[13px] tracking-widest2 text-muted mb-4">체험단 미션</h3>
             <div className="grid grid-cols-4 gap-3">
               {missionIcons.map(({ icon, label }) => (
                 <div key={label} className="flex flex-col items-center gap-2 bg-sand py-4 px-2">
-                  <div className="w-9 h-9 bg-cream rounded-full flex items-center justify-center text-base border border-line">
+                  <div className="w-9 h-9 bg-white rounded-full flex items-center justify-center text-base border border-line">
                     {icon}
                   </div>
                   <span className="text-[11px] text-muted text-center leading-tight">{label}</span>
@@ -197,7 +197,7 @@ export default function MissionDetailPage() {
 
           {/* 필수 체크 사항 */}
           {mission.requirements && (
-            <div className="border border-line p-6">
+            <div className="bg-white border border-line p-6">
               <h3 className="text-[13px] tracking-widest2 text-center mb-4">필수 체크 사항</h3>
               <div className="space-y-2.5">
                 {mission.requirements.split('\n').filter(Boolean).map((line: string, i: number) => (
@@ -211,7 +211,7 @@ export default function MissionDetailPage() {
           )}
 
           {/* 주의사항 공통 */}
-          <div className="border border-line p-6">
+          <div className="bg-white border border-line p-6">
             <h3 className="text-[13px] tracking-widest2 text-muted mb-3">방문 및 예약 안내</h3>
             <div className="space-y-2">
               {[
@@ -229,7 +229,7 @@ export default function MissionDetailPage() {
           </div>
 
           {/* 댓글 영역 */}
-          <div className="border border-line p-6">
+          <div className="bg-white border border-line p-6">
             <h3 className="text-[13px] tracking-widest2 text-muted mb-4">댓글</h3>
             <div className="text-center py-6 text-muted text-[13px]">아직 댓글이 없습니다</div>
             {user && (
@@ -245,7 +245,7 @@ export default function MissionDetailPage() {
         <div className="hidden lg:block w-72 shrink-0 sticky top-20 space-y-6">
 
           {/* 체험단 일정 */}
-          <div className="border border-line overflow-hidden">
+          <div className="bg-white border border-line overflow-hidden">
             <div className="bg-ink text-cream text-[12px] tracking-widest2 px-4 py-3">
               체험단 일정
             </div>
@@ -284,16 +284,16 @@ export default function MissionDetailPage() {
                 </div>
               )}
               {applied && (
-                <div className="w-full border border-line py-3 text-center">
+                <div className="w-full bg-white border border-line py-3 text-center">
                   <p className="text-[13px]">✓ 신청 완료!</p>
                   <p className="text-muted text-[11px] mt-0.5">운영자 승인을 기다려 주세요</p>
                 </div>
               )}
               {user?.role === 'PARTICIPANT' && isFull && (
-                <button disabled className="w-full border border-line text-muted py-3 text-[12px] tracking-widest2">모집 마감</button>
+                <button disabled className="w-full bg-white border border-line text-muted py-3 text-[12px] tracking-widest2">모집 마감</button>
               )}
               {user?.role === 'PARTICIPANT' && !isOpen && (
-                <button disabled className="w-full border border-line text-muted py-3 text-[12px] tracking-widest2">모집 종료</button>
+                <button disabled className="w-full bg-white border border-line text-muted py-3 text-[12px] tracking-widest2">모집 종료</button>
               )}
               {!user && (
                 <Link href="/login" className="btn-solid w-full block text-center">
@@ -301,7 +301,7 @@ export default function MissionDetailPage() {
                 </Link>
               )}
               {(user?.role === 'CLIENT' || user?.role === 'OPERATOR') && (
-                <button disabled className="w-full border border-line text-muted py-3 text-[12px] tracking-widest2">
+                <button disabled className="w-full bg-white border border-line text-muted py-3 text-[12px] tracking-widest2">
                   {user.role === 'OPERATOR' ? '운영자 계정' : '고객사 계정'}
                 </button>
               )}
@@ -309,7 +309,7 @@ export default function MissionDetailPage() {
           </div>
 
           {/* 주최사 카드 */}
-          <div className="border border-line p-4">
+          <div className="bg-white border border-line p-4">
             <p className="text-[11px] text-muted mb-2 tracking-widest2">주최사</p>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-sand rounded-full flex items-center justify-center font-serif italic text-sm">
@@ -325,7 +325,7 @@ export default function MissionDetailPage() {
           </div>
 
           {/* 공정위 문구 */}
-          <div className="border border-line p-4 text-center">
+          <div className="bg-white border border-line p-4 text-center">
             <p className="text-[11px] text-muted mb-2">공정위 문구</p>
             <div className="bg-sand py-4 px-3">
               <p className="text-muted text-[11px]">당첨된 이후 확인 가능</p>
@@ -350,12 +350,12 @@ export default function MissionDetailPage() {
               </button>
             )}
             {applied && (
-              <div className="w-full border border-line py-2.5 text-center">
+              <div className="w-full bg-white border border-line py-2.5 text-center">
                 <p className="text-[12px]">✓ 신청 완료!</p>
               </div>
             )}
             {user?.role === 'PARTICIPANT' && (isFull || !isOpen) && (
-              <button disabled className="w-full border border-line text-muted py-2.5 text-[12px]">
+              <button disabled className="w-full bg-white border border-line text-muted py-2.5 text-[12px]">
                 {isFull ? '모집 마감' : '모집 종료'}
               </button>
             )}
@@ -365,7 +365,7 @@ export default function MissionDetailPage() {
               </Link>
             )}
             {(user?.role === 'CLIENT' || user?.role === 'OPERATOR') && (
-              <button disabled className="w-full border border-line text-muted py-2.5 text-[12px]">
+              <button disabled className="w-full bg-white border border-line text-muted py-2.5 text-[12px]">
                 {user.role === 'OPERATOR' ? '운영자 계정' : '고객사 계정'}
               </button>
             )}

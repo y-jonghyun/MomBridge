@@ -30,12 +30,16 @@ export default function OperatorDashboard() {
     sendPaymentLink: false,
   });
   const [registerSubmitting, setRegisterSubmitting] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => { setHydrated(true); }, []);
 
   useEffect(() => {
+    if (!hydrated) return;
     if (!user) { router.push('/login'); return; }
     if (user.role !== 'OPERATOR') { router.push('/'); return; }
     loadStats();
-  }, [user]);
+  }, [user, hydrated]);
 
   async function loadStats() {
     const { data } = await api.get('/operator/stats');
@@ -114,7 +118,7 @@ export default function OperatorDashboard() {
   const rf = (k: keyof typeof registerForm, v: string | boolean) =>
     setRegisterForm(prev => ({ ...prev, [k]: v }));
 
-  if (!user) return null;
+  if (!hydrated || !user) return null;
 
   const tabs: { key: Tab; label: string; badge?: number }[] = [
     { key: 'overview', label: '개요' },
@@ -127,7 +131,7 @@ export default function OperatorDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-cream">
+    <div className="min-h-screen">
       {/* 헤더 */}
       <header className="bg-cream border-b border-line px-5 sm:px-10 py-5 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -141,7 +145,7 @@ export default function OperatorDashboard() {
       </header>
 
       {/* 모바일 탭 (sm 미만) */}
-      <div className="sm:hidden bg-cream border-b border-line overflow-x-auto">
+      <div className="sm:hidden border-b border-line overflow-x-auto">
         <div className="flex min-w-max">
           {tabs.map(t => (
             <button key={t.key} onClick={() => loadTab(t.key)}
@@ -162,7 +166,7 @@ export default function OperatorDashboard() {
 
       <div className="flex">
         {/* 사이드바 (데스크탑만) */}
-        <aside className="hidden sm:flex w-52 min-h-[calc(100vh-77px)] bg-cream border-r border-line py-6 flex-col">
+        <aside className="hidden sm:flex w-52 min-h-[calc(100vh-77px)] border-r border-line py-6 flex-col">
           <div className="flex-1">
             {tabs.map(t => (
               <button key={t.key} onClick={() => loadTab(t.key)}
@@ -191,7 +195,7 @@ export default function OperatorDashboard() {
           {tab === 'overview' && stats && (
             <div className="space-y-8">
               <h2 className="font-serif italic text-xl">대시보드 개요</h2>
-              <div className="grid grid-cols-2 lg:grid-cols-5 gap-px bg-line border border-line">
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-px bg-line bg-white border border-line">
                 {[
                   { label: '전체 회원', value: stats.totalUsers },
                   { label: '전체 미션', value: stats.totalMissions },
@@ -206,18 +210,18 @@ export default function OperatorDashboard() {
                 ))}
               </div>
               {stats.missionsByStatus && (
-                <div className="border border-line p-5">
+                <div className="bg-white border border-line p-5">
                   <h3 className="text-[13px] tracking-widest2 text-muted mb-4">미션 상태별 현황</h3>
                   <div className="flex gap-3 flex-wrap">
                     {(stats.missionsByStatus as any[]).map(s => (
-                      <div key={s.status} className="border border-line px-4 py-2 text-[12px]">
+                      <div key={s.status} className="bg-white border border-line px-4 py-2 text-[12px]">
                         {MISSION_STATUS_LABEL[s.status] ?? s.status}: {s._count}건
                       </div>
                     ))}
                   </div>
                 </div>
               )}
-              <div className="grid grid-cols-3 gap-px bg-line border border-line">
+              <div className="grid grid-cols-3 gap-px bg-line bg-white border border-line">
                 {([['applications', '지원서 승인 처리'], ['submissions', '콘텐츠 검수'], ['payouts', '정산 처리']] as const).map(([key, label]) => (
                   <button key={key} onClick={() => loadTab(key)}
                     className="bg-cream p-5 text-left hover:bg-sand/40 transition-colors">
@@ -236,13 +240,13 @@ export default function OperatorDashboard() {
               {/* 모바일 카드형 */}
               <div className="sm:hidden space-y-3">
                 {missions.map(m => (
-                  <div key={m.id} className="border border-line p-4">
+                  <div key={m.id} className="bg-white border border-line p-4">
                     <div className="flex items-start justify-between gap-2 mb-3">
                       <div className="flex-1 min-w-0">
                         <p className="text-[13px] line-clamp-2">{m.title}</p>
                         <p className="text-[11px] text-muted mt-0.5">{m.clientProfile?.businessName}</p>
                       </div>
-                      <span className="shrink-0 border border-line px-2 py-1 text-[11px] text-muted">
+                      <span className="shrink-0 bg-white border border-line px-2 py-1 text-[11px] text-muted">
                         {MISSION_STATUS_LABEL[m.status] ?? m.status}
                       </span>
                     </div>
@@ -253,7 +257,7 @@ export default function OperatorDashboard() {
                         <span className="text-ink">{Number(m.rewardAmount).toLocaleString()}원</span>
                       </div>
                       <select value={m.status} onChange={e => updateMissionStatus(m.id, e.target.value)}
-                        className="text-[11px] border border-line px-2 py-1 bg-cream">
+                        className="text-[11px] bg-white border border-line px-2 py-1">
                         {['DRAFT', 'OPEN', 'IN_PROGRESS', 'REVIEWING', 'CLOSED'].map(s => (
                           <option key={s} value={s}>{MISSION_STATUS_LABEL[s]}</option>
                         ))}
@@ -261,10 +265,10 @@ export default function OperatorDashboard() {
                     </div>
                   </div>
                 ))}
-                {missions.length === 0 && <div className="text-center py-12 text-muted border border-line">미션이 없습니다</div>}
+                {missions.length === 0 && <div className="text-center py-12 text-muted bg-white border border-line">미션이 없습니다</div>}
               </div>
               {/* 데스크탑 테이블형 */}
-              <div className="hidden sm:block border border-line overflow-hidden">
+              <div className="hidden sm:block bg-white border border-line overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-[13px] min-w-[600px]">
                     <thead className="bg-sand border-b border-line">
@@ -276,7 +280,7 @@ export default function OperatorDashboard() {
                           <td className="px-4 py-3 max-w-xs truncate">{m.title}</td>
                           <td className="px-4 py-3 text-muted">{m.clientProfile?.businessName}</td>
                           <td className="px-4 py-3">
-                            <span className="border border-line px-2 py-1 text-[11px] text-muted">
+                            <span className="bg-white border border-line px-2 py-1 text-[11px] text-muted">
                               {MISSION_STATUS_LABEL[m.status] ?? m.status}
                             </span>
                           </td>
@@ -284,7 +288,7 @@ export default function OperatorDashboard() {
                           <td className="px-4 py-3">{Number(m.rewardAmount).toLocaleString()}원</td>
                           <td className="px-4 py-3">
                             <select value={m.status} onChange={e => updateMissionStatus(m.id, e.target.value)}
-                              className="text-[11px] border border-line px-2 py-1 bg-cream">
+                              className="text-[11px] bg-white border border-line px-2 py-1">
                               {['DRAFT', 'OPEN', 'IN_PROGRESS', 'REVIEWING', 'CLOSED'].map(s => (
                                 <option key={s} value={s}>{MISSION_STATUS_LABEL[s]}</option>
                               ))}
@@ -306,7 +310,7 @@ export default function OperatorDashboard() {
               <h2 className="font-serif italic text-xl mb-6">지원서 승인 대기 ({applications.length}건)</h2>
               <div className="space-y-4">
                 {applications.map(a => (
-                  <div key={a.id} className="border border-line p-5">
+                  <div key={a.id} className="bg-white border border-line p-5">
                     <div className="flex items-start justify-between">
                       <div>
                         <p className="text-[13px]">{a.mission?.title}</p>
@@ -317,11 +321,11 @@ export default function OperatorDashboard() {
                     </div>
                     <div className="flex gap-2 mt-4">
                       <button onClick={() => reviewApplication(a.id, 'APPROVED')} className="btn-outline py-2 px-4 text-[11px]">승인</button>
-                      <button onClick={() => reviewApplication(a.id, 'REJECTED')} className="border border-line text-muted hover:text-ink hover:border-ink py-2 px-4 text-[11px] tracking-widest2 transition-colors">반려</button>
+                      <button onClick={() => reviewApplication(a.id, 'REJECTED')} className="bg-white border border-line text-muted hover:text-ink hover:border-ink py-2 px-4 text-[11px] tracking-widest2 transition-colors">반려</button>
                     </div>
                   </div>
                 ))}
-                {applications.length === 0 && <div className="text-center py-12 text-muted border border-line">대기 중인 지원서가 없습니다</div>}
+                {applications.length === 0 && <div className="text-center py-12 text-muted bg-white border border-line">대기 중인 지원서가 없습니다</div>}
               </div>
             </div>
           )}
@@ -332,7 +336,7 @@ export default function OperatorDashboard() {
               <h2 className="font-serif italic text-xl mb-6">콘텐츠 검수 대기 ({submissions.length}건)</h2>
               <div className="space-y-4">
                 {submissions.map(s => (
-                  <div key={s.id} className="border border-line p-5">
+                  <div key={s.id} className="bg-white border border-line p-5">
                     <div className="flex items-start justify-between mb-3">
                       <div>
                         <p className="text-[13px]">{s.mission?.title}</p>
@@ -344,16 +348,16 @@ export default function OperatorDashboard() {
                     {s.snsPostUrl && <a href={s.snsPostUrl} target="_blank" rel="noreferrer" className="text-[11px] text-ink underline block mb-3">SNS 링크 보기 →</a>}
                     {s.mediaUrls?.length > 0 && (
                       <div className="flex gap-2 mb-3 flex-wrap">
-                        {s.mediaUrls.map((url: string, i: number) => <a key={i} href={url} target="_blank" rel="noreferrer" className="text-[11px] border border-line px-2 py-1 text-muted">첨부 {i + 1}</a>)}
+                        {s.mediaUrls.map((url: string, i: number) => <a key={i} href={url} target="_blank" rel="noreferrer" className="text-[11px] bg-white border border-line px-2 py-1 text-muted">첨부 {i + 1}</a>)}
                       </div>
                     )}
                     <div className="flex gap-2">
                       <button onClick={() => reviewSubmission(s.id, 'APPROVED')} className="btn-outline py-2 px-4 text-[11px]">승인 (정산 생성)</button>
-                      <button onClick={() => reviewSubmission(s.id, 'REJECTED')} className="border border-line text-muted hover:text-ink hover:border-ink py-2 px-4 text-[11px] tracking-widest2 transition-colors">반려</button>
+                      <button onClick={() => reviewSubmission(s.id, 'REJECTED')} className="bg-white border border-line text-muted hover:text-ink hover:border-ink py-2 px-4 text-[11px] tracking-widest2 transition-colors">반려</button>
                     </div>
                   </div>
                 ))}
-                {submissions.length === 0 && <div className="text-center py-12 text-muted border border-line">대기 중인 제출물이 없습니다</div>}
+                {submissions.length === 0 && <div className="text-center py-12 text-muted bg-white border border-line">대기 중인 제출물이 없습니다</div>}
               </div>
             </div>
           )}
@@ -365,7 +369,7 @@ export default function OperatorDashboard() {
               {/* 모바일 카드형 */}
               <div className="sm:hidden space-y-3">
                 {payouts.map(p => (
-                  <div key={p.id} className="border border-line p-4">
+                  <div key={p.id} className="bg-white border border-line p-4">
                     <div className="mb-2">
                       <p className="text-[13px]">{p.participant?.user?.name}</p>
                       <p className="text-[11px] text-muted">{p.participant?.user?.email}</p>
@@ -380,10 +384,10 @@ export default function OperatorDashboard() {
                     </div>
                   </div>
                 ))}
-                {payouts.length === 0 && <div className="text-center py-12 text-muted border border-line">대기 중인 정산이 없습니다</div>}
+                {payouts.length === 0 && <div className="text-center py-12 text-muted bg-white border border-line">대기 중인 정산이 없습니다</div>}
               </div>
               {/* 데스크탑 테이블형 */}
-              <div className="hidden sm:block border border-line overflow-hidden">
+              <div className="hidden sm:block bg-white border border-line overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-[13px] min-w-[600px]">
                     <thead className="bg-sand border-b border-line">
@@ -418,7 +422,7 @@ export default function OperatorDashboard() {
             <div>
               <h2 className="font-serif italic text-xl mb-2">고객사 대신 미션 등록</h2>
               <p className="text-[13px] text-muted mb-6">고객사를 선택하고 미션을 대신 등록합니다. 결제 링크를 발송하면 고객사에게 SMS/카카오톡으로 전송됩니다.</p>
-              <div className="border border-line p-6">
+              <div className="bg-white border border-line p-6">
                 <form onSubmit={handleRegisterMission} className="space-y-4">
                   <div>
                     <label className="field-label">고객사 선택 *</label>
@@ -540,14 +544,14 @@ export default function OperatorDashboard() {
               {/* 모바일 카드형 */}
               <div className="sm:hidden space-y-3">
                 {users.map(u => (
-                  <div key={u.id} className="border border-line p-4">
+                  <div key={u.id} className="bg-white border border-line p-4">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <p className="text-[13px]">{u.name}</p>
                         <p className="text-[11px] text-muted truncate">{u.email}</p>
                         <div className="flex gap-1.5 mt-1.5">
-                          <span className="border border-line px-2 py-0.5 text-[11px] text-muted">{ROLE_LABEL[u.role] ?? u.role}</span>
-                          <span className="border border-line px-2 py-0.5 text-[11px] text-muted">
+                          <span className="bg-white border border-line px-2 py-0.5 text-[11px] text-muted">{ROLE_LABEL[u.role] ?? u.role}</span>
+                          <span className="bg-white border border-line px-2 py-0.5 text-[11px] text-muted">
                             {u.isActive ? '활성' : '비활성'}
                           </span>
                         </div>
@@ -560,10 +564,10 @@ export default function OperatorDashboard() {
                     </div>
                   </div>
                 ))}
-                {users.length === 0 && <div className="text-center py-12 text-muted border border-line">회원이 없습니다</div>}
+                {users.length === 0 && <div className="text-center py-12 text-muted bg-white border border-line">회원이 없습니다</div>}
               </div>
               {/* 데스크탑 테이블형 */}
-              <div className="hidden sm:block border border-line overflow-hidden">
+              <div className="hidden sm:block bg-white border border-line overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-[13px] min-w-[600px]">
                     <thead className="bg-sand border-b border-line">
@@ -577,10 +581,10 @@ export default function OperatorDashboard() {
                             <p className="text-[11px] text-muted">{u.email}</p>
                           </td>
                           <td className="px-4 py-3">
-                            <span className="border border-line px-2 py-1 text-[11px] text-muted">{ROLE_LABEL[u.role] ?? u.role}</span>
+                            <span className="bg-white border border-line px-2 py-1 text-[11px] text-muted">{ROLE_LABEL[u.role] ?? u.role}</span>
                           </td>
                           <td className="px-4 py-3">
-                            <span className="border border-line px-2 py-1 text-[11px] text-muted">
+                            <span className="bg-white border border-line px-2 py-1 text-[11px] text-muted">
                               {u.isActive ? '활성' : '비활성'}
                             </span>
                           </td>

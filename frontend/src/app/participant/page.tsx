@@ -192,29 +192,29 @@ export default function ParticipantPage() {
   const [searchInput, setSearchInput] = useState('');
 
   if (!hydrated || !user) return (
-    <div className="min-h-screen bg-cream">
+    <div className="min-h-screen">
       <div className="bg-cream border-b border-line px-5 py-4 flex items-center justify-between">
         <div className="h-6 w-24 bg-sand animate-pulse" />
         <div className="h-5 w-16 bg-sand animate-pulse" />
       </div>
       <div className="max-w-5xl mx-auto px-5 py-8 space-y-4">
-        <div className="grid grid-cols-3 gap-px bg-line border border-line">
+        <div className="grid grid-cols-3 gap-px bg-line bg-white border border-line">
           {[1,2,3].map(i => <div key={i} className="bg-cream p-4 h-20 animate-pulse" />)}
         </div>
-        <div className="border border-line h-12 animate-pulse" />
-        {[1,2,3].map(i => <div key={i} className="border border-line h-48 animate-pulse" />)}
+        <div className="bg-white border border-line h-12 animate-pulse" />
+        {[1,2,3].map(i => <div key={i} className="bg-white border border-line h-48 animate-pulse" />)}
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-cream">
+    <div className="min-h-screen">
       <header className="bg-cream border-b border-line px-5 sm:px-10 py-5 flex items-center justify-between gap-2">
         <div className="flex items-center gap-3 min-w-0">
           <Link href="/" className="font-serif italic text-lg whitespace-nowrap shrink-0">맘브릿지</Link>
           <span className="text-[11px] tracking-widest2 text-muted whitespace-nowrap shrink-0">참여자</span>
           {user.role === 'OPERATOR' && (
-            <Link href="/operator" className="text-[11px] text-muted hover:text-ink border border-line px-2.5 py-1 whitespace-nowrap shrink-0">← 운영자</Link>
+            <Link href="/operator" className="text-[11px] text-muted hover:text-ink bg-white border border-line px-2.5 py-1 whitespace-nowrap shrink-0">← 운영자</Link>
           )}
         </div>
         <div className="flex items-center gap-4 shrink-0">
@@ -235,7 +235,7 @@ export default function ParticipantPage() {
             </button>
             {/* 알림 드롭다운 */}
             {showNotifDropdown && (
-              <div className="absolute right-0 top-9 w-80 bg-cream border border-line z-50 overflow-hidden">
+              <div className="absolute right-0 top-9 w-80 bg-white border border-line z-50 overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-line">
                   <span className="text-[13px]">알림</span>
                   {unreadCount > 0 && (
@@ -262,7 +262,7 @@ export default function ParticipantPage() {
 
       <div className="max-w-5xl mx-auto px-5 sm:px-10 py-8">
         {/* 수익 요약 */}
-        <div className="grid grid-cols-3 gap-px bg-line border border-line mb-8">
+        <div className="grid grid-cols-3 gap-px bg-line bg-white border border-line mb-8">
           <div className="bg-cream p-4 sm:p-5 text-center">
             <p className="text-[11px] text-muted mb-1">누적 수익</p>
             <p className="text-base sm:text-xl font-serif italic">{totalEarned.toLocaleString()}원</p>
@@ -279,7 +279,7 @@ export default function ParticipantPage() {
 
         {/* 탭 */}
         <div className="overflow-x-auto mb-8">
-          <div className="flex border border-line min-w-max sm:min-w-0">
+          <div className="flex bg-white border border-line min-w-max sm:min-w-0">
             {tabs.map(t => (
               <button key={t.key} onClick={() => { setTab(t.key); if (t.key === 'missions') loadMissions(missionFilter); else loadTab(t.key); }}
                 className={`flex-shrink-0 sm:flex-1 px-4 py-3 text-[12px] tracking-wide transition-colors whitespace-nowrap ${tab === t.key ? 'bg-ink text-cream' : 'text-muted hover:bg-sand'}`}>
@@ -292,7 +292,7 @@ export default function ParticipantPage() {
         {loading && (
           <div className="space-y-3">
             {[1,2,3].map(i => (
-              <div key={i} className="border border-line p-5 animate-pulse">
+              <div key={i} className="bg-white border border-line p-5 animate-pulse">
                 <div className="flex items-start justify-between mb-3">
                   <div className="space-y-2 flex-1">
                     <div className="h-4 bg-sand w-3/4" />
@@ -309,17 +309,17 @@ export default function ParticipantPage() {
 
         {/* 미션 탐색 필터 */}
         {tab === 'missions' && !loading && (
-          <div className="border border-line p-4 mb-6 space-y-3">
+          <div className="bg-white border border-line p-4 mb-6 space-y-3">
             <form onSubmit={e => { e.preventDefault(); const nf = { ...missionFilter, keyword: searchInput }; setMissionFilter(nf); loadMissions(nf); }} className="flex">
               <input value={searchInput} onChange={e => setSearchInput(e.target.value)}
                 placeholder="미션 검색..."
-                className="flex-1 border border-line bg-transparent px-3 py-2 text-[13px] outline-none focus:border-ink" />
+                className="flex-1 bg-white border border-line px-3 py-2 text-[13px] outline-none focus:border-ink" />
               <button type="submit" className="px-4 py-2 border border-l-0 border-line text-[12px] hover:bg-sand">검색</button>
             </form>
             <div className="grid grid-cols-3 gap-2">
               <select value={missionFilter.category}
                 onChange={e => { const nf = { ...missionFilter, category: e.target.value }; setMissionFilter(nf); loadMissions(nf); }}
-                className="border border-line px-2 py-2 text-[12px] bg-cream outline-none w-full">
+                className="bg-white border border-line px-2 py-2 text-[12px] outline-none w-full">
                 <option value="">전체 유형</option>
                 <option value="SNS">SNS</option>
                 <option value="VISIT">방문형</option>
@@ -328,7 +328,7 @@ export default function ParticipantPage() {
               </select>
               <select value={missionFilter.regionSi}
                 onChange={e => { const nf = { ...missionFilter, regionSi: e.target.value }; setMissionFilter(nf); loadMissions(nf); }}
-                className="border border-line px-2 py-2 text-[12px] bg-cream outline-none w-full">
+                className="bg-white border border-line px-2 py-2 text-[12px] outline-none w-full">
                 <option value="">전체 지역</option>
                 <optgroup label="특별·광역시">
                   <option value="서울시">서울</option>
@@ -354,7 +354,7 @@ export default function ParticipantPage() {
               </select>
               <select value={missionFilter.sort}
                 onChange={e => { const nf = { ...missionFilter, sort: e.target.value }; setMissionFilter(nf); loadMissions(nf); }}
-                className="border border-line px-2 py-2 text-[12px] bg-cream outline-none w-full">
+                className="bg-white border border-line px-2 py-2 text-[12px] outline-none w-full">
                 <option value="NEWEST">최신순</option>
                 <option value="DEADLINE">마감임박</option>
                 <option value="REWARD">보상높은순</option>
@@ -372,10 +372,10 @@ export default function ParticipantPage() {
               const catLabel: Record<string, string> = { VISIT: '방문인증', SNS: 'SNS', REVIEW: '리뷰', VIDEO: '영상' };
               const pct = Math.min(100, Math.round(((m.currentCount ?? 0) / m.maxParticipants) * 100));
               return (
-                <Link key={m.id} href={`/missions/${m.id}`} className="block border border-line p-5 hover:bg-sand/30 transition-colors">
+                <Link key={m.id} href={`/missions/${m.id}`} className="block bg-white border border-line p-5 hover:bg-sand/30 transition-colors">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-muted border border-line px-2 py-0.5">
+                      <span className="text-[11px] text-muted bg-white border border-line px-2 py-0.5">
                         {catLabel[m.category] ?? m.category}
                       </span>
                       {dday >= 0 && dday <= 3 && <span className="text-[11px] bg-ink text-cream px-2 py-0.5">D-{dday || 'Day'}</span>}
@@ -414,7 +414,7 @@ export default function ParticipantPage() {
         {tab === 'my-applications' && !loading && (
           <div className="space-y-4">
             {applications.map(a => (
-              <div key={a.id} className="border border-line p-5">
+              <div key={a.id} className="bg-white border border-line p-5">
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0 mr-3">
                     <p className="text-[13px]">{a.mission?.title}</p>
@@ -422,7 +422,7 @@ export default function ParticipantPage() {
                     {a.rejectionReason && <p className="text-[12px] text-muted mt-1">반려 사유: {a.rejectionReason}</p>}
                   </div>
                   <div className="text-right shrink-0">
-                    <span className="text-[11px] text-muted border border-line px-2.5 py-1">
+                    <span className="text-[11px] text-muted bg-white border border-line px-2.5 py-1">
                       {STATUS_LABEL[a.status] ?? a.status}
                     </span>
                     <p className="text-[13px] mt-1">{Number(a.mission?.rewardAmount).toLocaleString()}원</p>
@@ -444,7 +444,7 @@ export default function ParticipantPage() {
                 )}
               </div>
             ))}
-            {applications.length === 0 && <div className="text-center py-20 text-muted border border-line">지원한 미션이 없습니다</div>}
+            {applications.length === 0 && <div className="text-center py-20 text-muted bg-white border border-line">지원한 미션이 없습니다</div>}
           </div>
         )}
 
@@ -452,10 +452,10 @@ export default function ParticipantPage() {
         {tab === 'my-submissions' && !loading && (
           <div className="space-y-4">
             {submissions.map(s => (
-              <div key={s.id} className="border border-line p-5">
+              <div key={s.id} className="bg-white border border-line p-5">
                 <div className="flex items-start justify-between mb-2">
                   <p className="text-[13px]">{s.mission?.title}</p>
-                  <span className="text-[11px] text-muted border border-line px-2.5 py-1">
+                  <span className="text-[11px] text-muted bg-white border border-line px-2.5 py-1">
                     {STATUS_LABEL[s.status] ?? s.status}
                   </span>
                 </div>
@@ -465,7 +465,7 @@ export default function ParticipantPage() {
                 <p className="text-[11px] text-muted mt-2">제출: {new Date(s.submittedAt).toLocaleDateString('ko-KR')}</p>
               </div>
             ))}
-            {submissions.length === 0 && <div className="text-center py-20 text-muted border border-line">제출한 콘텐츠가 없습니다</div>}
+            {submissions.length === 0 && <div className="text-center py-20 text-muted bg-white border border-line">제출한 콘텐츠가 없습니다</div>}
           </div>
         )}
 
@@ -473,7 +473,7 @@ export default function ParticipantPage() {
         {tab === 'earnings' && !loading && (
           <div className="space-y-4">
             {earnings.map(e => (
-              <div key={e.id} className="border border-line p-5 flex items-center justify-between">
+              <div key={e.id} className="bg-white border border-line p-5 flex items-center justify-between">
                 <div>
                   <p className="text-[13px]">{e.submission?.mission?.title}</p>
                   <p className="text-[12px] text-muted mt-1">{new Date(e.createdAt).toLocaleDateString('ko-KR')}</p>
@@ -481,13 +481,13 @@ export default function ParticipantPage() {
                 <div className="text-right">
                   <p className="font-serif italic text-lg">{Number(e.netAmount).toLocaleString()}원</p>
                   <p className="text-[11px] text-muted">수수료 -{Number(e.platformFee).toLocaleString()}원</p>
-                  <span className="mt-1 inline-block border border-line px-2 py-0.5 text-[11px] text-muted">
+                  <span className="mt-1 inline-block bg-white border border-line px-2 py-0.5 text-[11px] text-muted">
                     {e.status === 'COMPLETED' ? '지급완료' : '정산대기'}
                   </span>
                 </div>
               </div>
             ))}
-            {earnings.length === 0 && <div className="text-center py-20 text-muted border border-line">수익 내역이 없습니다</div>}
+            {earnings.length === 0 && <div className="text-center py-20 text-muted bg-white border border-line">수익 내역이 없습니다</div>}
           </div>
         )}
 
@@ -495,7 +495,7 @@ export default function ParticipantPage() {
         {tab === 'community' && (
           <div>
             {/* 카테고리 필터 + 글쓰기 */}
-            <div className="border border-line mb-6 px-4 py-4 space-y-3">
+            <div className="bg-white border border-line mb-6 px-4 py-4 space-y-3">
               {/* 1행: 카테고리 가로 스크롤 */}
               <div className="flex gap-1.5 overflow-x-auto">
                 {COMM_CATS.map(c => (
@@ -510,7 +510,7 @@ export default function ParticipantPage() {
               <div className="flex items-center justify-between">
                 <select value={communitySort}
                   onChange={e => { setCommunitySort(e.target.value); loadCommunity(communityCategory, e.target.value); }}
-                  className="border border-line px-2 py-1.5 text-[12px] bg-cream outline-none">
+                  className="bg-white border border-line px-2 py-1.5 text-[12px] outline-none">
                   <option value="NEWEST">최신순</option>
                   <option value="POPULAR">인기순</option>
                   <option value="VIEWS">조회순</option>
@@ -524,12 +524,12 @@ export default function ParticipantPage() {
             {/* 게시글 목록 */}
             {loading && <div className="flex justify-center py-16"><div className="w-6 h-6 border border-ink border-t-transparent rounded-full animate-spin" /></div>}
             {!loading && (
-              <div className="border border-line overflow-hidden">
+              <div className="bg-white border border-line overflow-hidden">
                 {/* 모바일: 카드형 */}
                 <div className="sm:hidden divide-y divide-line">
                   {communityPosts.map(p => (
                     <Link key={p.id} href={`/community/${p.id}`} className="flex items-start gap-3 px-4 py-3 hover:bg-sand/40 transition-colors">
-                      <span className="text-[11px] text-muted border border-line px-2 py-0.5 shrink-0 mt-0.5 min-w-[56px] text-center">{p.category}</span>
+                      <span className="text-[11px] text-muted bg-white border border-line px-2 py-0.5 shrink-0 mt-0.5 min-w-[56px] text-center">{p.category}</span>
                       <div className="min-w-0 flex-1">
                         <p className="text-[13px] line-clamp-2">{p.title}</p>
                         <p className="text-[11px] text-muted mt-1">{p.user?.name} · {commTimeAgo(p.createdAt)} · 조회 {p.viewCount} · 좋아요 {p.likeCount}</p>
