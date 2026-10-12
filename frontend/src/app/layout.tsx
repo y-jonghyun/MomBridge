@@ -17,8 +17,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <link rel="preconnect" href="https://mombridge-backend.onrender.com" />
         <link rel="dns-prefetch" href="https://mombridge-backend.onrender.com" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,500&family=Pinyon+Script&family=Noto+Sans+KR:wght@300;400;500&display=swap"
+          rel="stylesheet"
+        />
       </head>
-      <body className="min-h-screen bg-stone-50 antialiased">{children}</body>
+      <body className="min-h-screen bg-cream text-ink font-sans font-light antialiased">{children}</body>
     </html>
   );
 }

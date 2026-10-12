@@ -6,3 +6,21 @@
   * { @apply box-border; }
   html { @apply scroll-smooth; }
 }
+
+@layer components {
+  .btn-solid {
+    @apply inline-block px-7 py-3.5 text-[12px] tracking-widest2 text-center bg-ink text-cream border border-ink hover:opacity-85 transition-opacity;
+  }
+  .btn-outline {
+    @apply inline-block px-7 py-3.5 text-[12px] tracking-widest2 text-center bg-transparent text-ink border border-ink hover:bg-ink hover:text-cream transition-colors;
+  }
+  .section-title {
+    @apply font-serif italic text-xl sm:text-2xl text-center;
+  }
+  .field-input {
+    @apply w-full border-0 border-b border-line bg-transparent py-3 px-1 text-sm outline-none focus:border-ink transition-colors;
+  }
+  .field-label {
+    @apply block text-[12px] text-muted mb-1.5 tracking-wide;
+  }
+}
