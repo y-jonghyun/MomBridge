@@ -24,25 +24,20 @@ export const missionFieldsSchema = z.object({
   thumbnailUrl: z.preprocess(v => (v === '' ? undefined : v), httpUrl.optional()),
 });
 
-const withDateOrder = <T extends z.ZodTypeAny>(schema: T) =>
-  schema.superRefine((v: z.infer<typeof missionFieldsSchema>, ctx) => {
-    if (v.endDate < v.startDate) ctx.addIssue({ code: 'custom', path: ['endDate'], message: '종료일은 시작일 이후여야 합니다' });
-  });
+const checkDateOrder = (v: { startDate: Date; endDate: Date }, ctx: z.RefinementCtx) => {
+  if (v.endDate < v.startDate) ctx.addIssue({ code: 'custom', path: ['endDate'], message: '종료일은 시작일 이후여야 합니다' });
+};
 
-export const operatorCreateMissionSchema = withDateOrder(
-  missionFieldsSchema.extend({
-    clientProfileId: z.preprocess(v => (v === '' ? undefined : v), z.string().uuid().optional()),
-    sendPaymentLink: z.boolean().optional(),
-  }),
-);
+export const operatorCreateMissionSchema = missionFieldsSchema.extend({
+  clientProfileId: z.preprocess(v => (v === '' ? undefined : v), z.string().uuid().optional()),
+  sendPaymentLink: z.boolean().optional(),
+}).superRefine(checkDateOrder);
 
-export const payAndCreateMissionSchema = withDateOrder(
-  missionFieldsSchema.extend({
-    paymentKey: z.string().min(1).max(200),
-    orderId: z.string().min(1).max(200),
-    amount: z.coerce.number().int().positive(),
-  }),
-);
+export const payAndCreateMissionSchema = missionFieldsSchema.extend({
+  paymentKey: z.string().min(1).max(200),
+  orderId: z.string().min(1).max(200),
+  amount: z.coerce.number().int().positive(),
+}).superRefine(checkDateOrder);
 
 export const payExistingMissionSchema = z.object({
   paymentKey: z.string().min(1).max(200),
