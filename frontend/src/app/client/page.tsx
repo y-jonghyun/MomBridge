@@ -4,6 +4,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
+import KeywordRecommender, { KeywordSelection } from '@/components/campaign/KeywordRecommender';
+import CampaignPanel from '@/components/campaign/CampaignPanel';
 
 type Tab = 'my-missions' | 'create' | 'results' | 'profile';
 
@@ -16,10 +18,13 @@ const defaultForm = {
   regionSi: '', regionGu: '',
   startDate: '', endDate: '', submissionDeadline: '',
   requirements: '',
+  destinationUrl: '',
 };
 
+type CreateForm = typeof defaultForm & { keywords?: KeywordSelection | null };
+
 type TossIntent =
-  | { type: 'create'; form: typeof defaultForm }
+  | { type: 'create'; form: CreateForm }
   | { type: 'pay'; missionId: string; amount: number };
 
 async function initiateToss(clientKey: string, intent: TossIntent, orderName: string, customerName: string, totalAmount: number) {
@@ -56,6 +61,8 @@ function ClientPageContent() {
   const [tab, setTab] = useState<Tab>('my-missions');
   const [missions, setMissions] = useState<any[]>([]);
   const [form, setForm] = useState(defaultForm);
+  const [keywords, setKeywords] = useState<KeywordSelection | null>(null);
+  const [clientInfo, setClientInfo] = useState<{ category: string; regionGu: string; regionDong: string | null } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [selectedMission, setSelectedMission] = useState<any>(null);
@@ -116,6 +123,7 @@ function ClientPageContent() {
         name: userR.data.data.user.name ?? '',
         phone: profileR.data.data.contactPhone ?? '',
       }));
+      setClientInfo(profileR.data.data);
     } catch { /* 무시 */ }
   }
 
@@ -148,17 +156,20 @@ function ClientPageContent() {
     } catch { /* 에러 무시 */ } finally { setLoading(false); }
   }
 
-  async function handleCreateComplete(paymentKey: string, orderId: string, amount: number, formData: typeof defaultForm) {
+  async function handleCreateComplete(paymentKey: string, orderId: string, amount: number, formData: CreateForm) {
     setSubmitting(true);
     try {
+      const { keywords: pickedKeywords, ...fields } = formData;
       await api.post('/missions/pay-and-create', {
-        ...formData,
+        ...fields,
+        keywords: pickedKeywords ?? undefined,
         rewardAmount: Number(formData.rewardAmount),
         maxParticipants: Number(formData.maxParticipants),
         paymentKey, orderId, amount,
       });
       alert('미션이 등록됐습니다. 운영자 승인 후 오픈됩니다.');
       setForm(defaultForm);
+      setKeywords(null);
       router.replace('/client');
       setTab('my-missions');
       loadMissions();
@@ -192,7 +203,7 @@ function ClientPageContent() {
 
     const totalAmount = Number(form.rewardAmount) * Number(form.maxParticipants);
     try {
-      await initiateToss(clientKey, { type: 'create', form }, form.title || '맘브릿지 미션 등록', user?.name ?? '고객사', totalAmount);
+      await initiateToss(clientKey, { type: 'create', form: { ...form, keywords } }, form.title || '맘브릿지 미션 등록', user?.name ?? '고객사', totalAmount);
     } catch (err: any) {
       sessionStorage.removeItem('tossIntent');
       if (err?.code !== 'USER_CANCEL') alert(err?.message ?? '결제 진행 중 오류가 발생했습니다.');
@@ -381,6 +392,18 @@ function ClientPageContent() {
                 ))}
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">도착 URL {form.category === 'REVIEW' ? '(권장)' : '(선택)'}</label>
+                <input type="url" className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
+                  value={form.destinationUrl} onChange={e => f('destinationUrl', e.target.value)} placeholder="예약 페이지·스마트스토어·홈페이지 주소 (https://...)" />
+                <p className="text-xs text-gray-400 mt-1">체험단원마다 이 주소로 연결되는 추적 링크가 발급되어 리뷰 유입을 집계합니다. 등록 후에도 변경할 수 있습니다.</p>
+              </div>
+              <KeywordRecommender
+                defaultCategory={clientInfo?.category ?? ''}
+                defaultRegion={[form.regionGu || clientInfo?.regionGu, clientInfo?.regionDong].filter(Boolean).join(' ')}
+                value={keywords}
+                onChange={setKeywords}
+              />
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">수행 조건 (선택)</label>
                 <textarea rows={2} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none resize-none"
                   value={form.requirements} onChange={e => f('requirements', e.target.value)} placeholder="예: 인스타그램 팔로워 500명 이상, 게시물 24시간 이상 유지" />
@@ -476,6 +499,7 @@ function ClientPageContent() {
                         </div>
                       ))}
                     </div>
+                    <CampaignPanel mission={selectedMission} defaultCategory={clientInfo?.category ?? ''} />
                     {missionDetail.submissions.length > 0 && (
                       <div className="bg-white rounded-2xl p-5 shadow-sm">
                         <h4 className="font-semibold text-gray-900 mb-4">제출된 콘텐츠</h4>

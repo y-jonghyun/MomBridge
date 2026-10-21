@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
+import { ReviewGuideModal, PostCheckSummary } from '@/components/campaign/ReviewGuide';
 
 type Tab = 'missions' | 'my-applications' | 'my-submissions' | 'earnings' | 'community';
 
@@ -39,6 +40,9 @@ export default function ParticipantPage() {
   const [submitForm, setSubmitForm] = useState({ description: '', snsPostUrl: '' });
   const [submittingContent, setSubmittingContent] = useState(false);
   const [submittedMissionIds, setSubmittedMissionIds] = useState<Set<string>>(new Set());
+  const [guideMissionId, setGuideMissionId] = useState<string | null>(null);
+  const [checkResult, setCheckResult] = useState<any>(null);
+  const [reviewStats, setReviewStats] = useState<Record<string, { clicks: number; uniqueVisitors: number }>>({});
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
@@ -108,8 +112,12 @@ export default function ParticipantPage() {
         setSubmittedMissionIds(new Set(subR.data.data.map((s: any) => s.missionId)));
       }
       if (t === 'my-submissions') {
-        const r = await api.get('/submissions/my');
+        const [r, stats] = await Promise.all([
+          api.get('/submissions/my'),
+          api.get('/participant/reviews/stats').catch(() => ({ data: { data: [] } })),
+        ]);
         setSubmissions(r.data.data);
+        setReviewStats(Object.fromEntries(stats.data.data.map((x: any) => [x.missionId, x])));
       }
       if (t === 'earnings') {
         const r = await api.get('/participant/payouts');
@@ -151,16 +159,18 @@ export default function ParticipantPage() {
     if (!submitModal) return;
     setSubmittingContent(true);
     try {
+      let saved: any;
       if (submitModal.resubmitId) {
-        await api.patch(`/submissions/${submitModal.resubmitId}/resubmit`, submitForm);
+        saved = (await api.patch(`/submissions/${submitModal.resubmitId}/resubmit`, submitForm)).data.data;
         loadTab('my-submissions', true);
       } else {
-        await api.post('/submissions', { missionId: submitModal.missionId, ...submitForm });
+        saved = (await api.post('/submissions', { missionId: submitModal.missionId, ...submitForm })).data.data;
         setSubmittedMissionIds(prev => { const s = new Set(prev); s.add(submitModal.missionId); return s; });
       }
       setSubmitModal(null);
       setSubmitForm({ description: '', snsPostUrl: '' });
-      alert('제출 완료! 운영자 검수 후 정산됩니다.');
+      if (saved?.postCheckResult) setCheckResult(saved);
+      else alert('제출 완료! 운영자 검수 후 정산됩니다.');
     } catch (err: any) {
       alert(err?.response?.data?.error?.message ?? '제출에 실패했습니다');
     } finally { setSubmittingContent(false); }
@@ -448,7 +458,11 @@ export default function ParticipantPage() {
                   </div>
                 </div>
                 {a.status === 'APPROVED' && (
-                  <div className="mt-3 pt-3 border-t border-gray-100">
+                  <div className="mt-3 pt-3 border-t border-gray-100 space-y-2">
+                    <button onClick={() => setGuideMissionId(a.missionId)}
+                      className="w-full py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50">
+                      📋 작성 가이드 · 추적 링크 복사
+                    </button>
                     {submittedMissionIds.has(a.missionId) ? (
                       <div className="flex items-center gap-2 text-sm text-green-600 font-medium">
                         <span>✓ 콘텐츠 제출 완료</span>
@@ -483,6 +497,11 @@ export default function ParticipantPage() {
                 {s.reviewNote && <p className="text-sm text-blue-600 mt-2">검수 메모: {s.reviewNote}</p>}
                 {s.rejectionReason && <p className="text-sm text-red-500 mt-2">반려 사유: {s.rejectionReason}</p>}
                 <p className="text-xs text-gray-400 mt-2">제출: {new Date(s.submittedAt).toLocaleDateString('ko-KR')}</p>
+                {reviewStats[s.missionId] && (
+                  <p className="text-sm text-gray-700 mt-2">내 글로 들어온 방문 <b className="tabular-nums">{reviewStats[s.missionId].clicks}</b>회 · 고유 방문자 <b className="tabular-nums">{reviewStats[s.missionId].uniqueVisitors}</b>명
+                    <span className="block text-xs text-gray-400">추적 링크를 눌러 넘어온 방문만 집계됩니다. 블로그 조회수와는 다릅니다.</span></p>
+                )}
+                {s.postCheckResult && <div className="mt-2 border-t pt-2"><PostCheckSummary submission={s} /></div>}
                 {s.status === 'REVISION' && s.revisionCount < s.maxRevisions && (
                   <button onClick={() => {
                     setSubmitForm({ description: s.description ?? '', snsPostUrl: s.snsPostUrl ?? '' });
@@ -616,12 +635,12 @@ export default function ParticipantPage() {
                   placeholder="미션 수행 내용을 작성해주세요" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">SNS 게시물 URL (선택)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">게시물 URL (블로그 리뷰 미션은 네이버 블로그 글 주소 필수)</label>
                 <input
                   className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
                   value={submitForm.snsPostUrl}
                   onChange={e => setSubmitForm(f => ({ ...f, snsPostUrl: e.target.value }))}
-                  placeholder="https://www.instagram.com/p/..." />
+                  placeholder="https://blog.naver.com/아이디/글번호" />
               </div>
               <div className="flex justify-end gap-2">
                 <button type="button" onClick={() => setSubmitModal(null)}
@@ -632,6 +651,19 @@ export default function ParticipantPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {guideMissionId && <ReviewGuideModal missionId={guideMissionId} onClose={() => setGuideMissionId(null)} />}
+
+      {/* 제출 직후 자동 확인 결과 */}
+      {checkResult && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
+            <h2 className="text-base font-bold text-gray-900">제출 완료 · 자동 확인 결과</h2>
+            <PostCheckSummary submission={checkResult} />
+            <button onClick={() => setCheckResult(null)} className="w-full py-2.5 bg-slate-700 text-white text-sm font-bold rounded-xl">확인</button>
           </div>
         </div>
       )}

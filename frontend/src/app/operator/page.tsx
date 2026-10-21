@@ -4,8 +4,9 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
+import { SettingsEditor, SubmissionCheckPanel, TrafficSummary } from '@/components/operator/OperatorCampaignTools';
 
-type Tab = 'overview' | 'missions' | 'applications' | 'submissions' | 'payouts' | 'users' | 'register-mission';
+type Tab = 'overview' | 'missions' | 'applications' | 'submissions' | 'payouts' | 'users' | 'register-mission' | 'traffic' | 'settings';
 
 const MISSION_STATUS_LABEL: Record<string, string> = { DRAFT: '임시저장', OPEN: '모집중', IN_PROGRESS: '진행중', REVIEWING: '검수중', CLOSED: '종료' };
 const MISSION_STATUS_COLOR: Record<string, string> = { DRAFT: 'bg-gray-100 text-gray-600', OPEN: 'bg-green-100 text-green-700', IN_PROGRESS: 'bg-blue-100 text-blue-700', REVIEWING: 'bg-yellow-100 text-yellow-700', CLOSED: 'bg-red-100 text-red-600' };
@@ -68,11 +69,16 @@ export default function OperatorDashboard() {
     loadStats();
   }
 
-  async function reviewSubmission(id: string, status: 'APPROVED' | 'REJECTED') {
+  async function reviewSubmission(id: string, status: 'APPROVED' | 'REJECTED' | 'REVISION') {
     const reason = status === 'REJECTED' ? prompt('반려 사유') : undefined;
-    await api.patch(`/submissions/${id}/review`, { status, rejectionReason: reason });
-    setSubmissions(prev => prev.filter(s => s.id !== id));
-    loadStats();
+    const note = status === 'REVISION' ? prompt('수정 요청 내용 (예: 제목에 [광고]를 넣어 주세요)') : undefined;
+    try {
+      await api.patch(`/submissions/${id}/review`, { status, rejectionReason: reason ?? undefined, reviewNote: note ?? undefined });
+      setSubmissions(prev => prev.filter(s => s.id !== id));
+      loadStats();
+    } catch (err: any) {
+      alert(err?.response?.data?.error?.message ?? '처리에 실패했습니다');
+    }
   }
 
   async function processPayout(id: string) {
@@ -125,6 +131,8 @@ export default function OperatorDashboard() {
     { key: 'submissions', label: '콘텐츠 검수', badge: stats?.pendingSubmissions },
     { key: 'payouts', label: '정산 처리', badge: stats?.pendingPayouts },
     { key: 'users', label: '회원 관리' },
+    { key: 'traffic', label: '유입 성과' },
+    { key: 'settings', label: '운영 설정' },
   ];
 
   return (
@@ -345,13 +353,18 @@ export default function OperatorDashboard() {
                     </div>
                     {s.description && <p className="text-sm text-gray-700 bg-stone-50 rounded-lg p-3 mb-3">{s.description}</p>}
                     {s.snsPostUrl && <a href={s.snsPostUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-500 underline block mb-3">SNS 링크 보기 →</a>}
+                    <SubmissionCheckPanel submission={s} onConfirmed={u => setSubmissions(prev => prev.map(x => x.id === u.id ? { ...x, ...u } : x))} />
                     {s.mediaUrls?.length > 0 && (
                       <div className="flex gap-2 mb-3 flex-wrap">
                         {s.mediaUrls.map((url: string, i: number) => <a key={i} href={url} target="_blank" rel="noreferrer" className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">첨부 {i + 1}</a>)}
                       </div>
                     )}
                     <div className="flex gap-2">
-                      <button onClick={() => reviewSubmission(s.id, 'APPROVED')} className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700">승인 (정산 생성)</button>
+                      <button onClick={() => reviewSubmission(s.id, 'APPROVED')}
+                        disabled={s.mission?.category === 'REVIEW' && !['AUTO_PASSED', 'MANUAL_CONFIRMED'].includes(s.disclosureCheck)}
+                        title={s.mission?.category === 'REVIEW' && !['AUTO_PASSED', 'MANUAL_CONFIRMED'].includes(s.disclosureCheck) ? '대가 표시 확인 후 승인할 수 있습니다' : undefined}
+                        className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed">승인 (정산 생성)</button>
+                      <button onClick={() => reviewSubmission(s.id, 'REVISION')} className="px-4 py-2 border border-amber-400 text-amber-700 text-sm rounded-lg hover:bg-amber-50">수정 요청</button>
                       <button onClick={() => reviewSubmission(s.id, 'REJECTED')} className="px-4 py-2 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600">반려</button>
                     </div>
                   </div>
@@ -360,6 +373,9 @@ export default function OperatorDashboard() {
               </div>
             </div>
           )}
+
+          {tab === 'traffic' && <TrafficSummary />}
+          {tab === 'settings' && <SettingsEditor />}
 
           {/* 정산 처리 */}
           {tab === 'payouts' && !loading && (
