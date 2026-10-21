@@ -151,8 +151,13 @@ export default function ParticipantPage() {
     if (!submitModal) return;
     setSubmittingContent(true);
     try {
-      await api.post('/submissions', { missionId: submitModal.missionId, ...submitForm });
-      setSubmittedMissionIds(prev => { const s = new Set(prev); s.add(submitModal.missionId); return s; });
+      if (submitModal.resubmitId) {
+        await api.patch(`/submissions/${submitModal.resubmitId}/resubmit`, submitForm);
+        loadTab('my-submissions', true);
+      } else {
+        await api.post('/submissions', { missionId: submitModal.missionId, ...submitForm });
+        setSubmittedMissionIds(prev => { const s = new Set(prev); s.add(submitModal.missionId); return s; });
+      }
       setSubmitModal(null);
       setSubmitForm({ description: '', snsPostUrl: '' });
       alert('제출 완료! 운영자 검수 후 정산됩니다.');
@@ -478,6 +483,15 @@ export default function ParticipantPage() {
                 {s.reviewNote && <p className="text-sm text-blue-600 mt-2">검수 메모: {s.reviewNote}</p>}
                 {s.rejectionReason && <p className="text-sm text-red-500 mt-2">반려 사유: {s.rejectionReason}</p>}
                 <p className="text-xs text-gray-400 mt-2">제출: {new Date(s.submittedAt).toLocaleDateString('ko-KR')}</p>
+                {s.status === 'REVISION' && s.revisionCount < s.maxRevisions && (
+                  <button onClick={() => {
+                    setSubmitForm({ description: s.description ?? '', snsPostUrl: s.snsPostUrl ?? '' });
+                    setSubmitModal({ ...s, resubmitId: s.id });
+                  }}
+                    className="mt-3 w-full py-2.5 bg-slate-700 text-white text-sm font-bold rounded-xl hover:bg-slate-800">
+                    ✏️ 수정해서 재제출하기 ({s.revisionCount}/{s.maxRevisions})
+                  </button>
+                )}
               </div>
             ))}
             {submissions.length === 0 && <div className="text-center py-20 text-gray-400 bg-white rounded-2xl">제출한 콘텐츠가 없습니다</div>}
@@ -587,7 +601,7 @@ export default function ParticipantPage() {
           <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl">
             <div className="flex items-center justify-between px-6 py-4 border-b">
               <div>
-                <h2 className="text-base font-bold text-gray-900">콘텐츠 제출</h2>
+                <h2 className="text-base font-bold text-gray-900">{submitModal.resubmitId ? '콘텐츠 재제출' : '콘텐츠 제출'}</h2>
                 <p className="text-xs text-gray-400 mt-0.5">{submitModal.mission?.title}</p>
               </div>
               <button onClick={() => setSubmitModal(null)} className="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>

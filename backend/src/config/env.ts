@@ -18,6 +18,8 @@ export const env = {
   JWT_ACCESS_EXPIRES_IN: process.env.JWT_ACCESS_EXPIRES_IN ?? '15m',
   JWT_REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
   CORS_ORIGIN: (process.env.CORS_ORIGIN ?? 'http://localhost:3000').split(',').map(s => s.trim()),
+  // 앞단 프록시 홉 수. Render는 프록시 1단 → 1. 프록시 없이 직접 노출하면 0
+  TRUST_PROXY_HOPS: parseInt(process.env.TRUST_PROXY_HOPS ?? '1', 10),
 };
 
 export const isDev = () => env.NODE_ENV === 'development';

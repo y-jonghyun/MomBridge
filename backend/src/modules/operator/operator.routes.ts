@@ -1,6 +1,14 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate, requireRole } from '../../middleware/auth';
 import { prisma } from '../../config/database';
+import { z } from 'zod';
+import { parseInput } from '../../middleware/validate';
+import { missionStatusSchema } from '../missions/missions.schema';
+
+const applicationReviewSchema = z.object({
+  status: z.enum(['APPROVED', 'REJECTED']),
+  rejectionReason: z.string().max(2000).optional(),
+});
 
 const router = Router();
 router.use(authenticate, requireRole('OPERATOR'));
@@ -45,12 +53,13 @@ router.get('/missions', async (req: Request, res: Response, next: NextFunction) 
 // 미션 상태 변경
 router.patch('/missions/:id/status', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const { status } = parseInput(missionStatusSchema, req.body);
     const mission = await prisma.mission.update({
       where: { id: req.params.id },
       data: {
-        status: req.body.status,
-        ...(req.body.status === 'OPEN' && { publishedAt: new Date() }),
-        ...(req.body.status === 'CLOSED' && { closedAt: new Date() }),
+        status,
+        ...(status === 'OPEN' && { publishedAt: new Date() }),
+        ...(status === 'CLOSED' && { closedAt: new Date() }),
       },
     });
     res.json({ success: true, data: mission });
@@ -77,12 +86,13 @@ router.get('/applications', async (req: Request, res: Response, next: NextFuncti
 // 지원서 승인/반려
 router.patch('/applications/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const { status, rejectionReason } = parseInput(applicationReviewSchema, req.body);
     const opProfile = await prisma.operatorProfile.findUnique({ where: { userId: req.user!.sub } });
     const app = await prisma.application.update({
       where: { id: req.params.id },
       data: {
-        status: req.body.status,
-        rejectionReason: req.body.rejectionReason,
+        status,
+        rejectionReason,
         reviewerId: opProfile?.id,
         reviewedAt: new Date(),
       },
@@ -92,11 +102,11 @@ router.patch('/applications/:id', async (req: Request, res: Response, next: Next
       },
     });
     // 승인 시 미션 currentCount 증가
-    if (req.body.status === 'APPROVED') {
+    if (status === 'APPROVED') {
       await prisma.mission.update({ where: { id: app.missionId }, data: { currentCount: { increment: 1 } } });
     }
     // 참여자에게 알림 전송
-    const isApproved = req.body.status === 'APPROVED';
+    const isApproved = status === 'APPROVED';
     await prisma.notification.create({
       data: {
         userId: app.participant.userId,
@@ -104,7 +114,7 @@ router.patch('/applications/:id', async (req: Request, res: Response, next: Next
         title: isApproved ? '지원이 승인됐습니다! 🎉' : '지원 결과 안내',
         body: isApproved
           ? `[${app.mission.title}] 미션 지원이 승인됐습니다. 지금 바로 콘텐츠를 제출해보세요!`
-          : `[${app.mission.title}] 미션 지원이 반려됐습니다. 사유: ${req.body.rejectionReason ?? '없음'}`,
+          : `[${app.mission.title}] 미션 지원이 반려됐습니다. 사유: ${rejectionReason ?? '없음'}`,
         resourceId: app.id,
         resourceType: 'application',
       },
