@@ -3,13 +3,24 @@ import { authenticate } from '../../middleware/auth';
 import { prisma } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
 import bcrypt from 'bcryptjs';
+import { z } from 'zod';
 import * as authService from './auth.service';
+import { parseInput } from '../../middleware/validate';
 
 const router = Router();
 
+// 회원가입으로는 참여자·고객사만 만들 수 있다. 운영자 계정은 서버에서 scripts/create-operator로만 만든다
+const registerSchema = z.object({
+  email: z.string().trim().email().max(320),
+  password: z.string().min(6, '비밀번호는 6자 이상이어야 합니다').max(100),
+  name: z.string().trim().min(1, '이름을 입력해주세요').max(100),
+  role: z.enum(['PARTICIPANT', 'CLIENT'], { errorMap: () => ({ message: '참여자 또는 고객사로만 가입할 수 있습니다' }) }),
+  phone: z.preprocess(v => (v === '' ? undefined : v), z.string().trim().max(20).optional()),
+});
+
 router.post('/register', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await authService.register(req.body);
+    const result = await authService.register(parseInput(registerSchema, req.body));
     res.status(201).json({ success: true, data: result });
   } catch (e) { next(e); }
 });
