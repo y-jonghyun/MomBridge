@@ -197,12 +197,14 @@ npm.cmd run review:check-post -- https://blog.naver.com/<아이디>/<글번호> 
 - 다만 오늘 측정에서는 마지막 ping 후 수 시간이 지났는데도 `/health`가 0.4~0.7초에 응답했다. 유료 인스턴스이거나 다른 트래픽이 있는 것으로 보이며, **Render 대시보드에서 플랜 확인이 필요**하다.
 - 대응: 프론트 `/r/[code]`가 백엔드 응답을 9초 기다리고, 늦으면 "페이지로 이동하고 있습니다" 화면을 보여주며 1초 간격으로 최대 6회 자동 재시도한다(최대 약 1분). 재시도 요청은 같은 방문자가 이미 집계됐으면 다시 세지 않는다. 그래도 슬립에서 깨는 동안 독자가 수십 초를 기다릴 수 있으므로, **무료 플랜이면 정식 오픈 전에 상시 실행 플랜으로 바꾸거나 외부 모니터(5분 간격)를 두는 것을 권장**한다.
 
-### 배포 전 해야 할 일 (순서대로, 3차 기준)
-완료: PR #2 머지·배포·400 확인, 운영자 목록 확인(정상 1개), DB 비밀번호 교체.
+### 배포 전 해야 할 일 (순서대로, 4차 기준)
+완료: PR #2 머지·배포·400 확인, 운영자 목록 확인(정상 1개), DB 비밀번호 교체, PR #3 머지·배포, Vercel Root Directory=`frontend`, PR #1에 main 반영.
 
-1. **PR #3(의존성 보안 패치) 머지** → Render 배포 → `/health` 확인. 알려주면 PR #1에 main을 다시 반영한다.
+> ⚠️ **baseline(4~5번) 완료 전 Build Command 변경 금지** — 7번은 반드시 5번 이후
+
+1. ~~PR #3 머지·배포, PR #1에 main 반영~~ (완료)
 2. **Supabase Session pooler 주소 확인** (Connect → Session pooler, 포트 5432). 백업·상태 확인·`DIRECT_URL`에 쓴다.
-3. **운영 DB 백업** — 아래 "운영 DB 백업·상태 확인" 1)번. `pg_dump --version`이 서버 메이저 버전 이상인지 먼저 확인.
+3. **운영 DB 백업** — 먼저 4차 "PostgreSQL 명령줄 도구"로 서버 버전 확인·도구 준비, 그다음 아래 "운영 DB 백업·상태 확인" 1)번.
 4. **마이그레이션 상태 확인** — PR #1 브랜치에서:
    ```powershell
    cd C:\Mombridge; git switch feature/keyword-tracking; git pull
@@ -218,7 +220,7 @@ npm.cmd run review:check-post -- https://blog.naver.com/<아이디>/<글번호> 
    - Vercel(서버 전용): `TRACKING_PROXY_SECRET`(Render와 같은 값), `TRACKING_BACKEND_URL=https://mombridge-backend.onrender.com` → Redeploy
    - GitHub: secret `MOMBRIDGE_INTERNAL_JOB_TOKEN`(Render `INTERNAL_JOB_TOKEN`과 같은 값)
    - 비밀값 생성: `$b = New-Object byte[] 48; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); [Convert]::ToBase64String($b)`
-7. **Render Build Command 변경** (5번 baseline 후):
+7. **Render Build Command 변경** — ⚠️ **5번 baseline이 끝나고 `migrate status`가 정상인 것을 확인한 뒤에만**:
    `npm install --production=false && npx prisma generate && npm run build && npx prisma migrate deploy`
    → Manual Deploy로 한 번 배포해 빌드 로그에 `No pending migrations to apply`가 나오는지 확인 (main 코드 기준 리허설. 실패해도 이전 배포 유지).
 8. **블로그 실제 글 로컬 점검** (위 "블로그 확인 실제 글 점검", 다섯 경우).
@@ -235,13 +237,14 @@ npm.cmd run review:check-post -- https://blog.naver.com/<아이디>/<글번호> 
 $env:PROD_DB_URL = "<Session pooler 또는 직접 연결 주소 (...:5432/postgres)>"
 
 # 1) 백업 (custom 포맷, 복원 가능 여부까지 확인)
-pg_dump --format=custom --no-owner --no-privileges --file "mombridge_prod_$(Get-Date -Format yyyyMMdd_HHmm).dump" "$env:PROD_DB_URL"
+#    앱 데이터는 모두 public 스키마(_prisma_migrations 포함). Supabase 관리 스키마(auth·storage 등)는 권한 문제로 실패할 수 있어 제외
+pg_dump --format=custom --no-owner --no-privileges --schema=public --file "mombridge_prod_$(Get-Date -Format yyyyMMdd_HHmm).dump" "$env:PROD_DB_URL"
 pg_restore --list (Get-ChildItem mombridge_prod_*.dump | Sort-Object LastWriteTime | Select-Object -Last 1).FullName | Select-Object -First 15
 
 # 2) 상태 확인 (읽기 전용)
 psql "$env:PROD_DB_URL" -c "SELECT migration_name, finished_at, rolled_back_at FROM _prisma_migrations ORDER BY started_at;"
 psql "$env:PROD_DB_URL" -c "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'missions' AND column_name IN ('paymentStatus','paymentKey','orderId','totalAmount','paidAt') ORDER BY 1;"
-cd C:\Mombridge\backend; $env:DATABASE_URL = $env:PROD_DB_URL; npx.cmd prisma migrate status; Remove-Item Env:DATABASE_URL
+cd C:\Mombridge\backend; $env:DATABASE_URL = $env:PROD_DB_URL; $env:DIRECT_URL = $env:PROD_DB_URL; npx.cmd prisma migrate status; Remove-Item Env:DATABASE_URL, Env:DIRECT_URL
 ```
 
 결과 해석:
