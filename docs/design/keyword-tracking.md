@@ -6,7 +6,50 @@
 
 ---
 
-## 진행 상황 (2026-10-21, 2차 갱신)
+## 진행 상황 (2026-10-21, 3차 갱신)
+
+### 3차: Render 기준 마이그레이션 정리
+**Render 설정 (사용자 확인, 2026-10-21)**: Runtime Node(Docker 아님), Root Directory `backend`, Build `npm install --production=false && npx prisma generate && npm run build`, Pre-Deploy 사용 불가(무료 플랜), Start `npm start`.
+
+**마이그레이션은 지금까지 자동으로 실행된 적이 없다**
+- `npm start` = `node dist/server.js` — 마이그레이션 없음. Build Command에도 없음.
+- `prisma migrate deploy`가 들어 있는 곳은 `backend/Dockerfile`의 CMD뿐인데, Render는 Docker를 쓰지 않으므로 실행되지 않았다.
+- 그런데 결제 컬럼 5개는 2026-09-13 `schema.prisma`에만 추가됐고(마이그레이션 없음), 운영 서버는 결제 기능이 동작한다 → **운영 DB 스키마는 마이그레이션이 아닌 다른 방법(`prisma db push`나 SQL 직접 실행으로 추정)으로 반영돼 왔다.** 따라서 운영 DB에 `_prisma_migrations` 기록이 없거나 일부만 있을 가능성이 높다 → 첫 배포 전에 상태 확인과 baseline이 필요하다.
+- 앞서 "Docker CMD의 migrate가 6543으로 돌아 기동 실패" 위험은 Render에는 해당하지 않는다. 대신 **PR #1을 그냥 머지하면 마이그레이션이 아예 실행되지 않아**, 새 코드가 없는 컬럼(`missions.campaignCode` 등)을 조회하며 미션 관련 API 전체가 500을 낸다. 머지 전에 마이그레이션 경로가 반드시 준비돼야 한다.
+
+**마이그레이션 실행 위치 비교 (무료 플랜, Pre-Deploy 불가)**
+
+| 방식 | 실패 시 | 장점 | 단점 |
+|---|---|---|---|
+| **A. Build Command 끝에 추가 (추천)** `... && npm run build && npx prisma migrate deploy` | 빌드 실패 → **이전 배포가 계속 서비스**(다운타임 없음) | 배포마다 자동, 실패가 안전한 쪽으로 남음 | 마이그레이션이 새 코드보다 먼저 적용됨 → 이전 코드와 호환돼야 함(아래 조치로 해결) |
+| B. Start Command 앞에 추가 `npx prisma migrate deploy && npm start` | 새 인스턴스가 기동 실패. 무료 플랜은 **슬립에서 깨어날 때마다** 실행 → DB 일시 장애 시 깨어나지 못함 | 코드와 같은 시점 | 콜드 스타트가 수 초 더 길어짐(추적 링크 지연 악화), 실패 영향이 큼 |
+| C. 배포 전 직접 실행 | 사람이 잊으면 새 코드가 옛 스키마로 떠서 500 | 완전히 통제 | 매번 수동, 순서 실수 위험 |
+
+- **결정: A.** 단, 첫 배포는 baseline 때문에 상태 확인을 수동으로 먼저 한다(아래 순서 4~5).
+- 이전 코드 호환: 이번 마이그레이션에서 NOT NULL로 추가되는 컬럼은 `missions.campaignCode` 하나뿐 → **DB 기본값을 추가**해 이전 코드가 미션을 만들어도 실패하지 않게 했다(로컬 검증 완료). 나머지는 nullable 컬럼과 새 테이블이라 이전 코드에 영향 없음.
+- Render는 Build 단계에서도 환경변수를 읽으므로 `DIRECT_URL`을 Render 환경변수에 넣으면 된다.
+
+**되돌리기**
+1. 코드: Render 대시보드 → Events/Deploys → 이전 배포 **Rollback**. 새 스키마는 이전 코드와 호환되므로 대부분 이것만으로 충분.
+2. DB(필요할 때만): `docs/ops/rollback-20261021100000_keyword_tracking_reports.sql`을 5432 주소로 실행 — 새 테이블·컬럼과 해당 마이그레이션 기록을 삭제(데이터도 삭제됨). 로컬에서 되돌리기 → 다시 적용까지 검증함. 최후 수단은 배포 전 받은 `pg_dump` 백업 복원.
+3. 마이그레이션이 중간에 실패하면 `_prisma_migrations`에 실패로 기록되고 다음 `migrate deploy`가 멈춘다 → 원인 수정 후 `npx.cmd prisma migrate resolve --rolled-back <이름>`(되돌린 경우) 또는 `--applied <이름>`(수동으로 끝낸 경우).
+
+**`directUrl` 추가 (PR #1)**
+- `schema.prisma` datasource에 `directUrl = env("DIRECT_URL")`. 앱 실행과 `prisma generate`는 `DIRECT_URL` 없이도 동작하고(확인함), `prisma migrate *`·`validate`만 요구한다. CI·테스트에도 넣었다.
+- Render에 넣을 `DIRECT_URL` 형식 (Supabase → Connect → **Session pooler**):
+  `postgresql://postgres.<프로젝트 REF>:<DB 비밀번호>@<리전 호스트>.pooler.supabase.com:5432/postgres`
+  - 지금 `DATABASE_URL`과 **같은 호스트·사용자·비밀번호, 포트만 5432**, 끝의 `?pgbouncer=true`는 붙이지 않는다.
+  - 비밀번호에 `@ : / ? # %` 같은 문자가 있으면 URL 인코딩해야 한다.
+  - Direct connection(`db.<REF>.supabase.co:5432`)은 기본이 IPv6 전용이라 Render에서 연결이 안 될 수 있어 Session pooler를 권장.
+
+**Dockerfile 정리 제안 (아직 적용 안 함)**
+- 현재 `backend/Dockerfile`·`frontend/Dockerfile`·`docker-compose.yml`(backend·frontend 서비스)·`devops/docker-configuration.yml`은 배포에 쓰이지 않는데, Docker CMD에 `migrate deploy`가 있어 "배포 때 마이그레이션이 돈다"는 오해를 준다.
+- 제안: `docker-compose.yml`은 **로컬 테스트용 postgres 서비스만** 남기고, 두 Dockerfile과 `devops/docker-configuration.yml`은 삭제. README의 실행 방법을 Render 기준(Build/Start Command)으로 갱신. 로컬 Docker가 필요해지면 그때 Render와 같은 명령으로 다시 만든다.
+- 대안: 파일은 남기되 CMD에서 `migrate deploy`를 빼고 맨 위에 "Render는 이 파일을 쓰지 않음" 주석. → 승인해 주시면 별도 PR로 진행.
+
+**npm audit (PR #3)**: express 4.22.3(proxy-addr 2.0.8, qs 6.16.1), `npm audit fix`, 미사용 uuid·multer 제거. 8건 → 3 high(개발 도구 `ts-node-dev` 계열만), 운영 의존성 0건. 개발 도구 정리는 나중에.
+
+**PR #1에 main 반영**: PR #2 머지분을 merge(충돌은 `package.json` scripts 한 곳, PR #1 쪽으로 정리). PR #3 머지 후 한 번 더 반영 예정.
 
 ### 2차 작업 (PR 전)
 | 커밋 | 내용 |
@@ -110,17 +153,35 @@ npm.cmd run review:check-post -- https://blog.naver.com/<아이디>/<글번호> 
 - 다만 오늘 측정에서는 마지막 ping 후 수 시간이 지났는데도 `/health`가 0.4~0.7초에 응답했다. 유료 인스턴스이거나 다른 트래픽이 있는 것으로 보이며, **Render 대시보드에서 플랜 확인이 필요**하다.
 - 대응: 프론트 `/r/[code]`가 백엔드 응답을 9초 기다리고, 늦으면 "페이지로 이동하고 있습니다" 화면을 보여주며 1초 간격으로 최대 6회 자동 재시도한다(최대 약 1분). 재시도 요청은 같은 방문자가 이미 집계됐으면 다시 세지 않는다. 그래도 슬립에서 깨는 동안 독자가 수십 초를 기다릴 수 있으므로, **무료 플랜이면 정식 오픈 전에 상시 실행 플랜으로 바꾸거나 외부 모니터(5분 간격)를 두는 것을 권장**한다.
 
-### 배포 전 해야 할 일
-1. 운영 DB 백업 및 상태 확인 (아래 "운영 DB 백업·상태 확인").
-2. 환경변수 설정
-   - Render(백엔드): `CLICK_HASH_SECRET`(32자 이상), `TRACKING_PROXY_SECRET`, `INTERNAL_JOB_TOKEN`, `TRACKING_BASE_URL`, `KEYWORD_TOOL_PROVIDER=mock`
-   - Vercel(프론트, 서버 전용): `TRACKING_PROXY_SECRET`(백엔드와 같은 값), `TRACKING_BACKEND_URL`
-   - GitHub: secret `MOMBRIDGE_INTERNAL_JOB_TOKEN`, (선택) variable `MOMBRIDGE_BACKEND_URL`
-   - `CLICK_HASH_SECRET`이 없으면 리다이렉트만 되고 클릭은 기록되지 않는다. `TRACKING_PROXY_SECRET`이 없으면 모든 방문자가 Vercel IP로 보여 고유 방문자 집계가 틀어진다.
-3. ~~프론트 주소 확인~~ → `https://mombridge-frontend.vercel.app` (위 "같은 값을 넣어야 하는 환경변수" 참고).
-4. 실제 네이버 블로그 글로 게시글 확인 결과를 점검 — 로컬과 배포 서버 양쪽에서 (위 "블로그 확인 실제 글 점검").
-5. 개인정보처리방침 반영 (6절).
-6. 정식 도메인 구매 후 Vercel에 연결하고 `TRACKING_BASE_URL` 변경 (글에 링크가 들어가기 전에).
+### 배포 전 해야 할 일 (순서대로, 3차 기준)
+완료: PR #2 머지·배포·400 확인, 운영자 목록 확인(정상 1개), DB 비밀번호 교체.
+
+1. **PR #3(의존성 보안 패치) 머지** → Render 배포 → `/health` 확인. 알려주면 PR #1에 main을 다시 반영한다.
+2. **Supabase Session pooler 주소 확인** (Connect → Session pooler, 포트 5432). 백업·상태 확인·`DIRECT_URL`에 쓴다.
+3. **운영 DB 백업** — 아래 "운영 DB 백업·상태 확인" 1)번. `pg_dump --version`이 서버 메이저 버전 이상인지 먼저 확인.
+4. **마이그레이션 상태 확인** — PR #1 브랜치에서:
+   ```powershell
+   cd C:\Mombridge; git switch feature/keyword-tracking; git pull
+   cd backend; npm.cmd ci
+   $env:DATABASE_URL = "<Session pooler 주소>"; $env:DIRECT_URL = $env:DATABASE_URL
+   npx.cmd prisma migrate status
+   Remove-Item Env:DATABASE_URL, Env:DIRECT_URL
+   ```
+   + "운영 DB 백업·상태 확인" 2)번의 psql 조회 2개. **결과(접속 정보 제외)를 알려주면 baseline 명령을 정리**한다 (`_prisma_migrations`가 없을 가능성이 높음).
+5. **baseline 적용** (4번 결과에 따라 안내받은 명령 실행).
+6. **환경변수 추가** (지금 코드는 쓰지 않으므로 머지 전에 넣어도 안전. Render는 저장 시 재배포될 수 있음)
+   - Render: `DIRECT_URL`(Session pooler), `CLICK_HASH_SECRET`(32자 이상), `TRACKING_PROXY_SECRET`, `INTERNAL_JOB_TOKEN`, `TRACKING_BASE_URL`·`FRONTEND_URL`(= `https://mombridge-frontend.vercel.app`), `KEYWORD_TOOL_PROVIDER=mock`, `CORS_ORIGIN`에 프론트 주소가 있는지 확인
+   - Vercel(서버 전용): `TRACKING_PROXY_SECRET`(Render와 같은 값), `TRACKING_BACKEND_URL=https://mombridge-backend.onrender.com` → Redeploy
+   - GitHub: secret `MOMBRIDGE_INTERNAL_JOB_TOKEN`(Render `INTERNAL_JOB_TOKEN`과 같은 값)
+   - 비밀값 생성: `$b = New-Object byte[] 48; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); [Convert]::ToBase64String($b)`
+7. **Render Build Command 변경** (5번 baseline 후):
+   `npm install --production=false && npx prisma generate && npm run build && npx prisma migrate deploy`
+   → Manual Deploy로 한 번 배포해 빌드 로그에 `No pending migrations to apply`가 나오는지 확인 (main 코드 기준 리허설. 실패해도 이전 배포 유지).
+8. **블로그 실제 글 로컬 점검** (위 "블로그 확인 실제 글 점검", 다섯 경우).
+9. **Render 플랜 확인** (무료면 슬립으로 리다이렉트 지연).
+10. **PR #1 머지** → 빌드 로그에서 `Applying migration 20261021090000_...`, `20261021100000_...` 확인 → 배포 후 확인: `/health`, 운영자 화면 접속, 체험단원 가이드 추적 링크, `/r/` 링크 클릭 → 도착 URL+UTM, Actions → Daily jobs → Run workflow 성공, 서버 쪽 블로그 점검(`--server`).
+11. 문제가 생기면 위 "되돌리기".
+12. 오픈 전: 개인정보처리방침 반영(6절), 정식 도메인 연결 후 `TRACKING_BASE_URL`·`FRONTEND_URL`·`CORS_ORIGIN` 변경(글에 링크가 들어가기 전), 검색광고 API 약관 확인 후 `KEYWORD_TOOL_PROVIDER=naver`.
 
 ### 운영 DB 백업·상태 확인 (직접 실행할 명령)
 접속 문자열은 본인 터미널의 환경변수에만 넣고 대화에는 붙이지 마세요. Supabase는 **직접 연결(5432) 또는 Session pooler** 주소를 써야 합니다(Transaction pooler 6543은 pg_dump가 지원하지 않음). `pg_dump`는 서버와 같거나 더 높은 메이저 버전이어야 합니다.
