@@ -176,7 +176,8 @@ router.patch('/users/:id/active', async (req: Request, res: Response, next: Next
   try {
     const user = await prisma.user.update({
       where: { id: req.params.id },
-      data: { isActive: req.body.isActive },
+      // 비활성화하면 리프레시 토큰을 무효화해 남은 세션이 재발급받지 못하게 한다
+      data: { isActive: req.body.isActive === true, ...(req.body.isActive !== true && { tokenVersion: { increment: 1 } }) },
       select: { id: true, email: true, name: true, role: true, isActive: true },
     });
     res.json({ success: true, data: user });
