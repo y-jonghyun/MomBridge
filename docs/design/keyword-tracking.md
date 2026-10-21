@@ -20,6 +20,26 @@
   - 운영 결과에 `DROP`/`ALTER COLUMN`/`SET DATA TYPE`이 있으면 적용하지 말고 결과를 공유.
 - 그다음 **첫 적용은 PC에서 직접 `migrate deploy`**(출력을 바로 확인), 이후 Build Command에 넣어 `No pending migrations` 리허설. 새 스키마는 이전 코드와 호환되므로 PR #1 머지 전에 적용해도 된다.
 
+**운영 비교 결과 (사용자 실행)**: `CREATE TYPE` 3, `CREATE TABLE` 8, 그 외 기존 스키마와의 차이 2건 — 기록 없이 생긴 드리프트.
+1. `DROP INDEX "notifications_created"` — 운영에 수동으로 만든 인덱스가 있고 `schema.prisma`에는 없음.
+2. `missions."paidAt" SET DATA TYPE TIMESTAMP(3)` — 운영 `paidAt`이 정밀도 지정 없는 `TIMESTAMP`(= 정밀도 6)로 수동 추가된 것으로 추정.
+- 로컬에서 같은 드리프트(수동 `paidAt TIMESTAMP` + `notifications_created` 인덱스)를 만들자 **diff가 운영과 같은 줄 번호(11, 16)로 재현**됐고, 그 상태에서 `migrate deploy`는 두 마이그레이션을 **정상 적용**, 인덱스·`paidAt` 타입은 **그대로 유지**, Prisma의 `paidAt` 읽기·쓰기 정상.
+- 이유: `migrate deploy`는 diff를 적용하는 게 아니라 마이그레이션 파일만 실행한다. 두 파일 모두 이 인덱스와 `paidAt` 타입을 건드리지 않는다(보정 마이그레이션은 `ADD COLUMN IF NOT EXISTS`라 이미 있는 `paidAt`은 건너뜀).
+- **판단: 드리프트를 그대로 두고 적용해도 된다.** 정리는 배포와 분리해 나중에 "운영에 맞춰 스키마·마이그레이션을 기록하는" 작은 PR로(운영 DB는 바꾸지 않음): `@@index([createdAt], map: "notifications_created")`, `paidAt @db.Timestamp(6)` + 운영에서는 아무 일도 하지 않는 마이그레이션(`CREATE INDEX IF NOT EXISTS`, 같은 타입으로의 `ALTER COLUMN`). 그 전에 아래 SQL로 실제 정의를 확인한다.
+- 확인 SQL (Supabase SQL Editor):
+  ```sql
+  select column_name, data_type, datetime_precision, is_nullable, column_default
+  from information_schema.columns
+  where table_schema = 'public' and table_name = 'missions'
+    and column_name in ('paymentStatus','paymentKey','orderId','totalAmount','paidAt')
+  order by column_name;
+
+  select indexname, indexdef from pg_indexes
+  where schemaname = 'public' and tablename = 'notifications'
+  order by indexname;
+  ```
+  기대값: `paidAt` = `timestamp without time zone`, precision 6 / `notifications_created` = `CREATE INDEX notifications_created ON public.notifications USING btree ("createdAt")`. 다르면 적용 전에 공유.
+
 ## 진행 상황 (2026-10-21, 4차 갱신)
 
 ### 4차: 오늘 완료한 것
