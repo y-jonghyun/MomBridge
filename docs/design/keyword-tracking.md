@@ -9,6 +9,17 @@
 > ## ⚠️ baseline 완료 전에는 Render Build Command에 `prisma migrate deploy`를 넣지 말 것
 > baseline(아래 "배포 전 해야 할 일" 4~5번) 전에 넣으면 배포가 실패하고, 경우에 따라 **이후 모든 배포가 막힌다**(4차 "migrate deploy 실패 시 동작" 참고).
 
+## 진행 상황 (2026-10-21, 5차 갱신)
+
+### 5차: 운영 DB 상태 확인 결과 (사용자 실행)
+- Supabase 서버 버전 **17.6**, `pg_dump` 17로 백업 완료(사용자 PC 보관).
+- `prisma migrate status`(Session pooler): 마이그레이션 4개 중 **미적용 2개** — `20261021090000_sync_mission_payment_columns`, `20261021100000_keyword_tracking_reports`. 즉 `_prisma_migrations`가 있고 init·add_community는 적용 기록이 있다 → **baseline(`migrate resolve`) 불필요.**
+- 결제 컬럼 5개는 운영 API 응답에 이미 있음(기록 없이 추가된 상태) → 보정 마이그레이션은 `IF NOT EXISTS`라 아무것도 바꾸지 않고 "적용됨"으로 기록만 남는다.
+- **적용 전 읽기 전용 비교**(`prisma migrate diff --from-url <운영> --to-schema-datamodel`)를 한 번 더 한다. 기록 없이 바뀐 것이 결제 컬럼 외에 더 있는지 확인하기 위함.
+  - 로컬에서 운영과 같은 상태(init·add_community 기록 + 결제 컬럼)를 재현해 만든 **기대 결과**: `CREATE TYPE` 3, `CREATE TABLE` 8, `missions`·`submissions`에 `ADD COLUMN`만, 인덱스·FK 추가. **`DROP`·`ALTER COLUMN`·`SET DATA TYPE`은 0개.** (`mission_keywords_one_main_per_mission` 부분 유니크 인덱스는 Prisma 스키마에 표현되지 않아 diff에는 나오지 않는 것이 정상)
+  - 운영 결과에 `DROP`/`ALTER COLUMN`/`SET DATA TYPE`이 있으면 적용하지 말고 결과를 공유.
+- 그다음 **첫 적용은 PC에서 직접 `migrate deploy`**(출력을 바로 확인), 이후 Build Command에 넣어 `No pending migrations` 리허설. 새 스키마는 이전 코드와 호환되므로 PR #1 머지 전에 적용해도 된다.
+
 ## 진행 상황 (2026-10-21, 4차 갱신)
 
 ### 4차: 오늘 완료한 것
