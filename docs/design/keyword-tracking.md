@@ -18,26 +18,44 @@
 - 테스트 134개 통과.
 - 실제 프론트 주소: `https://mombridge-frontend.vercel.app` — 코드에는 넣지 않고 `.env.example`과 배포 설정값으로만 쓴다.
 
+### 운영 DB 연결 방식 (2026-10-21 확인)
+- 운영 DB는 **Supabase Transaction pooler(포트 6543)** 이고 접속 문자열 끝에 `?pgbouncer=true`가 붙어 있다. 접속 정보 자체는 이 문서에 적지 않는다.
+- 2026-10-21 운영 DB 비밀번호를 교체했고 Render `DATABASE_URL`도 갱신했다 (서버 정상 기동 확인).
+- 용도별로 쓸 주소:
+
+| 용도 | 쓸 주소 | 이유 |
+|---|---|---|
+| 서버 실행, `operator:list`·`operator:create`, `review:check-post` | Transaction pooler(6543, `?pgbouncer=true`) — 지금 Render `DATABASE_URL`과 같은 값 | Prisma 일반 쿼리는 `pgbouncer=true`로 동작 |
+| `prisma migrate deploy`·`migrate status`·`migrate resolve` | **Session pooler(5432) 또는 직접 연결(5432)** | 마이그레이션은 트랜잭션 모드 pgbouncer에서 동작이 보장되지 않음 (advisory lock 등) |
+| `pg_dump`·`pg_restore`·`psql` 점검 | **Session pooler 또는 직접 연결(5432)** | `pg_dump`는 트랜잭션 모드 pooler를 지원하지 않음 |
+
+- Supabase 대시보드 → Connect에서 Session pooler / Direct connection 주소를 확인할 수 있다. 비밀번호는 교체한 새 비밀번호.
+
+### PowerShell 실행 규칙
+- 이 PC의 PowerShell은 실행 정책 때문에 `npm`이 막혀 있으므로 **`npm.cmd`** 로 실행한다 (`npx`도 `npx.cmd`).
+- 접속 문자열은 그 터미널 세션의 환경변수에만 넣고, 끝나면 지운다.
+
 ### 운영자 계정
 ```powershell
-cd C:Mombridgeackend; npm ci; npm run build
-$env:DATABASE_URL = $env:PROD_DB_URL     # 운영 DB 접속 문자열 (본인 터미널에만)
+cd C:\Mombridge\backend; npm.cmd ci; npm.cmd run build
+$env:DATABASE_URL = "<Transaction pooler 주소 (...:6543/postgres?pgbouncer=true)>"   # Render DATABASE_URL과 같은 값
 $env:JWT_ACCESS_SECRET = "x"; $env:JWT_REFRESH_SECRET = "x"   # 스크립트 실행용 자리값 (토큰을 발급하지 않음)
-npm run operator:list                                          # 현재 운영자 목록 (읽기 전용)
-npm run operator:create -- --email ops@example.com --name 홍길동   # 비밀번호는 프롬프트로 입력, 10자 이상
-Remove-Item Env:DATABASE_URL
+npm.cmd run operator:list                                          # 현재 운영자 목록 (읽기 전용)
+npm.cmd run operator:create -- --email ops@example.com --name 홍길동   # 비밀번호는 프롬프트로 입력, 10자 이상
+Remove-Item Env:DATABASE_URL, Env:JWT_ACCESS_SECRET, Env:JWT_REFRESH_SECRET
 ```
-psql만 쓰려면:
+- 2026-10-21 확인: 운영 DB의 운영자는 정상 계정 1개뿐이며 이상 계정 없음.
+psql만 쓰려면 (Session pooler 또는 직접 연결 주소):
 `psql "$env:PROD_DB_URL" -c "SELECT u.email, u.name, u.\"isActive\", u.\"createdAt\", u.\"lastLoginAt\", (p.id IS NOT NULL) AS has_profile FROM users u LEFT JOIN operator_profiles p ON p.\"userId\" = u.id WHERE u.role = 'OPERATOR' ORDER BY u.\"createdAt\";"`
 - 목록에 모르는 계정이 있으면 예전 가입 API로 누군가 만든 운영자일 수 있다. `isActive`를 false로 바꾸거나(운영자 화면 회원 관리) 삭제를 검토.
 
 ### 블로그 확인 실제 글 점검
 ```powershell
-cd C:Mombridgeackend; npm run build
+cd C:\Mombridge\backend; npm.cmd run build
 # 로컬(내 PC IP로 조회). --save-html로 받은 HTML을 저장해 두면 선택자 수정에 쓸 수 있다
-npm run review:check-post -- https://blog.naver.com/<아이디>/<글번호> --keyword 망원동카페 --save-html post.html
+npm.cmd run review:check-post -- https://blog.naver.com/<아이디>/<글번호> --keyword 망원동카페 --save-html post.html
 # 배포 서버(Render IP로 조회). 운영자 로그인 필요. 이 기능이 배포된 뒤에만 동작
-npm run review:check-post -- https://blog.naver.com/<아이디>/<글번호> --server https://mombridge-backend.onrender.com --email ops@example.com
+npm.cmd run review:check-post -- https://blog.naver.com/<아이디>/<글번호> --server https://mombridge-backend.onrender.com --email ops@example.com
 ```
 출력: HTTP 상태·최종 URL·크기, **차단 신호**(403/429, 캡차·비정상 접근 문구, 로그인 페이지 이동, 본문 없는 짧은 응답), 찾은 본문·제목 선택자, 본문 앞부분, 대가 표시 판정. 저장은 하지 않으며 서버 API는 운영자당 분당 5회로 제한.
 
@@ -108,8 +126,8 @@ npm run review:check-post -- https://blog.naver.com/<아이디>/<글번호> --se
 접속 문자열은 본인 터미널의 환경변수에만 넣고 대화에는 붙이지 마세요. Supabase는 **직접 연결(5432) 또는 Session pooler** 주소를 써야 합니다(Transaction pooler 6543은 pg_dump가 지원하지 않음). `pg_dump`는 서버와 같거나 더 높은 메이저 버전이어야 합니다.
 
 ```powershell
-# 0) 접속 문자열을 이 터미널 세션에만 설정
-$env:PROD_DB_URL = "postgresql://...:5432/postgres"
+# 0) 접속 문자열을 이 터미널 세션에만 설정 — Session pooler 또는 직접 연결(5432). 6543 Transaction pooler 아님
+$env:PROD_DB_URL = "<Session pooler 또는 직접 연결 주소 (...:5432/postgres)>"
 
 # 1) 백업 (custom 포맷, 복원 가능 여부까지 확인)
 pg_dump --format=custom --no-owner --no-privileges --file "mombridge_prod_$(Get-Date -Format yyyyMMdd_HHmm).dump" "$env:PROD_DB_URL"
@@ -118,7 +136,7 @@ pg_restore --list (Get-ChildItem mombridge_prod_*.dump | Sort-Object LastWriteTi
 # 2) 상태 확인 (읽기 전용)
 psql "$env:PROD_DB_URL" -c "SELECT migration_name, finished_at, rolled_back_at FROM _prisma_migrations ORDER BY started_at;"
 psql "$env:PROD_DB_URL" -c "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'missions' AND column_name IN ('paymentStatus','paymentKey','orderId','totalAmount','paidAt') ORDER BY 1;"
-cd C:\Mombridge\backend; $env:DATABASE_URL = $env:PROD_DB_URL; npx prisma migrate status; Remove-Item Env:DATABASE_URL
+cd C:\Mombridge\backend; $env:DATABASE_URL = $env:PROD_DB_URL; npx.cmd prisma migrate status; Remove-Item Env:DATABASE_URL
 ```
 
 결과 해석:
