@@ -13,7 +13,9 @@
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "test": "jest",
-    "type-check": "tsc --noEmit -p ."
+    "type-check": "tsc --noEmit -p .",
+    "operator:create": "node dist/scripts/create-operator.js",
+    "operator:list": "node dist/scripts/list-operators.js"
   },
   "dependencies": {
     "@prisma/client": "^5.8.0",
