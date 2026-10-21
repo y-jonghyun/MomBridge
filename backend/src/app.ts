@@ -15,8 +15,10 @@ app.set('trust proxy', env.TRUST_PROXY_HOPS);
 
 app.use(helmet());
 app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+// 파일 업로드 없이 텍스트만 받는다(가장 긴 필드가 1만 자 ≈ 30KB). 큰 본문이 필요한 라우트가 생기면 그 라우트에만 따로 지정
+const BODY_LIMIT = '100kb';
+app.use(express.json({ limit: BODY_LIMIT }));
+app.use(express.urlencoded({ extended: true, limit: BODY_LIMIT }));
 app.use(cookieParser());
 
 // 살아 있는지만 본다 (keep-alive 핑용 — DB가 잠시 느려도 서버를 깨우는 데는 지장 없게 DB를 보지 않음)

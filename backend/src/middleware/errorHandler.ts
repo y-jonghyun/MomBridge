@@ -21,6 +21,17 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
     return;
   }
 
+  // body-parser 오류: 본문이 너무 큼(413), JSON 형식 오류(400) — 클라이언트 잘못이라 500으로 보내지 않는다
+  const type = (err as { type?: string })?.type;
+  if (type === 'entity.too.large') {
+    res.status(413).json({ success: false, error: { code: 'PAYLOAD_TOO_LARGE', message: '요청 내용이 너무 큽니다' } });
+    return;
+  }
+  if (type === 'entity.parse.failed') {
+    res.status(400).json({ success: false, error: { code: 'INVALID_JSON', message: '요청 형식이 올바르지 않습니다' } });
+    return;
+  }
+
   logger.error('Unhandled error', { err, path: req.path });
   res.status(500).json({
     success: false,
