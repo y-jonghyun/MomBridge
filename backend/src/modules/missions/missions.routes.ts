@@ -10,6 +10,7 @@ import {
   missionStatusSchema, expectedMissionAmount,
 } from './missions.schema';
 import { newCampaignCode, normalizeMissionKeywords, saveMissionKeywords } from './mission-extras';
+import { recruitingCutoff } from './mission-lifecycle';
 import { logger } from '../../utils/logger';
 
 const router = Router();
@@ -27,6 +28,8 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const where: any = {
       status: 'OPEN' as const,
       isVisible: true,
+      // 일 배치가 상태를 바꾸기 전(자정~03:30)에도 마감일이 지난 미션은 보이지 않게
+      endDate: { gte: recruitingCutoff() },
       ...(req.query.category && { category: req.query.category as never }),
       ...(req.query.regionSi && { regionSi: String(req.query.regionSi) }),
       ...(req.query.regionGu && { regionGu: String(req.query.regionGu) }),
