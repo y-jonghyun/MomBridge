@@ -5,7 +5,8 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum UserRole {
@@ -70,19 +71,19 @@ enum NotificationType {
 }
 
 model User {
-  id            String    @id @default(uuid()) @db.Uuid
-  email         String    @unique @db.VarChar(320)
-  passwordHash  String    @db.VarChar(255)
-  role          UserRole
-  name          String    @db.VarChar(100)
-  phone         String?   @db.VarChar(20)
-  profileImage  String?   @db.VarChar(2048)
-  isActive      Boolean   @default(true)
-  isVerified    Boolean   @default(false)
-  lastLoginAt   DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  deletedAt     DateTime?
+  id           String    @id @default(uuid()) @db.Uuid
+  email        String    @unique @db.VarChar(320)
+  passwordHash String    @db.VarChar(255)
+  role         UserRole
+  name         String    @db.VarChar(100)
+  phone        String?   @db.VarChar(20)
+  profileImage String?   @db.VarChar(2048)
+  isActive     Boolean   @default(true)
+  isVerified   Boolean   @default(false)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
 
   participantProfile ParticipantProfile?
   clientProfile      ClientProfile?
@@ -171,48 +172,55 @@ model OperatorProfile {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  reviewedSubmissions  Submission[]  @relation("SubmissionReviewer")
-  approvedApplications Application[] @relation("ApplicationReviewer")
+  user                    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewedSubmissions     Submission[]  @relation("SubmissionReviewer")
+  disclosureConfirmations Submission[]  @relation("DisclosureConfirmer")
+  approvedApplications    Application[] @relation("ApplicationReviewer")
 
   @@map("operator_profiles")
 }
 
 model Mission {
-  id               String          @id @default(uuid()) @db.Uuid
-  clientProfileId  String          @db.Uuid
-  title            String          @db.VarChar(200)
-  description      String          @db.Text
-  category         MissionCategory
-  status           MissionStatus   @default(DRAFT)
-  regionSi         String          @db.VarChar(50)
-  regionGu         String          @db.VarChar(50)
-  regionDong       String?         @db.VarChar(50)
-  maxParticipants  Int             @default(1)
-  currentCount     Int             @default(0)
-  rewardAmount     Decimal         @db.Decimal(12, 2)
-  rewardDescription String?        @db.Text
-  requirements     String?         @db.Text
-  startDate        DateTime
-  endDate          DateTime
+  id                 String          @id @default(uuid()) @db.Uuid
+  clientProfileId    String          @db.Uuid
+  title              String          @db.VarChar(200)
+  description        String          @db.Text
+  category           MissionCategory
+  status             MissionStatus   @default(DRAFT)
+  regionSi           String          @db.VarChar(50)
+  regionGu           String          @db.VarChar(50)
+  regionDong         String?         @db.VarChar(50)
+  maxParticipants    Int             @default(1)
+  currentCount       Int             @default(0)
+  rewardAmount       Decimal         @db.Decimal(12, 2)
+  rewardDescription  String?         @db.Text
+  requirements       String?         @db.Text
+  startDate          DateTime
+  endDate            DateTime
   submissionDeadline DateTime
-  thumbnailUrl     String?         @db.VarChar(2048)
-  viewCount        Int             @default(0)
-  isVisible        Boolean         @default(true)
-  paymentStatus    String          @default("PENDING") @db.Text
-  totalAmount      Decimal?        @db.Decimal(12, 2)
-  paymentKey       String?         @db.VarChar(200)
-  orderId          String?         @db.VarChar(200)
-  paidAt           DateTime?
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  publishedAt      DateTime?
-  closedAt         DateTime?
+  thumbnailUrl       String?         @db.VarChar(2048)
+  viewCount          Int             @default(0)
+  isVisible          Boolean         @default(true)
+  paymentStatus      String          @default("PENDING") @db.Text
+  totalAmount        Decimal?        @db.Decimal(12, 2)
+  paymentKey         String?         @db.VarChar(200)
+  orderId            String?         @db.VarChar(200)
+  paidAt             DateTime?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  publishedAt        DateTime?
+  closedAt           DateTime?
+  /// DB 기본값은 마이그레이션 직후 이전 버전 코드(캠페인 코드를 모름)가 미션을 만들어도 실패하지 않게 하기 위한 것. 새 코드는 직접 지정
+  campaignCode       String          @unique @default(dbgenerated("substr(md5((random())::text), 1, 8)")) @db.VarChar(12)
+  destinationUrl     String?         @db.VarChar(2048)
 
-  clientProfile ClientProfile @relation(fields: [clientProfileId], references: [id])
+  clientProfile ClientProfile     @relation(fields: [clientProfileId], references: [id])
   applications  Application[]
   submissions   Submission[]
   tags          MissionTag[]
+  keywords      MissionKeyword[]
+  trackingLinks TrackingLink[]
+  shareLinks    ReportShareLink[]
 
   @@index([status, isVisible])
   @@index([regionSi, regionGu, status])
@@ -221,9 +229,9 @@ model Mission {
 }
 
 model Tag {
-  id        String     @id @default(uuid()) @db.Uuid
-  name      String     @unique @db.VarChar(50)
-  createdAt DateTime   @default(now())
+  id        String       @id @default(uuid()) @db.Uuid
+  name      String       @unique @db.VarChar(50)
+  createdAt DateTime     @default(now())
   missions  MissionTag[]
 
   @@map("tags")
@@ -253,10 +261,11 @@ model Application {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
-  mission     Mission            @relation(fields: [missionId], references: [id])
-  participant ParticipantProfile @relation(fields: [participantId], references: [id])
-  reviewer    OperatorProfile?   @relation("ApplicationReviewer", fields: [reviewerId], references: [id])
-  submission  Submission?
+  mission      Mission            @relation(fields: [missionId], references: [id])
+  participant  ParticipantProfile @relation(fields: [participantId], references: [id])
+  reviewer     OperatorProfile?   @relation("ApplicationReviewer", fields: [reviewerId], references: [id])
+  submission   Submission?
+  trackingLink TrackingLink?
 
   @@unique([missionId, participantId])
   @@index([missionId, status])
@@ -285,11 +294,20 @@ model Submission {
   updatedAt       DateTime         @updatedAt
   submittedAt     DateTime         @default(now())
 
-  mission     Mission            @relation(fields: [missionId], references: [id])
-  application Application        @relation(fields: [applicationId], references: [id])
-  participant ParticipantProfile @relation(fields: [participantId], references: [id])
-  reviewer    OperatorProfile?   @relation("SubmissionReviewer", fields: [reviewerId], references: [id])
-  payout      Payout?
+  // 블로그 게시글 자동 확인 결과 (리뷰 캠페인만)
+  postCheckedAt           DateTime?
+  postCheckResult         Json?
+  disclosureCheck         DisclosureCheck?
+  disclosureConfirmedById String?          @db.Uuid
+  disclosureConfirmedAt   DateTime?
+  disclosureConfirmNote   String?          @db.Text
+
+  mission               Mission            @relation(fields: [missionId], references: [id])
+  application           Application        @relation(fields: [applicationId], references: [id])
+  participant           ParticipantProfile @relation(fields: [participantId], references: [id])
+  reviewer              OperatorProfile?   @relation("SubmissionReviewer", fields: [reviewerId], references: [id])
+  disclosureConfirmedBy OperatorProfile?   @relation("DisclosureConfirmer", fields: [disclosureConfirmedById], references: [id])
+  payout                Payout?
 
   @@index([missionId, status])
   @@index([participantId, status])
@@ -297,22 +315,22 @@ model Submission {
 }
 
 model Payout {
-  id            String      @id @default(uuid()) @db.Uuid
-  submissionId  String      @unique @db.Uuid
-  participantId String      @db.Uuid
-  amount        Decimal     @db.Decimal(12, 2)
-  platformFee   Decimal     @default(0) @db.Decimal(12, 2)
-  netAmount     Decimal     @db.Decimal(12, 2)
+  id            String       @id @default(uuid()) @db.Uuid
+  submissionId  String       @unique @db.Uuid
+  participantId String       @db.Uuid
+  amount        Decimal      @db.Decimal(12, 2)
+  platformFee   Decimal      @default(0) @db.Decimal(12, 2)
+  netAmount     Decimal      @db.Decimal(12, 2)
   status        PayoutStatus @default(PENDING)
-  bankName      String?     @db.VarChar(50)
-  bankAccount   String?     @db.VarChar(50)
-  accountHolder String?     @db.VarChar(50)
-  externalTxId  String?     @db.VarChar(200)
+  bankName      String?      @db.VarChar(50)
+  bankAccount   String?      @db.VarChar(50)
+  accountHolder String?      @db.VarChar(50)
+  externalTxId  String?      @db.VarChar(200)
   scheduledAt   DateTime?
   completedAt   DateTime?
-  failReason    String?     @db.Text
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  failReason    String?      @db.Text
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   submission  Submission         @relation(fields: [submissionId], references: [id])
   participant ParticipantProfile @relation(fields: [participantId], references: [id])
@@ -400,4 +418,150 @@ model CommunityLike {
 
   @@id([postId, userId])
   @@map("community_likes")
+}
+
+// =============================================================================
+// 키워드 추천 · 추적 링크 · 유입 리포트
+// =============================================================================
+
+enum KeywordRole {
+  MAIN
+  SUB
+}
+
+enum DeviceType {
+  MOBILE
+  PC
+  UNKNOWN
+}
+
+/// 대가 표시 확인 상태. 승인은 AUTO_PASSED 또는 MANUAL_CONFIRMED일 때만 가능
+enum DisclosureCheck {
+  AUTO_PASSED
+  NEEDS_MANUAL_REVIEW
+  MANUAL_CONFIRMED
+}
+
+/// 광고주가 확정한 키워드 + 확정 당시 지표 스냅샷
+model MissionKeyword {
+  id              String      @id @default(uuid()) @db.Uuid
+  missionId       String      @db.Uuid
+  keyword         String      @db.VarChar(100)
+  role            KeywordRole
+  monthlyPcQc     Int?
+  monthlyMobileQc Int?
+  isLowVolume     Boolean     @default(false)
+  compIdx         String?     @db.VarChar(10)
+  snapshotAt      DateTime    @default(now())
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  @@unique([missionId, keyword])
+  @@index([missionId, role])
+  @@map("mission_keywords")
+}
+
+model KeywordCache {
+  cacheKey  String   @id @db.VarChar(300)
+  source    String   @db.VarChar(20)
+  response  Json
+  fetchedAt DateTime
+  expiresAt DateTime
+
+  @@index([expiresAt])
+  @@map("keyword_cache")
+}
+
+/// 체험단원 × 캠페인(Application)마다 하나
+model TrackingLink {
+  id            String    @id @default(uuid()) @db.Uuid
+  code          String    @unique @db.VarChar(16)
+  applicationId String    @unique @db.Uuid
+  missionId     String    @db.Uuid
+  participantId String    @db.Uuid
+  createdAt     DateTime  @default(now())
+  disabledAt    DateTime?
+
+  application Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  mission     Mission      @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  clicks      ClickEvent[]
+  daily       ClickDaily[]
+
+  @@index([missionId])
+  @@index([participantId])
+  @@map("tracking_links")
+}
+
+/// 클릭 원본. 보관 기간이 지나면 일 집계만 남기고 삭제한다. IP·UA 원문은 저장하지 않는다
+model ClickEvent {
+  id            BigInt     @id @default(autoincrement())
+  linkId        String     @db.Uuid
+  occurredAt    DateTime   @default(now())
+  dayKey        DateTime   @db.Date
+  refererDomain String?    @db.VarChar(255)
+  device        DeviceType
+  isBot         Boolean
+  botRule       String?    @db.VarChar(50)
+  isUnique      Boolean
+
+  link TrackingLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  @@index([linkId, dayKey])
+  @@index([dayKey])
+  @@map("click_events")
+}
+
+/// 당일 고유 방문자 판정용 해시. 원본과 같은 보관 기간
+model ClickDailyVisitor {
+  linkId      String   @db.Uuid
+  dayKey      DateTime @db.Date
+  visitorHash String   @db.Char(64)
+
+  @@id([linkId, dayKey, visitorHash])
+  @@index([dayKey])
+  @@map("click_daily_visitors")
+}
+
+/// 영구 보관되는 일 단위 집계 (봇 제외 수치 + 참고용 봇 수)
+model ClickDaily {
+  linkId         String   @db.Uuid
+  dayKey         DateTime @db.Date
+  totalClicks    Int      @default(0)
+  uniqueVisitors Int      @default(0)
+  mobileClicks   Int      @default(0)
+  pcClicks       Int      @default(0)
+  unknownClicks  Int      @default(0)
+  botClicks      Int      @default(0)
+  referers       Json     @default("{}")
+  updatedAt      DateTime @updatedAt
+
+  link TrackingLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  @@id([linkId, dayKey])
+  @@index([dayKey])
+  @@map("click_daily")
+}
+
+model ReportShareLink {
+  id        String    @id @default(uuid()) @db.Uuid
+  missionId String    @db.Uuid
+  tokenHash String    @unique @db.Char(64)
+  createdBy String    @db.Uuid
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  @@index([missionId])
+  @@map("report_share_links")
+}
+
+model PlatformSetting {
+  key       String   @id @db.VarChar(100)
+  value     Json
+  updatedBy String?  @db.Uuid
+  updatedAt DateTime @updatedAt
+
+  @@map("platform_settings")
 }

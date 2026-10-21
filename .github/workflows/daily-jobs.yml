@@ -1,0 +1,22 @@
+name: Daily jobs
+
+# 클릭 원본 → 일 집계 롤업, 보관 기간(기본 90일)이 지난 원본·해시 삭제.
+# 작업은 멱등이라 GitHub 스케줄이 지연되거나 하루 빠져도 다음 실행에서 따라잡는다.
+on:
+  schedule:
+    - cron: '30 18 * * *' # 매일 03:30 KST
+  workflow_dispatch:
+
+jobs:
+  daily:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run daily job
+        env:
+          BACKEND_URL: ${{ vars.MOMBRIDGE_BACKEND_URL || 'https://mombridge-backend.onrender.com' }}
+          JOB_TOKEN: ${{ secrets.MOMBRIDGE_INTERNAL_JOB_TOKEN }}
+        run: |
+          if [ -z "$JOB_TOKEN" ]; then echo "MOMBRIDGE_INTERNAL_JOB_TOKEN secret is not set"; exit 1; fi
+          # 무료 플랜 기동 대기를 고려해 넉넉히 재시도
+          curl --fail-with-body -sS --retry 5 --retry-delay 20 --retry-all-errors --max-time 120 \
+            -X POST -H "X-Internal-Token: $JOB_TOKEN" "$BACKEND_URL/api/v1/internal/jobs/daily"
