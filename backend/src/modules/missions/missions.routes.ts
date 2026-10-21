@@ -59,6 +59,8 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
       include: {
         clientProfile: { select: { businessName: true, category: true, address: true, regionSi: true, regionGu: true } },
         tags: { include: { tag: true } },
+        // 고객사가 고른 메인·서브 키워드 (검색량 같은 내부 수치는 공개하지 않음)
+        keywords: { select: { keyword: true, role: true }, orderBy: [{ role: 'asc' }, { snapshotAt: 'asc' }] },
         _count: { select: { applications: true } },
       },
     });
