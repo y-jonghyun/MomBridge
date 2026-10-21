@@ -1,13 +1,63 @@
 # 설계안: 키워드 추천 · 리뷰 유입 성과 리포트
 
-- 상태: **구현 완료 · 배포 전 확인 대기** (PR #1 `feature/keyword-tracking`, 머지 전)
-- 작성일: 2026-10-21 / 진행 갱신: 2026-10-21 (4차)
+- 상태: **운영 배포 완료** (PR #1 머지 `ba10926`, 2026-10-22) · 후속 PR 3건 리뷰 대기 · 배포 후 확인 일부 남음
+- 작성일: 2026-10-21 / 진행 갱신: 2026-10-22 (6차)
 - 대상 코드: `dd80742` 기준
 
 ---
 
-> ## ⚠️ baseline 완료 전에는 Render Build Command에 `prisma migrate deploy`를 넣지 말 것
-> baseline(아래 "배포 전 해야 할 일" 4~5번) 전에 넣으면 배포가 실패하고, 경우에 따라 **이후 모든 배포가 막힌다**(4차 "migrate deploy 실패 시 동작" 참고).
+> 5차까지의 "baseline 전 Build Command 변경 금지" 경고는 해소됨: 운영 DB는 `_prisma_migrations` 기록이 있어 baseline이 필요 없었고, 마이그레이션 적용 후 Build Command에 `migrate deploy`를 넣었다.
+
+## 진행 상황 (2026-10-22, 6차 갱신)
+
+### 6차: 배포 결과 (사용자 실행)
+- **백업 검증**: `pg_restore --list` 정상(TOC 536개, public 테이블 17개의 TABLE DATA 확인). 도구 위치 `C:\Tools\pgsql\pgsql\bin`.
+- **운영 실제 정의 (SQL Editor)**
+  - `missions.paidAt` = `timestamp without time zone`, precision 6 (예상과 같음)
+  - `notifications_created` = `CREATE INDEX notifications_created ON public.notifications USING btree ("createdAt" DESC)` — **5차 기대값 `("createdAt")`과 달리 DESC.** 정합성 PR에 DESC로 반영함.
+- **PC에서 `migrate deploy`** → `sync_mission_payment_columns`, `keyword_tracking_reports` 2개 적용, `migrate status` up to date.
+- **환경변수**
+  - Render: `DIRECT_URL`, `CLICK_HASH_SECRET`, `TRACKING_PROXY_SECRET`, `INTERNAL_JOB_TOKEN`, `TRACKING_BASE_URL`(`https://mombridge-frontend.vercel.app`), `KEYWORD_TOOL_PROVIDER=mock`. `CORS_ORIGIN`은 기존값 유지(운영 + 미리보기 주소, 쉼표 구분).
+  - Vercel: `TRACKING_PROXY_SECRET`, `TRACKING_BACKEND_URL` — **Production만**. Preview에는 없으므로 미리보기 배포의 `/r/` 링크는 백엔드로 전달되지 않는다(미리보기에서 추적 링크를 시험할 때만 필요).
+  - GitHub secret `MOMBRIDGE_INTERNAL_JOB_TOKEN`.
+- **Render Build Command 끝에 `&& npx prisma migrate deploy` 추가.**
+  - 저장 직후 자동 재배포가 main(당시 PR #1 머지 전) 코드로 돌았는데, 그 코드의 `schema.prisma`에는 `directUrl`이 없어 `migrate deploy`가 `DATABASE_URL`(6543 Transaction pooler)로 붙어 멈춤 → 사용자가 취소, 서비스 영향 없음(이전 배포 유지).
+  - 교훈: Build Command·환경변수 저장은 **현재 main 코드로** 재배포를 일으킨다. 빌드 설정을 바꿀 때는 그 설정이 지금 main에서도 동작하는지 먼저 본다.
+- **PR #1 머지 `ba10926`** → Render 빌드가 5432로 연결, `No pending migrations to apply`(PC에서 먼저 적용했으므로 정상), 배포 성공. `/health` ok, `/r/AAAAAAAAAAAA` 안내 페이지 정상, 미션 목록 정상, Vercel Ready.
+- **블로그 실제 글 로컬 점검 2건**: 일반 글 → 수동 확인 필요(정상), 첫 줄 "소정의 원고료" 협찬 글 → 자동 통과 TOP(정상). 다만 두 글 모두 "차단 신호: 캡차" 오탐 → 아래 PR로 수정.
+
+### 6차: 후속 PR (main 기준 브랜치, 리뷰 대기)
+| 브랜치 | 커밋 | 내용 | 머지 시 운영 영향 |
+|---|---|---|---|
+| `chore/schema-align-prod` | `9872261` | `paidAt @db.Timestamp(6)`, `@@index([createdAt(sort: Desc)], map: "notifications_created")`, 마이그레이션 `20261022090000_align_schema_with_production` | 빌드에서 마이그레이션 1개 적용되지만 **운영 DB는 바뀌지 않음** |
+| `fix/review-check-captcha-false-positive` | `61eaa5f` | 블로그 점검 캡차 오탐 수정 | 서버 쪽 점검(`--server`) 결과 표시만 바뀜 |
+| `chore/remove-unused-docker` | `2fd716d` | Dockerfile·`.dockerignore`·`devops/docker-configuration.yml`·루트 `vercel.json` 삭제, compose는 postgres만, README 갱신 | 없음(배포에 쓰이지 않는 파일) |
+
+**스키마 정합성 PR**
+- 마이그레이션은 운영에서 아무것도 하지 않는다. `paidAt`은 정밀도가 6이 **아닐 때만** `ALTER`를 실행하는 DO 블록이라, 운영에서는 ALTER 자체가 돌지 않아 `missions` 잠금도 없다. 인덱스는 `CREATE INDEX IF NOT EXISTS ... ("createdAt" DESC)`.
+- 로컬 검증
+  - CI와 같은 검사(`migrate diff --from-migrations --to-schema-datamodel --exit-code`): 차이 없음
+  - 빈 DB에 5개 적용 → 스키마와 차이 없음
+  - 운영과 같은 상태(init·add_community 기록 + 직접 추가한 `paidAt TIMESTAMP` + DESC 인덱스) → 미적용 3개 적용, `migrate diff --from-url`이 **차이 없음**(5차의 11·16번 줄이 사라짐), 정의는 그대로
+  - 테스트 134개 통과
+- 머지 후 Render 빌드 로그에서 `Applying migration 20261022090000_align_schema_with_production` 확인. 이후 운영 비교(`migrate diff --from-url <운영> --to-schema-datamodel`)는 **빈 결과가 정상**이다.
+
+**캡차 오탐 원인과 수정**
+- 원인: 네이버 PostView 페이지에는 정상 글에도 숨겨진 안부게시판 캡차 레이어(`<div id="captcha_layer" style="... display:none">`, `<iframe id="captchalayeredframe" title="안부게시판 캡차">`)가 들어 있다. 차단 문구 패턴을 **HTML 전체**에 적용해서 모든 글이 "캡차 화면"으로 표시됐다(공개 글 `blogpeople/224442782663`으로 재현).
+- 수정: 문구 패턴(캡차·비정상 접근·접근 거부)은 **본문을 찾지 못했을 때만**, 그리고 **화면에 보이는 글자에만** 적용한다(script·style·iframe·숨김 요소 제외). HTTP 상태(401/403/429/451/503)와 로그인 페이지 이동 신호는 그대로다. 본문에 "보안문자" 같은 단어가 있는 글도 차단으로 보지 않는다.
+- 같은 글로 다시 실행하면 `차단 신호: 없음`. 테스트 135개 통과(정상 글 + 숨겨진 캡차 레이어 → 신호 없음, 본문 없는 실제 캡차 화면 → 신호 있음).
+- 판정 로직(자동 통과·수동 확인)에는 영향이 없다. 차단 신호는 진단 출력에만 쓰인다.
+
+### 배포 후 체크리스트 (6차 기준)
+완료: 백업·검증, 운영 정의 확인, 마이그레이션 적용, 환경변수(Render·Vercel Production·GitHub), Build Command 변경, PR #1 머지·배포, `/health`·`/r/` 안내 페이지·미션 목록 확인, 블로그 로컬 점검 2건.
+
+1. **후속 PR 3건 리뷰·머지** (순서 무관). 스키마 PR은 빌드 로그에서 마이그레이션 1개 적용 확인.
+2. **Daily jobs 수동 실행** — Actions → Daily jobs → Run workflow → 성공(HTTP 200) 확인. 무료 플랜이면 첫 요청이 기동 대기로 늦을 수 있다(재시도 내장).
+3. **실제 추적 링크 클릭 테스트** — 운영자 화면에서 미션의 추적 링크 생성 → `https://mombridge-frontend.vercel.app/r/<code>` 클릭 → 도착 URL과 UTM 확인 → 다음 날 Daily jobs 후 리포트에 클릭 집계 반영 확인.
+4. **서버 쪽 블로그 점검(`--server`)** — 캡차 오탐 PR 머지 후에 실행해야 차단 신호 결과를 그대로 믿을 수 있다. Render IP에서 네이버가 막는지가 핵심(HTTP 403/429, 로그인 이동, 본문 없음).
+5. **Render 플랜 검토** (현재 Free) — 슬립 중 `/r/` 지연(최대 약 1분) 때문에 정식 오픈 전 상시 실행 플랜 또는 외부 모니터 권장.
+6. 오픈 전(변경 없음): 개인정보처리방침, 정식 도메인 연결 후 `TRACKING_BASE_URL`·`FRONTEND_URL`·`CORS_ORIGIN` 변경, 검색광고 API 약관 확인 후 `KEYWORD_TOOL_PROVIDER=naver`.
+7. 나중에: 개발 도구 정리(`npm audit` 개발 의존성), CI의 Postgres 16 → 운영과 같은 17로 맞추기 검토.
 
 ## 진행 상황 (2026-10-21, 5차 갱신)
 
