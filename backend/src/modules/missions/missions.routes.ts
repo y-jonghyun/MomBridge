@@ -11,6 +11,7 @@ import {
 } from './missions.schema';
 import { newCampaignCode, normalizeMissionKeywords, saveMissionKeywords } from './mission-extras';
 import { logger } from '../../utils/logger';
+import { captureError, reportIssue } from '../../lib/monitoring';
 
 const router = Router();
 
@@ -144,12 +145,13 @@ router.post('/pay-and-create', authenticate, requireRole('CLIENT'), async (req: 
 
     if (!tossRes.ok) {
       const err = await tossRes.json().catch(() => ({}));
+      reportIssue('Toss payment confirm rejected', { area: 'payment', extra: { status: tossRes.status, code: (err as any).code, orderId } });
       throw new AppError('PAYMENT_FAILED', 400, (err as any).message ?? '결제 확인에 실패했습니다');
     }
 
     const payment = await tossRes.json() as { paymentKey: string; orderId: string; approvedAt: string };
 
-    // 2. 미션 생성
+    // 2. 미션 생성 — 여기서 실패하면 결제는 됐는데 미션이 없는 상태 → 즉시 알림(수동 환불·등록 필요)
     const mission = await prisma.mission.create({
       data: {
         ...missionData,
@@ -162,6 +164,9 @@ router.post('/pay-and-create', authenticate, requireRole('CLIENT'), async (req: 
         totalAmount: Number(amount),
         paidAt: new Date(payment.approvedAt),
       },
+    }).catch(err => {
+      captureError(err, { area: 'payment', userId: req.user!.sub, extra: { stage: 'create_after_confirm', orderId: payment.orderId, amount } });
+      throw err;
     });
     // 결제는 이미 끝났으므로 키워드 저장 실패가 미션 생성을 되돌리지 않게 한다 (생성 후 수정 가능)
     if (keywords) {
@@ -203,6 +208,7 @@ router.patch('/:id/pay', authenticate, requireRole('CLIENT'), async (req: Reques
 
     if (!tossRes.ok) {
       const err = await tossRes.json().catch(() => ({}));
+      reportIssue('Toss payment confirm rejected', { area: 'payment', extra: { status: tossRes.status, code: (err as any).code, orderId } });
       throw new AppError('PAYMENT_FAILED', 400, (err as any).message ?? '결제 확인에 실패했습니다');
     }
     const payment = await tossRes.json() as { paymentKey: string; orderId: string; approvedAt: string };
@@ -217,6 +223,9 @@ router.patch('/:id/pay', authenticate, requireRole('CLIENT'), async (req: Reques
         totalAmount: Number(amount),
         paidAt: new Date(payment.approvedAt),
       },
+    }).catch(err => {
+      captureError(err, { area: 'payment', userId: req.user!.sub, extra: { stage: 'update_after_confirm', orderId: payment.orderId, missionId: req.params.id, amount } });
+      throw err;
     });
 
     res.json({ success: true, data: mission });
