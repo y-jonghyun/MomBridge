@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import * as authService from './auth.service';
 import { parseInput } from '../../middleware/validate';
+import { loginPerEmail, loginPerIp, registerPerIp } from './auth-limits';
 
 const router = Router();
 
@@ -18,14 +19,14 @@ const registerSchema = z.object({
   phone: z.preprocess(v => (v === '' ? undefined : v), z.string().trim().max(20).optional()),
 });
 
-router.post('/register', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/register', registerPerIp, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await authService.register(parseInput(registerSchema, req.body));
     res.status(201).json({ success: true, data: result });
   } catch (e) { next(e); }
 });
 
-router.post('/login', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/login', loginPerIp, loginPerEmail, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await authService.login(req.body);
     res.json({ success: true, data: result });
