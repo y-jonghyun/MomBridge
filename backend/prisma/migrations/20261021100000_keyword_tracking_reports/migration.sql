@@ -16,6 +16,8 @@ ADD COLUMN     "destinationUrl" VARCHAR(2048);
 -- 기존 미션에 캠페인 코드(utm_campaign) 부여: 소문자 16진수 8자
 UPDATE "missions" SET "campaignCode" = substr(md5(random()::text || "id"::text), 1, 8) WHERE "campaignCode" IS NULL;
 ALTER TABLE "missions" ALTER COLUMN "campaignCode" SET NOT NULL;
+-- 배포 순서상 마이그레이션이 새 코드보다 먼저 적용되므로, 이전 코드가 미션을 만들어도 실패하지 않도록 기본값을 둔다
+ALTER TABLE "missions" ALTER COLUMN "campaignCode" SET DEFAULT substr(md5((random())::text), 1, 8);
 
 -- AlterTable
 ALTER TABLE "submissions" ADD COLUMN     "disclosureCheck" "DisclosureCheck",

@@ -5,7 +5,8 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum UserRole {
@@ -209,7 +210,8 @@ model Mission {
   updatedAt          DateTime        @updatedAt
   publishedAt        DateTime?
   closedAt           DateTime?
-  campaignCode       String          @unique @db.VarChar(12)
+  /// DB 기본값은 마이그레이션 직후 이전 버전 코드(캠페인 코드를 모름)가 미션을 만들어도 실패하지 않게 하기 위한 것. 새 코드는 직접 지정
+  campaignCode       String          @unique @default(dbgenerated("substr(md5((random())::text), 1, 8)")) @db.VarChar(12)
   destinationUrl     String?         @db.VarChar(2048)
 
   clientProfile ClientProfile     @relation(fields: [clientProfileId], references: [id])
