@@ -95,6 +95,7 @@ model User {
   communityPosts     CommunityPost[]
   communityComments  CommunityComment[]
   communityLikes     CommunityLike[]
+  passwordResets     PasswordResetToken[]
 
   @@index([email])
   @@index([role])
@@ -567,4 +568,20 @@ model PlatformSetting {
   updatedAt DateTime @updatedAt
 
   @@map("platform_settings")
+}
+
+/// 비밀번호 재설정 링크. 토큰 원문은 메일에만 있고 DB에는 SHA-256 해시만 저장한다
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique @db.Char(64)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
 }
