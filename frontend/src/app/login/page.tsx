@@ -1,12 +1,24 @@
 ﻿'use client';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import api from '@/lib/api';
+import api, { apiErrorMessage } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 
+/** 로그인 후 돌아갈 경로. 다른 사이트로 보내지 않도록 같은 사이트 경로만 허용 */
+function safeNext(next: string | null): string | null {
+  return next && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/login') ? next : null;
+}
+
 export default function LoginPage() {
+  return <Suspense><LoginForm /></Suspense>;
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const expired = searchParams.get('expired') === '1';
+  const next = safeNext(searchParams.get('next'));
   const setAuth = useAuthStore((s) => s.setAuth);
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
@@ -19,12 +31,12 @@ export default function LoginPage() {
       const { data } = await api.post('/auth/login', form);
       setAuth(data.data.user, data.data.accessToken, data.data.refreshToken);
       const role = data.data.user.role;
-      if (role === 'OPERATOR') router.push('/operator');
+      if (next) router.push(next);
+      else if (role === 'OPERATOR') router.push('/operator');
       else if (role === 'PARTICIPANT') router.push('/participant');
       else router.push('/client');
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message;
-      setError(msg ?? '로그인에 실패했습니다');
+      setError(apiErrorMessage(err, '로그인에 실패했습니다'));
     } finally {
       setLoading(false);
     }
@@ -35,6 +47,9 @@ export default function LoginPage() {
       <div className="w-full max-w-md bg-white rounded-2xl shadow-sm p-8">
         <h1 className="text-2xl font-bold text-center mb-2">맘브릿지</h1>
         <p className="text-gray-500 text-center mb-8">로그인</p>
+        {expired && !error && (
+          <p className="mb-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">로그인이 만료됐습니다. 다시 로그인해 주세요.</p>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

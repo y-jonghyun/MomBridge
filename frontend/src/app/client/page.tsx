@@ -135,9 +135,12 @@ function ClientPageContent() {
       if (profileForm.name.trim()) tasks.push(api.patch('/auth/me/name', { name: profileForm.name }));
       if (profileForm.phone) tasks.push(api.patch('/client/profile/phone', { phone: profileForm.phone }));
       if (profileForm.newPassword) {
+        // 비밀번호를 바꾸면 다른 기기의 로그인은 끊기고, 이 화면은 새 토큰으로 계속 쓴다
         tasks.push(api.patch('/auth/me/password', {
           currentPassword: profileForm.currentPassword,
           newPassword: profileForm.newPassword,
+        }).then(r => {
+          if (r.data.data?.accessToken) useAuthStore.getState().setTokens(r.data.data.accessToken, r.data.data.refreshToken);
         }));
       }
       await Promise.all(tasks);

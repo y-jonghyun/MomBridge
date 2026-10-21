@@ -1,5 +1,6 @@
 ﻿import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import ServerWakeNotice from '@/components/common/ServerWakeNotice';
 
 export const metadata: Metadata = {
   title: '맘브릿지 — 지역 마케팅 미션 플랫폼',
@@ -18,7 +19,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://mombridge-backend.onrender.com" />
         <link rel="dns-prefetch" href="https://mombridge-backend.onrender.com" />
       </head>
-      <body className="min-h-screen bg-stone-50 antialiased">{children}</body>
+      <body className="min-h-screen bg-stone-50 antialiased">
+        {children}
+        <ServerWakeNotice />
+      </body>
     </html>
   );
 }
