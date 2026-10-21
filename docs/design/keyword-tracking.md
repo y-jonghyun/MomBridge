@@ -48,7 +48,8 @@
 
 ### Dockerfile 정리 (승인됨, PR #1 머지 후 별도 PR)
 - 삭제: `backend/Dockerfile`, `frontend/Dockerfile`, `backend/.dockerignore`, `frontend/.dockerignore`, `devops/docker-configuration.yml`, `docker-compose.yml`의 backend·frontend 서비스(로컬 테스트용 postgres만 유지). README 실행 방법을 Render·Vercel 기준으로 갱신.
-- 함께 제안: 저장소 루트 `vercel.json` 삭제(Root Directory=`frontend`에서 사용되지 않음).
+- 저장소 루트 `vercel.json`도 같은 PR에서 삭제 (승인됨, 2026-10-21). Root Directory=`frontend`에서는 읽히지 않으며 `frontend/vercel.json`은 유지.
+- 다음 단계(백업, `migrate status`)는 사용자가 준비되면 결과를 가져오기로 함 — baseline 명령은 그 결과를 보고 정리.
 
 ## 진행 상황 (2026-10-21, 3차 갱신)
 
