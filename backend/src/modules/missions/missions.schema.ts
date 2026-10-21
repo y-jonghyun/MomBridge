@@ -1,10 +1,33 @@
 import { z } from 'zod';
+import { validateDestinationUrl } from '../tracking/destination';
 
 // 빈 문자열은 "입력 안 함"으로 취급한다 (프론트 폼이 빈 값을 ''로 보냄)
 const optionalText = (max: number) =>
   z.preprocess(v => (v === '' || v === null ? undefined : v), z.string().max(max).optional());
 
 const httpUrl = z.string().max(2048).url().refine(v => /^https?:\/\//i.test(v), 'http/https URL만 허용됩니다');
+
+/** 광고주가 등록하는 도착 URL (추적 링크가 이동할 곳) */
+export const destinationUrlSchema = z.string().transform((v, ctx) => {
+  const r = validateDestinationUrl(v);
+  if (!r.ok) { ctx.addIssue({ code: 'custom', message: r.reason }); return z.NEVER; }
+  return r.url;
+});
+
+const keywordEntrySchema = z.object({
+  keyword: z.string().trim().min(1).max(100),
+  monthlyPcQc: z.number().int().min(0).nullable().optional(),
+  monthlyMobileQc: z.number().int().min(0).nullable().optional(),
+  isLowVolume: z.boolean().optional(),
+  compIdx: z.enum(['low', 'mid', 'high', 'unknown']).optional(),
+});
+
+/** 확정 키워드: 메인 1개 + 서브 여러 개 (서브 최대 개수는 설정값으로 검사) */
+export const missionKeywordsSchema = z.object({
+  main: keywordEntrySchema,
+  subs: z.array(keywordEntrySchema).max(10).default([]),
+});
+export type MissionKeywordsInput = z.infer<typeof missionKeywordsSchema>;
 
 /** 미션 생성 시 클라이언트가 지정할 수 있는 필드 (상태·결제·집계 필드는 서버가 정한다) */
 export const missionFieldsSchema = z.object({
@@ -22,6 +45,8 @@ export const missionFieldsSchema = z.object({
   endDate: z.coerce.date(),
   submissionDeadline: z.coerce.date(),
   thumbnailUrl: z.preprocess(v => (v === '' ? undefined : v), httpUrl.optional()),
+  destinationUrl: z.preprocess(v => (v === '' || v === null ? undefined : v), destinationUrlSchema.optional()),
+  keywords: missionKeywordsSchema.optional(),
 });
 
 const checkDateOrder = (v: { startDate: Date; endDate: Date }, ctx: z.RefinementCtx) => {

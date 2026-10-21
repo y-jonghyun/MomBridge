@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../../src/config/database';
 import { env } from '../../src/config/env';
 import type { UserRole } from '../../src/middleware/auth';
+import { randomCampaignCode } from '../../src/lib/random';
 
 let seq = 0;
 const next = () => `${Date.now().toString(36)}${(seq++).toString(36)}`;
@@ -46,7 +47,7 @@ export async function createMission(clientProfileId: string, extra: Record<strin
       clientProfileId,
       title: '테스트 미션',
       description: '설명',
-      category: 'REVIEW',
+      category: 'SNS',
       status: 'OPEN',
       regionSi: '서울',
       regionGu: '마포구',
@@ -55,6 +56,7 @@ export async function createMission(clientProfileId: string, extra: Record<strin
       startDate: new Date(now),
       endDate: new Date(now + 14 * 86400000),
       submissionDeadline: new Date(now + 10 * 86400000),
+      campaignCode: randomCampaignCode(),
       ...extra,
     } as any,
   });
@@ -62,4 +64,10 @@ export async function createMission(clientProfileId: string, extra: Record<strin
 
 export async function createApprovedApplication(missionId: string, participantId: string) {
   return prisma.application.create({ data: { missionId, participantId, status: 'APPROVED' } });
+}
+
+export async function createTrackingLink(missionId: string, participantId: string) {
+  const application = await createApprovedApplication(missionId, participantId);
+  const { ensureTrackingLink } = await import('../../src/modules/tracking/links');
+  return { application, link: await ensureTrackingLink(application.id) };
 }

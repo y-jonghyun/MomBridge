@@ -10,6 +10,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  secrets-guard:
+    name: Server secrets stay server-side
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: No server secret exposed via NEXT_PUBLIC_, committed .env, or hard-coded value
+        run: |
+          if grep -rnE "NEXT_PUBLIC_[A-Z_]*(SECRET|SEARCHAD|HASH|JOB_TOKEN)" \
+              --include='*.ts' --include='*.tsx' --include='*.js' --include='*.json' --include='*.yml' \
+              frontend backend .github --exclude-dir=node_modules; then
+            echo "::error::server secret referenced via NEXT_PUBLIC_"; exit 1
+          fi
+          if git ls-files | grep -E '(^|/)\.env(\.local|\.production)?$'; then
+            echo "::error::.env file committed"; exit 1
+          fi
+          if grep -rnE "(NAVER_SEARCHAD|CLICK_HASH|TRACKING_PROXY)[A-Z_]*[[:space:]]*[:=][[:space:]]*['\"][^'\"]{8,}" \
+              --include='*.ts' --include='*.tsx' frontend/src backend/src; then
+            echo "::error::hard-coded secret value"; exit 1
+          fi
+
   backend:
     name: Backend type-check & tests
     runs-on: ubuntu-latest

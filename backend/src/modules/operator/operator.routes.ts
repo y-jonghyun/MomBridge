@@ -4,6 +4,7 @@ import { prisma } from '../../config/database';
 import { z } from 'zod';
 import { parseInput } from '../../middleware/validate';
 import { missionStatusSchema } from '../missions/missions.schema';
+import { ensureTrackingLink } from '../tracking/links';
 
 const applicationReviewSchema = z.object({
   status: z.enum(['APPROVED', 'REJECTED']),
@@ -104,6 +105,8 @@ router.patch('/applications/:id', async (req: Request, res: Response, next: Next
     // 승인 시 미션 currentCount 증가
     if (status === 'APPROVED') {
       await prisma.mission.update({ where: { id: app.missionId }, data: { currentCount: { increment: 1 } } });
+      // 체험단원 × 캠페인 추적 링크 발급 (이미 있으면 그대로)
+      await ensureTrackingLink(app.id);
     }
     // 참여자에게 알림 전송
     const isApproved = status === 'APPROVED';

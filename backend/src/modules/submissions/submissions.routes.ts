@@ -4,6 +4,10 @@ import { authenticate, requireRole } from '../../middleware/auth';
 import { prisma } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
 import { parseInput } from '../../middleware/validate';
+import { Prisma } from '@prisma/client';
+import { parseNaverBlogUrl } from '../review-check/naver-blog-url';
+import { checkReviewPost } from '../review-check/review-check.service';
+import { ensureTrackingLink } from '../tracking/links';
 
 const router = Router();
 
@@ -27,6 +31,37 @@ const reviewSchema = z.object({
   reviewNote: z.string().max(5000).optional(),
   rejectionReason: z.string().max(5000).optional(),
 });
+
+const disclosureConfirmSchema = z.object({
+  reason: z.string().trim().min(2, '확인 사유를 입력하세요').max(2000),
+});
+
+/** 리뷰(블로그) 캠페인: 네이버 블로그 URL 필수 + 게시글 자동 확인 + 대가 표시 확인 전 승인 불가 */
+const isReviewCampaign = (mission: { category: string }) => mission.category === 'REVIEW';
+
+/** 리뷰 캠페인이면 블로그 URL을 검증하고 게시글을 1회 확인한 결과를 돌려준다 */
+async function reviewCheckFields(
+  mission: { id: string; category: string },
+  applicationId: string,
+  snsPostUrl: string | undefined,
+) {
+  if (!isReviewCampaign(mission)) return { snsPostUrl };
+  if (!snsPostUrl) throw new AppError('VALIDATION_ERROR', 400, '네이버 블로그 글 주소를 입력하세요');
+  const ref = parseNaverBlogUrl(snsPostUrl);
+  if ('error' in ref) throw new AppError('INVALID_BLOG_URL', 400, ref.error);
+
+  const link = await ensureTrackingLink(applicationId);
+  const { disclosureCheck, result } = await checkReviewPost(ref, mission.id, link.code);
+  return {
+    snsPostUrl: ref.canonicalUrl,
+    postCheckedAt: new Date(result.checkedAt),
+    postCheckResult: result as unknown as Prisma.InputJsonValue,
+    disclosureCheck,
+    disclosureConfirmedById: null,
+    disclosureConfirmedAt: null,
+    disclosureConfirmNote: null,
+  };
+}
 
 async function requireParticipantProfile(userId: string) {
   const profile = await prisma.participantProfile.findUnique({ where: { userId } });
@@ -86,6 +121,9 @@ router.post('/', authenticate, requireRole('PARTICIPANT'), async (req: Request, 
       throw new AppError('ALREADY_SUBMITTED', 409, '이미 제출했습니다. 수정 요청을 받은 경우 재제출을 이용하세요');
     }
 
+    const mission = await prisma.mission.findUniqueOrThrow({ where: { id: input.missionId }, select: { id: true, category: true } });
+    const check = await reviewCheckFields(mission, application.id, input.snsPostUrl);
+
     const submission = await prisma.submission.create({
       data: {
         missionId: input.missionId,
@@ -93,7 +131,7 @@ router.post('/', authenticate, requireRole('PARTICIPANT'), async (req: Request, 
         participantId: profile.id,
         description: input.description,
         mediaUrls: input.mediaUrls ?? [],
-        snsPostUrl: input.snsPostUrl,
+        ...check,
       },
     });
     res.status(201).json({ success: true, data: submission });
@@ -115,12 +153,16 @@ router.patch('/:id/resubmit', authenticate, requireRole('PARTICIPANT'), async (r
       throw new AppError('REVISION_LIMIT', 409, `재제출은 최대 ${submission.maxRevisions}회까지 가능합니다`);
     }
 
+    const mission = await prisma.mission.findUniqueOrThrow({ where: { id: submission.missionId }, select: { id: true, category: true } });
+    // 재제출도 게시글 확인은 1회만
+    const check = await reviewCheckFields(mission, submission.applicationId, input.snsPostUrl ?? submission.snsPostUrl ?? undefined);
+
     const updated = await prisma.submission.update({
       where: { id: submission.id },
       data: {
         ...(input.description !== undefined && { description: input.description }),
         ...(input.mediaUrls !== undefined && { mediaUrls: input.mediaUrls }),
-        ...(input.snsPostUrl !== undefined && { snsPostUrl: input.snsPostUrl }),
+        ...check,
         status: 'SUBMITTED',
         revisionCount: { increment: 1 },
         submittedAt: new Date(),
@@ -142,6 +184,14 @@ router.patch('/:id/review', authenticate, requireRole('OPERATOR'), async (req: R
     // 이미 처리된 제출물을 다시 승인하면 정산이 중복 생성되므로 검수 대기 상태만 허용
     if (current.status !== 'SUBMITTED') {
       throw new AppError('ALREADY_REVIEWED', 409, '검수 대기 중인 제출물만 처리할 수 있습니다');
+    }
+    if (input.status === 'APPROVED') {
+      const missionForGate = await prisma.mission.findUniqueOrThrow({ where: { id: current.missionId }, select: { category: true } });
+      const disclosureOk = current.disclosureCheck === 'AUTO_PASSED' || current.disclosureCheck === 'MANUAL_CONFIRMED';
+      if (isReviewCampaign(missionForGate) && !disclosureOk) {
+        throw new AppError('DISCLOSURE_REQUIRED', 422,
+          '대가 표시(경제적 이해관계 표시)가 확인되지 않아 승인할 수 없습니다. 게시글을 직접 확인한 뒤 수동 확인 처리하거나 수정 요청을 보내세요');
+      }
     }
 
     const submission = await prisma.submission.update({
@@ -209,14 +259,54 @@ router.patch('/:id/review', authenticate, requireRole('OPERATOR'), async (req: R
   } catch (e) { next(e); }
 });
 
+// 대가 표시 수동 확인 (OPERATOR) — 자동 확인에서 문구를 찾지 못한 글(이미지 표시 등)을 운영자가 직접 확인
+router.post('/:id/disclosure-confirm', authenticate, requireRole('OPERATOR'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { reason } = parseInput(disclosureConfirmSchema, req.body);
+    const opProfile = await prisma.operatorProfile.findUnique({ where: { userId: req.user!.sub } });
+    if (!opProfile) throw new AppError('PROFILE_REQUIRED', 403, '운영자 프로필이 필요합니다');
+
+    const current = await prisma.submission.findUnique({ where: { id: req.params.id } });
+    if (!current) throw new AppError('NOT_FOUND', 404, '제출물을 찾을 수 없습니다');
+    if (current.disclosureCheck !== 'NEEDS_MANUAL_REVIEW') {
+      throw new AppError('NOT_PENDING_MANUAL_REVIEW', 409, '수동 확인이 필요한 제출물이 아닙니다');
+    }
+
+    const now = new Date();
+    const [updated] = await prisma.$transaction([
+      prisma.submission.update({
+        where: { id: current.id },
+        data: {
+          disclosureCheck: 'MANUAL_CONFIRMED',
+          disclosureConfirmedById: opProfile.id,
+          disclosureConfirmedAt: now,
+          disclosureConfirmNote: reason,
+        },
+      }),
+      prisma.auditLog.create({
+        data: {
+          actorId: req.user!.sub,
+          action: 'SUBMISSION_DISCLOSURE_MANUAL_CONFIRM',
+          targetTable: 'submissions',
+          targetId: current.id,
+          before: { disclosureCheck: current.disclosureCheck },
+          after: { disclosureCheck: 'MANUAL_CONFIRMED', reason, confirmedAt: now.toISOString() },
+        },
+      }),
+    ]);
+    res.json({ success: true, data: updated });
+  } catch (e) { next(e); }
+});
+
 // 검수 대기 목록 (OPERATOR)
 router.get('/pending', authenticate, requireRole('OPERATOR'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const submissions = await prisma.submission.findMany({
       where: { status: 'SUBMITTED' },
       include: {
-        mission: { select: { title: true } },
+        mission: { select: { title: true, category: true } },
         participant: { include: { user: { select: { name: true, email: true } } } },
+        disclosureConfirmedBy: { include: { user: { select: { name: true } } } },
       },
       orderBy: { submittedAt: 'asc' },
     });

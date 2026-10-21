@@ -8,6 +8,8 @@ import {
   operatorCreateMissionSchema, payAndCreateMissionSchema, payExistingMissionSchema,
   missionStatusSchema, expectedMissionAmount,
 } from './missions.schema';
+import { newCampaignCode, normalizeMissionKeywords, saveMissionKeywords } from './mission-extras';
+import { logger } from '../../utils/logger';
 
 const router = Router();
 
@@ -69,7 +71,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 router.post('/', authenticate, requireRole('OPERATOR'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = req.user!;
-    const { clientProfileId: requestedProfileId, sendPaymentLink: sendLinkInput, ...missionData } =
+    const { clientProfileId: requestedProfileId, sendPaymentLink: sendLinkInput, keywords, ...missionData } =
       parseInput(operatorCreateMissionSchema, req.body);
     let clientProfileId = requestedProfileId;
     if (!clientProfileId) {
@@ -84,10 +86,12 @@ router.post('/', authenticate, requireRole('OPERATOR'), async (req: Request, res
       data: {
         ...missionData,
         clientProfileId,
+        campaignCode: await newCampaignCode(),
         status: 'DRAFT',
         paymentStatus: sendPaymentLink ? 'PENDING' : 'WAIVED',
       },
     });
+    if (keywords) await saveMissionKeywords(mission.id, keywords);
 
     // 결제 링크 SMS/알림톡 발송
     if (sendPaymentLink) {
@@ -116,12 +120,13 @@ router.post('/', authenticate, requireRole('OPERATOR'), async (req: Request, res
 router.post('/pay-and-create', authenticate, requireRole('CLIENT'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     // 0. 입력 검증 — 결제 승인 전에 해야 결제만 되고 미션이 안 만들어지는 일이 없다
-    const { paymentKey, orderId, amount, ...missionData } = parseInput(payAndCreateMissionSchema, req.body);
+    const { paymentKey, orderId, amount, keywords, ...missionData } = parseInput(payAndCreateMissionSchema, req.body);
     if (amount !== expectedMissionAmount(missionData.rewardAmount, missionData.maxParticipants)) {
       throw new AppError('AMOUNT_MISMATCH', 400, '결제 금액이 미션 금액(보상 × 인원)과 일치하지 않습니다');
     }
     const clientProfile = await prisma.clientProfile.findUnique({ where: { userId: req.user!.sub } });
     if (!clientProfile) throw new AppError('PROFILE_REQUIRED', 403, '고객사 프로필이 필요합니다');
+    if (keywords) await normalizeMissionKeywords(keywords);
 
     // 1. 토스페이먼츠 결제 확인
     const tossSecretKey = process.env.TOSS_SECRET_KEY;
@@ -146,6 +151,7 @@ router.post('/pay-and-create', authenticate, requireRole('CLIENT'), async (req: 
       data: {
         ...missionData,
         clientProfileId: clientProfile.id,
+        campaignCode: await newCampaignCode(),
         status: 'DRAFT',
         paymentStatus: 'PAID',
         paymentKey: payment.paymentKey,
@@ -154,6 +160,11 @@ router.post('/pay-and-create', authenticate, requireRole('CLIENT'), async (req: 
         paidAt: new Date(payment.approvedAt),
       },
     });
+    // 결제는 이미 끝났으므로 키워드 저장 실패가 미션 생성을 되돌리지 않게 한다 (생성 후 수정 가능)
+    if (keywords) {
+      await saveMissionKeywords(mission.id, keywords)
+        .catch(err => logger.warn('mission keywords save failed after payment', { missionId: mission.id, error: (err as Error).name }));
+    }
 
     res.status(201).json({ success: true, data: mission });
   } catch (e) { next(e); }

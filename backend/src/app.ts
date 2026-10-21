@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import { env } from './config/env';
 import { errorHandler } from './middleware/errorHandler';
 import routes from './routes';
+import redirectRoutes from './modules/tracking/redirect.routes';
 
 const app = express();
 
@@ -18,6 +19,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', env: env.NODE_ENV }));
+
+// 추적 링크 리다이렉트 (프론트 /r/:code 가 이 경로로 프록시)
+app.use('/r', redirectRoutes);
 
 app.use('/api/v1', routes);
 
