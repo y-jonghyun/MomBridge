@@ -1,10 +1,54 @@
 # 설계안: 키워드 추천 · 리뷰 유입 성과 리포트
 
-- 상태: **구현 완료 · 배포 전 확인 대기** (브랜치 `feature/keyword-tracking`, 아직 push하지 않음)
-- 작성일: 2026-10-21 / 진행 갱신: 2026-10-21
+- 상태: **구현 완료 · 배포 전 확인 대기** (PR #1 `feature/keyword-tracking`, 머지 전)
+- 작성일: 2026-10-21 / 진행 갱신: 2026-10-21 (4차)
 - 대상 코드: `dd80742` 기준
 
 ---
+
+> ## ⚠️ baseline 완료 전에는 Render Build Command에 `prisma migrate deploy`를 넣지 말 것
+> baseline(아래 "배포 전 해야 할 일" 4~5번) 전에 넣으면 배포가 실패하고, 경우에 따라 **이후 모든 배포가 막힌다**(4차 "migrate deploy 실패 시 동작" 참고).
+
+## 진행 상황 (2026-10-21, 4차 갱신)
+
+### 4차: 오늘 완료한 것
+- **PR #2**(운영자 자가 가입 차단) 머지 → Render 배포 `32bcfc1` Live → OPERATOR 가입 시도 400 확인.
+- **PR #3**(의존성 보안 패치) 체크 통과 후 머지 → Render 배포 `277f8e8` Live → `/health` ok, 쿼리스트링 있는 미션 목록 API 정상, 비로그인 미션 탐색·운영자 대시보드·미션 관리 화면 정상.
+- 운영 DB 운영자: 정상 계정 1개 확인. 운영 DB 비밀번호 교체, Render `DATABASE_URL` 갱신.
+- **Vercel Root Directory를 `./` → `frontend`로 변경.** `./`인 동안 오늘 프론트 배포가 전부 실패하고 있었다. 변경 후 재배포 Ready, PR #3 미리보기 통과.
+- PR #1에 main(PR #2, PR #3) 반영. `package.json`·`package-lock.json` 충돌 정리(PR #3의 express 4.22.3·uuid/multer 제거 + PR #1의 jest·cheerio 유지), 테스트 134개 통과.
+  - 이 브랜치 기준 `npm audit`: 운영 의존성 **0건**. 전체 36건은 모두 개발 도구(jest 29 계열, ts-node-dev)라 PR #1 머지 후 Render 빌드 로그 숫자는 늘어 보인다(개발 도구 정리 때 처리).
+
+### Vercel(Root Directory = `frontend`)에서 `/r/` 추적 링크
+- `/r/:code`는 **Next.js 라우트 핸들러 `frontend/src/app/r/[code]/route.ts`** 다. `vercel.json` rewrite나 `next.config.ts` 설정에 의존하지 않으므로 Root Directory가 `frontend`인 지금 구성에서 그대로 빌드된다(로컬 `frontend/`에서 `next build` 시 `ƒ /r/[code]` 확인, PR #1 Vercel 미리보기 빌드 성공).
+- 저장소 루트의 `vercel.json`(빌드 명령 `cd frontend && ...`, `outputDirectory: frontend/.next`)은 Root Directory=`frontend`에서는 **읽히지 않는다**(Vercel은 Root Directory 안의 `vercel.json`, 즉 `frontend/vercel.json`을 쓴다). 혼동을 주므로 Dockerfile 정리 PR에서 함께 삭제를 제안.
+- 필요한 것은 Vercel 프로젝트 환경변수뿐: `TRACKING_PROXY_SECRET`, `TRACKING_BACKEND_URL`(서버 전용).
+- 미리보기 배포는 Vercel 로그인(Deployment Protection) 뒤에 있어 익명으로는 확인할 수 없다. 운영 도메인 `https://mombridge-frontend.vercel.app`은 공개(200)이며, 블로그 독자가 접근하는 것은 운영 도메인이다. **Deployment Protection을 운영 도메인까지 켜면 독자에게 Vercel 로그인 화면이 뜨므로 켜지 말 것.**
+- 머지 후 확인: `https://mombridge-frontend.vercel.app/r/AAAAAAAAAAAA` → 우리 안내 페이지 "링크를 찾을 수 없습니다"(지금은 라우트가 없어 Next 기본 404).
+
+### migrate deploy 실패 시 동작 (로컬 재현, Prisma 5.22)
+| 상황 | 결과 | DB 상태 |
+|---|---|---|
+| A. `_prisma_migrations`가 없는 DB(`db push`로 만든 DB) | **P3005** "database schema is not empty"로 시작 전에 거부 | 변경 없음 |
+| C. 이력은 있으나 마이그레이션 일부 객체가 이미 있음 | **P3018**로 실패. 같은 파일 안에서 먼저 실행된 문장(enum·컬럼·테이블)은 **모두 롤백됨**(Postgres에서 마이그레이션 파일 단위 트랜잭션) | 그 마이그레이션은 변경 없음. 단 `_prisma_migrations`에 **실패 기록**이 남음 |
+- 결론: "DB가 일부만 바뀐 채 남는" 일은 마이그레이션 파일 단위로는 일어나지 않는다. 앞선 파일들은 각각 성공한 만큼 적용된다(이번 보정 마이그레이션은 `IF NOT EXISTS`라 이미 컬럼이 있어도 성공).
+- 그러나 실패 기록이 남으면 **이후 모든 `migrate deploy`가 P3009로 멈추고**, Build Command에 넣어 둔 상태에서는 **어떤 코드도 배포할 수 없게 된다**(긴급 수정 포함). 풀려면 원인 정리 후 `npx.cmd prisma migrate resolve --rolled-back <이름>`.
+- 그래서 **baseline 완료 → `migrate status`가 "Database schema is up to date" 또는 "새 마이그레이션 2개만 대기"인 것을 확인 → 그다음 Build Command 변경** 순서를 지킨다.
+
+### PostgreSQL 명령줄 도구 (pg_dump·psql)
+1. **운영 DB 서버 버전 확인** (도구 설치 전, 브라우저만으로): Supabase 대시보드 → SQL Editor에서 `show server_version;` 실행. (또는 Settings → Infrastructure의 Postgres 버전)
+2. **같은 메이저 버전(또는 더 높은 버전)의 명령줄 도구만** 받는다. `pg_dump`는 서버보다 낮은 메이저 버전이면 거부한다.
+   - **권장: 설치 없는 zip** — EDB "PostgreSQL binaries" 페이지(https://www.enterprisedb.com/download-postgresql-binaries)에서 Windows x86-64, 서버와 같은 메이저 버전 zip을 받아 예: `C:\Tools\pgsql`에 압축 해제. 관리자 권한·서비스 설치 없음. 그 안의 `bin\pg_dump.exe`, `bin\psql.exe`, `bin\pg_restore.exe`만 쓴다.
+   - 대안: https://www.postgresql.org/download/windows/ 의 EDB 설치 프로그램 → "Select Components"에서 **Command Line Tools만** 체크(Server·pgAdmin·Stack Builder 해제).
+3. 확인 및 세션 PATH 추가:
+   ```powershell
+   $env:Path = "C:\Tools\pgsql\bin;" + $env:Path      # 설치 프로그램을 썼다면 C:\Program Files\PostgreSQL\<버전>\bin
+   pg_dump --version; psql --version; pg_restore --version
+   ```
+
+### Dockerfile 정리 (승인됨, PR #1 머지 후 별도 PR)
+- 삭제: `backend/Dockerfile`, `frontend/Dockerfile`, `backend/.dockerignore`, `frontend/.dockerignore`, `devops/docker-configuration.yml`, `docker-compose.yml`의 backend·frontend 서비스(로컬 테스트용 postgres만 유지). README 실행 방법을 Render·Vercel 기준으로 갱신.
+- 함께 제안: 저장소 루트 `vercel.json` 삭제(Root Directory=`frontend`에서 사용되지 않음).
 
 ## 진행 상황 (2026-10-21, 3차 갱신)
 
