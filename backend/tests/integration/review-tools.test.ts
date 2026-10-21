@@ -32,6 +32,21 @@ describe('블로그 글 진단', () => {
     expect(login.result!.disclosureCheck).toBe('NEEDS_MANUAL_REVIEW');
   });
 
+  it('does not flag a normal post that carries the hidden captcha layer or mentions captcha in the body', async () => {
+    // 실제 PostView 페이지에 들어 있는 숨겨진 안부게시판 캡차 레이어와 스크립트
+    const page = `<html><body>${okHtml.replace('망원동카페 후기', '망원동카페 후기 · 보안문자 입력 없이 예약')}
+      <div id="captcha_layer" class="layerpopup" style="z-index:-1; display:none;"><div class="frame_wrap">
+      <iframe id="captchalayeredframe" src="about:blank" title="안부게시판 캡차"></iframe></div></div>
+      <script>var captchaUrl = "/CaptchaLayer.naver";</script></body></html>`;
+    const r = await diagnoseBlogPost(URL_, opts, 'local', fetcher(200, page));
+    expect(r.parsing!.contentSelector).toBe('.se-main-container');
+    expect(r.blockSignals).toEqual([]);
+    // 본문이 없는 실제 캡차 화면은 숨겨진 요소·스크립트를 빼고도 잡힌다
+    const blocked = await diagnoseBlogPost(URL_, opts, 'server', fetcher(200,
+      '<html><body><script>var captcha = 1;</script><div><h2>자동입력 방지</h2><p>보안문자를 입력해 주세요</p></div></body></html>'));
+    expect(blocked.blockSignals).toContain('캡차(자동입력 방지) 화면');
+  });
+
   it('reports network errors and URL errors without throwing', async () => {
     const err = await diagnoseBlogPost(URL_, opts, 'server', { fetchPost: async () => { throw new TypeError('fetch failed'); } });
     expect(err.fetch!.error).toContain('fetch failed');

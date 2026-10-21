@@ -1,3 +1,4 @@
+import * as cheerio from 'cheerio';
 import { parseNaverBlogUrl } from './naver-blog-url';
 import { NaverBlogPostFetcher, PostFetcher } from './post-fetcher';
 import { CheckOptions, MANUAL_REASON_LABEL, runPostCheck } from './review-check.service';
@@ -34,11 +35,26 @@ const BLOCK_PATTERNS: [RegExp, string][] = [
   [/Access Denied|Forbidden|Request blocked/i, '접근 거부 문구'],
 ];
 
+/**
+ * 화면에 보이는 글자만. 정상 글에도 숨겨진 안부게시판 캡차 레이어(display:none, iframe)와
+ * 스크립트 안의 captcha 문자열이 있어서, HTML 전체로 검사하면 모든 글이 차단으로 보인다.
+ */
+function visibleText(html: string): string {
+  const $ = cheerio.load(html);
+  $('script, style, noscript, template, iframe').remove();
+  $('[style]').filter((_, el) => /display\s*:\s*none|visibility\s*:\s*hidden/i.test($(el).attr('style') ?? '')).remove();
+  return $('body').text().replace(/\s+/g, ' ');
+}
+
 function blockSignals(status: number | null, finalUrl: string | null, html: string, found: boolean): string[] {
   const out: string[] = [];
   if (status !== null && [401, 403, 429, 451, 503].includes(status)) out.push(`HTTP ${status}`);
   if (finalUrl && /nid\.naver\.com|login/i.test(finalUrl)) out.push(`로그인 페이지로 이동됨 (${finalUrl})`);
-  for (const [re, label] of BLOCK_PATTERNS) if (re.test(html)) out.push(label);
+  // 본문을 읽었으면 차단 화면이 아니다. 본문 속 "보안문자" 같은 단어도 신호로 보지 않는다
+  if (!found) {
+    const text = visibleText(html);
+    for (const [re, label] of BLOCK_PATTERNS) if (re.test(text)) out.push(label);
+  }
   if (status === 200 && !found && html.length < 3000) out.push(`본문 없이 짧은 응답 (${html.length}자)`);
   return out;
 }
