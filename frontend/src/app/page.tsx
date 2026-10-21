@@ -152,9 +152,13 @@ export default function Home() {
         )}
       </div>
 
-      {/* 푸터는 #12(약관·방침)가 머지된 뒤 BUSINESS_INFO에 맞춘다 — 이번 PR에서는 건드리지 않는다 */}
-      <footer className="mt-7 border-t border-stone-200 bg-white py-6 text-center text-xs text-slate-400">
-        © 2026 맘브릿지 · 지역 마케팅 미션 플랫폼
+      <footer className="mt-7 border-t border-line bg-paper py-6 text-center text-xs text-muted">
+        <p>© 2026 맘브릿지 · 지역 마케팅 미션 플랫폼</p>
+        <p className="mt-2">
+          <Link href="/terms" className="hover:underline">이용약관</Link>
+          <span className="mx-2">·</span>
+          <Link href="/privacy" className="font-semibold hover:underline">개인정보처리방침</Link>
+        </p>
       </footer>
 
       <BottomTabBarSpacer />

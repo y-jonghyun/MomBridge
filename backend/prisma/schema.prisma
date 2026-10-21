@@ -117,6 +117,7 @@ model User {
   communityComments  CommunityComment[]
   communityLikes     CommunityLike[]
   passwordResets     PasswordResetToken[]
+  consents           UserConsent[]
 
   @@index([email])
   @@index([role])
@@ -651,4 +652,26 @@ model PasswordResetToken {
   @@index([userId])
   @@index([expiresAt])
   @@map("password_reset_tokens")
+}
+
+enum ConsentType {
+  AGE_14
+  TERMS
+  PRIVACY
+  MARKETING
+}
+
+/// 약관·개인정보 동의 기록. 동의 시점의 문서 버전을 남긴다 (철회·재동의도 행을 추가)
+model UserConsent {
+  id        String      @id @default(uuid()) @db.Uuid
+  userId    String      @db.Uuid
+  type      ConsentType
+  version   String      @db.VarChar(20)
+  agreed    Boolean
+  createdAt DateTime    @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
+  @@map("user_consents")
 }

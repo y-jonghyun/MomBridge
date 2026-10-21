@@ -5,6 +5,7 @@ import { env } from '../../config/env';
 import { AppError } from '../../middleware/errorHandler';
 import { UserRole } from '../../middleware/auth';
 import { normalizePhone } from '../../lib/phone';
+import { Agreements, consentRows } from './consent';
 
 /** 이메일은 소문자로 저장·비교한다 (대소문자만 다른 중복 계정 방지) */
 export const normalizeEmail = (email: string) => email.trim().toLowerCase();
@@ -24,7 +25,7 @@ export function signTokens(user: TokenUser) {
 }
 
 export async function register(body: {
-  email: string; password: string; name: string; role: UserRole; phone: string;
+  email: string; password: string; name: string; role: UserRole; phone: string; agreements: Agreements;
 }) {
   const email = normalizeEmail(body.email);
   const phone = normalizePhone(body.phone);
@@ -32,8 +33,9 @@ export async function register(body: {
   if (await prisma.user.findUnique({ where: { phone } })) throw phoneTaken();
 
   const passwordHash = await bcrypt.hash(body.password, env.BCRYPT_ROUNDS);
-  // 사용자와 프로필을 한 번에 만든다 (중첩 create는 한 트랜잭션) — 프로필 없는 계정이 남지 않게
-  const user = await createUserWithProfile({ email, passwordHash, name: body.name, role: body.role, phone });
+  const user = await createUserWithProfile({
+    email, passwordHash, name: body.name, role: body.role, phone, agreements: body.agreements,
+  });
 
   const { tokenVersion, ...publicUser } = user;
   return { user: publicUser, ...signTokens({ ...user, tokenVersion }) };
@@ -44,7 +46,7 @@ const phoneTaken = () => new AppError('PHONE_EXISTS', 409, '이미 가입된 번
 
 /** 유일 제약과 부딪히는 순간(동시 가입)에도 같은 응답을 주도록 한곳에서 만든다 */
 async function createUserWithProfile(input: {
-  email: string; passwordHash: string; name: string; role: UserRole; phone: string;
+  email: string; passwordHash: string; name: string; role: UserRole; phone: string; agreements: Agreements;
 }) {
   try {
     // 사용자와 프로필을 한 번에 만든다 (중첩 create는 한 트랜잭션) — 프로필 없는 계정이 남지 않게
@@ -55,6 +57,8 @@ async function createUserWithProfile(input: {
         ...(input.role === 'CLIENT' && {
           clientProfile: { create: { businessName: input.name, category: '', address: '', regionSi: '', regionGu: '' } },
         }),
+        // 동의 기록도 계정과 같은 트랜잭션으로 남긴다
+        consents: { create: consentRows(input.agreements) },
       },
       select: { id: true, email: true, name: true, role: true, createdAt: true, tokenVersion: true },
     });
