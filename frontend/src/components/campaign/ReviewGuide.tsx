@@ -9,6 +9,7 @@ interface Guide {
   mainKeyword: string | null;
   subKeywords: string[];
   trackingUrl: string | null;
+  trackingUnavailableReason: 'NO_DESTINATION' | 'NOT_CONFIGURED' | null;
   trackingInstruction: string;
   disclosureInstruction: string;
   disclosureExamples: string[];
@@ -78,7 +79,11 @@ export function ReviewGuideModal({ missionId, onClose }: { missionId: string; on
                     <CopyButton text={guide.trackingUrl} label="링크 복사" />
                   </div>
                 ) : (
-                  <p className="text-gray-500">광고주가 이동할 주소를 아직 등록하지 않았습니다. 등록되면 여기에 링크가 표시됩니다.</p>
+                  <p className="text-gray-500">
+                    {guide.trackingUnavailableReason === 'NOT_CONFIGURED'
+                      ? '추적 링크를 준비하고 있습니다. 잠시 후 다시 확인해 주세요.'
+                      : '광고주가 이동할 주소를 아직 등록하지 않았습니다. 등록되면 여기에 링크가 표시됩니다.'}
+                  </p>
                 )}
                 <p className="text-xs text-gray-500 mt-2">이 링크는 회원님 전용입니다. 다른 링크로 바꾸거나 단축 URL로 바꾸지 마세요.</p>
               </section>

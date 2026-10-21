@@ -67,6 +67,7 @@ router.post('/missions/:id/report/share', async (req: Request, res: Response, ne
   try {
     const mission = await requireCampaignAccess(req, req.params.id);
     const { expiresInDays } = parseInput(shareSchema, req.body);
+    if (!env.FRONTEND_URL) throw new AppError('NOT_CONFIGURED', 503, '공유 링크 주소(FRONTEND_URL)가 서버에 설정되지 않았습니다');
     const maxDays = await getSetting('report.shareMaxDays');
     if (expiresInDays > maxDays) throw new AppError('VALIDATION_ERROR', 400, `공유 기간은 최대 ${maxDays}일입니다`);
 

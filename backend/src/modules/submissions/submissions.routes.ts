@@ -263,8 +263,8 @@ router.patch('/:id/review', authenticate, requireRole('OPERATOR'), async (req: R
 router.post('/:id/disclosure-confirm', authenticate, requireRole('OPERATOR'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { reason } = parseInput(disclosureConfirmSchema, req.body);
-    const opProfile = await prisma.operatorProfile.findUnique({ where: { userId: req.user!.sub } });
-    if (!opProfile) throw new AppError('PROFILE_REQUIRED', 403, '운영자 프로필이 필요합니다');
+    // 예전 회원가입으로 만든 운영자는 프로필이 없을 수 있어, 확인자 기록을 위해 만들어 둔다
+    const opProfile = await prisma.operatorProfile.upsert({ where: { userId: req.user!.sub }, create: { userId: req.user!.sub }, update: {} });
 
     const current = await prisma.submission.findUnique({ where: { id: req.params.id } });
     if (!current) throw new AppError('NOT_FOUND', 404, '제출물을 찾을 수 없습니다');

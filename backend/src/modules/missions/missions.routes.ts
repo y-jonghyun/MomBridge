@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate, requireRole } from '../../middleware/auth';
 import { prisma } from '../../config/database';
+import { env } from '../../config/env';
 import { AppError } from '../../middleware/errorHandler';
 import { sendAlimTalk } from '../../utils/sms';
 import { parseInput } from '../../middleware/validate';
@@ -99,9 +100,11 @@ router.post('/', authenticate, requireRole('OPERATOR'), async (req: Request, res
         where: { id: clientProfileId },
         select: { contactPhone: true, businessName: true },
       });
-      if (clientProfile?.contactPhone) {
-        const frontendUrl = process.env.FRONTEND_URL ?? 'https://mombridge.vercel.app';
-        const paymentUrl = `${frontendUrl}/client`;
+      // 존재하지 않는 기본 도메인으로 결제 링크를 보내지 않도록 FRONTEND_URL이 없으면 발송하지 않는다
+      if (clientProfile?.contactPhone && !env.FRONTEND_URL) {
+        logger.error('FRONTEND_URL is not set; payment link SMS skipped', { missionId: mission.id });
+      } else if (clientProfile?.contactPhone) {
+        const paymentUrl = `${env.FRONTEND_URL}/client`;
         const fallbackText = `[맘브릿지] ${mission.title} 미션이 등록됐습니다.\n결제 후 미션이 활성화됩니다.\n\n결제 링크: ${paymentUrl}\n(맘브릿지 로그인 후 내 미션 목록에서 확인하세요)`;
         await sendAlimTalk(
           clientProfile.contactPhone,

@@ -163,11 +163,34 @@ describeDb('리뷰 제출 확인 · 대가 표시', () => {
     expect(res.status).toBe(200);
     expect(res.body.data).toMatchObject({
       mainKeyword: '망원동카페',
-      trackingUrl: `https://mombridge.vercel.app/r/${link.code}`,
+      trackingUrl: `https://tracking.test.example/r/${link.code}`,
       trackingInstruction: '글에 추적 링크 1개를 넣으세요',
     });
     const stranger = await createParticipant('남');
     expect((await request(app).get(`/api/v1/participant/missions/${mission.id}/guide`).set('Authorization', `Bearer ${stranger.token}`)).status).toBe(404);
+  });
+
+  it('hides the tracking link (instead of using a hard-coded domain) when TRACKING_BASE_URL is not set', async () => {
+    const { mission, p } = await setup();
+    const { env } = await import('../../src/config/env');
+    const saved = env.TRACKING_BASE_URL;
+    env.TRACKING_BASE_URL = '';
+    try {
+      const res = await request(app).get(`/api/v1/participant/missions/${mission.id}/guide`).set('Authorization', `Bearer ${p.token}`);
+      expect(res.body.data).toMatchObject({ trackingUrl: null, trackingUnavailableReason: 'NOT_CONFIGURED' });
+    } finally { env.TRACKING_BASE_URL = saved; }
+  });
+
+  it('manual confirmation works for an operator account that has no operator profile yet', async () => {
+    const { mission, p, link } = await setup();
+    fetcher.html = blogHtml('망원동 카페 후기', '분위기 최고', link.code);
+    const sub = (await submit(p.token, mission.id, POST_URL)).body.data;
+    const { createUser } = await import('../helpers/factory');
+    const legacyOp = await createUser('OPERATOR', '예전 운영자');
+    const res = await request(app).post(`/api/v1/submissions/${sub.id}/disclosure-confirm`)
+      .set('Authorization', `Bearer ${legacyOp.token}`).send({ reason: '직접 확인' });
+    expect(res.status).toBe(200);
+    expect(await prisma.operatorProfile.findUnique({ where: { userId: legacyOp.user.id } })).not.toBeNull();
   });
 
   it('approving an application issues a tracking link', async () => {

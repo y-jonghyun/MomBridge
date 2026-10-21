@@ -32,6 +32,7 @@ export async function ensureTrackingLink(applicationId: string) {
   throw new Error('could not allocate a unique tracking code');
 }
 
-export function publicTrackingUrl(code: string): string {
-  return trackingUrlFor(env.TRACKING_BASE_URL, code);
+/** TRACKING_BASE_URL이 설정되지 않았으면 null (링크를 잘못된 도메인으로 내보내지 않는다) */
+export function publicTrackingUrl(code: string): string | null {
+  return env.TRACKING_BASE_URL ? trackingUrlFor(env.TRACKING_BASE_URL, code) : null;
 }

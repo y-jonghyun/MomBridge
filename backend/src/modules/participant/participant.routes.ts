@@ -58,6 +58,7 @@ router.get('/missions/:missionId/guide', async (req: Request, res: Response, nex
         subKeywords: keywords.subs.map(k => k.keyword),
         // 광고주가 도착 URL을 등록하기 전에는 링크를 보여주지 않는다 (눌러도 이동할 곳이 없음)
         trackingUrl: application.mission.destinationUrl ? publicTrackingUrl(link.code) : null,
+        trackingUnavailableReason: !application.mission.destinationUrl ? 'NO_DESTINATION' : !publicTrackingUrl(link.code) ? 'NOT_CONFIGURED' : null,
         trackingInstruction: '글에 추적 링크 1개를 넣으세요',
         disclosureInstruction:
           '대가를 받았다는 사실을 글 제목 또는 본문 첫 부분에, 본문보다 크거나 다른 색 글자로 적어 주세요. ' +

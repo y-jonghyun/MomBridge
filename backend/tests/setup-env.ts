@@ -7,5 +7,6 @@ process.env.JWT_REFRESH_SECRET = 'test-refresh-secret-test-refresh-secret';
 process.env.CLICK_HASH_SECRET = 'test-click-hash-secret-0123456789abcdef';
 process.env.TRACKING_PROXY_SECRET = 'test-proxy-secret';
 process.env.INTERNAL_JOB_TOKEN = 'test-job-token';
-process.env.TRACKING_BASE_URL = 'https://mombridge.vercel.app';
+process.env.TRACKING_BASE_URL = 'https://tracking.test.example';
+process.env.FRONTEND_URL = 'https://app.test.example';
 process.env.KEYWORD_TOOL_PROVIDER = 'mock';
