@@ -18,6 +18,8 @@ export interface PostAnalysis {
   matchedPhrase: string | null;
   /** 본문 시작 부분에 이미지가 있음 → 이미지로 대가 표시했을 가능성 */
   topImagePresent: boolean;
+  /** 진단용: 어떤 선택자로 본문·제목을 찾았는지, 본문 앞부분 */
+  debug?: { contentSelector: string | null; titleSelector: string | null; bodyTextLength: number; bodyStart: string };
 }
 
 export interface AnalyzeOptions {
@@ -44,16 +46,21 @@ function findPhrase(text: string, patterns: string[]): string | null {
 
 export function analyzePost(html: string, opts: AnalyzeOptions): PostAnalysis {
   const $ = cheerio.load(html);
-  const content = CONTENT_SELECTORS.map(s => $(s).first()).find(el => el.length > 0);
+  const contentSelector = CONTENT_SELECTORS.find(s => $(s).first().length > 0) ?? null;
+  const content = contentSelector ? $(contentSelector).first() : null;
 
   let title = '';
+  let titleSelector: string | null = null;
   for (const s of TITLE_SELECTORS) {
     const t = $(s).first().text().replace(/\s+/g, ' ').trim();
-    if (t) { title = t; break; }
+    if (t) { title = t; titleSelector = s; break; }
   }
 
   if (!content) {
-    return { found: false, title, hasTrackingLink: false, hasMainKeyword: null, disclosurePosition: 'NONE', matchedPhrase: null, topImagePresent: false };
+    return {
+      found: false, title, hasTrackingLink: false, hasMainKeyword: null, disclosurePosition: 'NONE', matchedPhrase: null, topImagePresent: false,
+      debug: { contentSelector, titleSelector, bodyTextLength: 0, bodyStart: '' },
+    };
   }
 
   // 추적 링크: 일반 링크·링크 카드(OG 링크)·본문 텍스트 어디든 코드가 있으면 포함으로 본다
@@ -91,5 +98,8 @@ export function analyzePost(html: string, opts: AnalyzeOptions): PostAnalysis {
     ? firstComponent.is('.se-image, .se-imageStrip, .se-imageGroup, .se-sticker')
     : content.children().first().find('img').addBack('img').length > 0;
 
-  return { found: true, title, hasTrackingLink, hasMainKeyword, disclosurePosition, matchedPhrase, topImagePresent };
+  return {
+    found: true, title, hasTrackingLink, hasMainKeyword, disclosurePosition, matchedPhrase, topImagePresent,
+    debug: { contentSelector, titleSelector, bodyTextLength: bodyText.length, bodyStart: bodyText.slice(0, opts.topChars) },
+  };
 }

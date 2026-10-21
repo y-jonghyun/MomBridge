@@ -15,7 +15,8 @@
     "test": "jest",
     "type-check": "tsc --noEmit -p .",
     "operator:create": "node dist/scripts/create-operator.js",
-    "operator:list": "node dist/scripts/list-operators.js"
+    "operator:list": "node dist/scripts/list-operators.js",
+    "review:check-post": "node dist/scripts/check-blog-post.js"
   },
   "dependencies": {
     "@prisma/client": "^5.8.0",

@@ -13,6 +13,7 @@ import publicReportRoutes from '../modules/reports/public-report.routes';
 import operatorReportRoutes from '../modules/reports/operator-report.routes';
 import settingsRoutes from '../modules/settings/settings.routes';
 import internalRoutes from '../modules/jobs/internal.routes';
+import reviewToolsRoutes from '../modules/review-check/review-tools.routes';
 
 const router = Router();
 
@@ -21,6 +22,7 @@ router.use('/missions', missionRoutes);
 router.use('/submissions', submissionRoutes);
 router.use('/operator/reports', operatorReportRoutes);
 router.use('/operator/settings', settingsRoutes);
+router.use('/operator/tools', reviewToolsRoutes);
 router.use('/operator', operatorRoutes);
 router.use('/participant', participantRoutes);
 router.use('/client', campaignRoutes);
