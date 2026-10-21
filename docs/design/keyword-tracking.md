@@ -6,7 +6,60 @@
 
 ---
 
-## 진행 상황 (2026-10-21)
+## 진행 상황 (2026-10-21, 2차 갱신)
+
+### 2차 작업 (PR 전)
+| 커밋 | 내용 |
+|---|---|
+| `fix(auth)` | **회원가입으로 운영자를 만들 수 있던 문제** 차단 (참여자·고객사만 허용). 운영자 생성·목록 스크립트 추가 |
+| `fix` | `TRACKING_BASE_URL`·`FRONTEND_URL`을 환경변수로만 받음(코드 기본 도메인 제거). 프로필 없는 기존 운영자도 수동 확인 가능 |
+| `feat(review-check)` | 블로그 글 1건 진단 명령 (로컬 / 배포 서버) |
+
+- 테스트 134개 통과.
+- 실제 프론트 주소: `https://mombridge-frontend.vercel.app` — 코드에는 넣지 않고 `.env.example`과 배포 설정값으로만 쓴다.
+
+### 운영자 계정
+```powershell
+cd C:Mombridgeackend; npm ci; npm run build
+$env:DATABASE_URL = $env:PROD_DB_URL     # 운영 DB 접속 문자열 (본인 터미널에만)
+$env:JWT_ACCESS_SECRET = "x"; $env:JWT_REFRESH_SECRET = "x"   # 스크립트 실행용 자리값 (토큰을 발급하지 않음)
+npm run operator:list                                          # 현재 운영자 목록 (읽기 전용)
+npm run operator:create -- --email ops@example.com --name 홍길동   # 비밀번호는 프롬프트로 입력, 10자 이상
+Remove-Item Env:DATABASE_URL
+```
+psql만 쓰려면:
+`psql "$env:PROD_DB_URL" -c "SELECT u.email, u.name, u.\"isActive\", u.\"createdAt\", u.\"lastLoginAt\", (p.id IS NOT NULL) AS has_profile FROM users u LEFT JOIN operator_profiles p ON p.\"userId\" = u.id WHERE u.role = 'OPERATOR' ORDER BY u.\"createdAt\";"`
+- 목록에 모르는 계정이 있으면 예전 가입 API로 누군가 만든 운영자일 수 있다. `isActive`를 false로 바꾸거나(운영자 화면 회원 관리) 삭제를 검토.
+
+### 블로그 확인 실제 글 점검
+```powershell
+cd C:Mombridgeackend; npm run build
+# 로컬(내 PC IP로 조회). --save-html로 받은 HTML을 저장해 두면 선택자 수정에 쓸 수 있다
+npm run review:check-post -- https://blog.naver.com/<아이디>/<글번호> --keyword 망원동카페 --save-html post.html
+# 배포 서버(Render IP로 조회). 운영자 로그인 필요. 이 기능이 배포된 뒤에만 동작
+npm run review:check-post -- https://blog.naver.com/<아이디>/<글번호> --server https://mombridge-backend.onrender.com --email ops@example.com
+```
+출력: HTTP 상태·최종 URL·크기, **차단 신호**(403/429, 캡차·비정상 접근 문구, 로그인 페이지 이동, 본문 없는 짧은 응답), 찾은 본문·제목 선택자, 본문 앞부분, 대가 표시 판정. 저장은 하지 않으며 서버 API는 운영자당 분당 5회로 제한.
+
+점검할 글 예시: ① 제목에 [광고] ② 본문 첫 줄에 "제품을 제공받아" ③ 끝에만 표시 ④ 이미지로만 표시 ⑤ 비공개 글.
+
+**서버에서 네이버 접근이 막힐 가능성 (검토)**
+- robots.txt(`User-agent: *`)는 `PostView.naver`를 막지 않는다. AI 수집 봇(ClaudeBot, GPTBot 등)은 전면 차단돼 있으나, 플랫폼 서버는 제출된 글 1건 확인용이며 UA에 목적을 밝힌다.
+- **위험 요인**: Render는 해외 리전(미국·프랑크푸르트·싱가포르)의 클라우드 IP다. 네이버가 해외 데이터센터 IP에 캡차·403·빈 페이지를 줄 가능성은 공개 자료로 확인할 수 없어 **실측이 필요**하다. 로컬에서는 통과하고 서버에서만 차단 신호가 나오면 이 경우다.
+- 막혀도 기능이 멈추지는 않는다: 조회 실패·본문 없음은 `NEEDS_MANUAL_REVIEW`로 가고 운영자가 직접 확인한다. 다만 모든 리뷰가 수동 확인이 된다.
+- 막힐 경우 대안: (a) Vercel 서울 리전(icn1) 서버 함수에서 조회하고 결과만 백엔드로 넘기기, (b) 국내 호스팅의 조회 전용 소형 서버, (c) 수동 확인 운영. 실측 결과를 보고 정한다.
+
+### 같은 값을 넣어야 하는 환경변수
+비밀값은 직접 만들어 넣으세요 (예: `openssl rand -base64 48`).
+
+| 값 | 넣는 곳 (모두 같은 값) | 비고 |
+|---|---|---|
+| 프록시 공유 비밀값 | Render `TRACKING_PROXY_SECRET` = Vercel `TRACKING_PROXY_SECRET` | 다르면 방문자 IP·UA를 믿지 않아 모든 방문자가 Vercel IP 하나로 집계됨 |
+| 일 배치 토큰 | Render `INTERNAL_JOB_TOKEN` = GitHub secret `MOMBRIDGE_INTERNAL_JOB_TOKEN` | 다르면 일 배치가 404로 실패 |
+| 프론트 공개 주소 | Render `TRACKING_BASE_URL` = Render `FRONTEND_URL` = Render `CORS_ORIGIN`(에 포함) = 실제 Vercel 주소 `https://mombridge-frontend.vercel.app` | 정식 도메인으로 바꿀 때 셋 다 같이 변경. `/r/` 경로는 이 주소의 Vercel에서 처리 |
+| 백엔드 주소 | Vercel `TRACKING_BACKEND_URL` = GitHub variable `MOMBRIDGE_BACKEND_URL` = Vercel `NEXT_PUBLIC_API_URL`에서 `/api/v1`을 뺀 값 | `https://mombridge-backend.onrender.com` |
+
+한 곳에만 두는 값: `CLICK_HASH_SECRET`(Render, 32자 이상 — 바꾸면 그날 고유 방문자가 한 번 더 세어짐), `JWT_*`, `DATABASE_URL`, `NAVER_SEARCHAD_*`(약관 확인 후).
 
 ### 커밋 (기존 문제 수정을 먼저 분리)
 
@@ -23,14 +76,14 @@
 - 백엔드 124개 통과 (로컬 Postgres 17 기준). DB가 없으면 통합 테스트 42개는 건너뛰고 82개 실행.
 - 필수 11개 항목: `tests/unit/keywords|tracking|review-check.test.ts`, `tests/integration/*.test.ts`에 각각 "필수 N"으로 표기.
 - 프론트엔드: `tsc --noEmit`, `next build` 통과. 로컬에서 프론트 → 백엔드 프록시 전체 흐름(지원 승인 → 가이드 → 링크 클릭 → 302 + UTM → 모바일/봇/고유 방문자 기록 → 리포트)을 직접 실행해 확인. 백엔드가 꺼져 있을 때 "이동 중" 대기 페이지와 자동 재시도도 확인.
-- **GitHub Actions CI는 아직 실행되지 않음** (push 전).
+- GitHub Actions CI: PR에서 실행.
 
 ### 승인 후 바뀐 점
 - **대가 표시를 못 찾으면 자동 거부·수정 요청을 하지 않고 `NEEDS_MANUAL_REVIEW`(수동 확인 필요)** 로 둔다. 승인은 `AUTO_PASSED` 또는 운영자 `MANUAL_CONFIRMED`일 때만 가능. 수동 확인 시 운영자·시각·사유를 `submissions`와 `audit_logs`에 기록.
 - **표시 위치 반영**: 공정위 「추천·보증 등에 관한 표시·광고 심사지침」 개정(2024.12.1 시행)으로 블로그 등 문자 매체는 표시문구를 **"게시물의 제목 또는 첫 부분"**에 둬야 한다(종전 "첫 부분 또는 끝 부분"에서 변경). 제목, 또는 본문 앞 200자(설정값)에서 찾으면 통과. 끝에만 있으면 `DISCLOSURE_NOT_AT_TOP`로 수동 확인. 같은 개정에서 '체험단', '선물', '~에서 보내주셨어요', '소정의 수수료를 지급받을 수 있음' 등은 명확한 표시가 아닌 예시로 명시돼 있어 인정 문구에서 뺐다.
 - 첫 본문 요소가 이미지면 "이미지 속 대가 표시 확인 필요" 경고를 운영자에게 보여준다.
 - 블로그 리뷰 흐름(블로그 URL 필수·자동 확인·승인 차단)은 **미션 유형 `REVIEW`** 에만 적용. 다른 유형은 기존 그대로.
-- 추적 링크 도메인은 `TRACKING_BASE_URL`(기본 `https://mombridge.vercel.app`) 설정값.
+- 추적 링크 도메인은 `TRACKING_BASE_URL` 환경변수로만 받는다(코드 기본값 없음). 실제 값: `https://mombridge-frontend.vercel.app`.
 - 키워드 도구는 `KEYWORD_TOOL_PROVIDER=mock`이 기본. 화면에 "샘플 데이터" 배지 표시.
 - 배치는 GitHub Actions `daily-jobs.yml`(매일 03:30 KST) → `POST /api/v1/internal/jobs/daily`.
 
@@ -46,8 +99,8 @@
    - Vercel(프론트, 서버 전용): `TRACKING_PROXY_SECRET`(백엔드와 같은 값), `TRACKING_BACKEND_URL`
    - GitHub: secret `MOMBRIDGE_INTERNAL_JOB_TOKEN`, (선택) variable `MOMBRIDGE_BACKEND_URL`
    - `CLICK_HASH_SECRET`이 없으면 리다이렉트만 되고 클릭은 기록되지 않는다. `TRACKING_PROXY_SECRET`이 없으면 모든 방문자가 Vercel IP로 보여 고유 방문자 집계가 틀어진다.
-3. **`https://mombridge.vercel.app`이 현재 `DEPLOYMENT_NOT_FOUND`를 반환한다.** 실제 프론트 배포 주소를 확인해 `TRACKING_BASE_URL`과 `FRONTEND_URL`에 넣어야 한다.
-4. 실제 네이버 블로그 글 1~2개로 게시글 확인 결과를 점검. 스마트에디터 HTML 구조는 공개 자료를 기준으로 구현했고 실제 글로는 검증하지 못했다.
+3. ~~프론트 주소 확인~~ → `https://mombridge-frontend.vercel.app` (위 "같은 값을 넣어야 하는 환경변수" 참고).
+4. 실제 네이버 블로그 글로 게시글 확인 결과를 점검 — 로컬과 배포 서버 양쪽에서 (위 "블로그 확인 실제 글 점검").
 5. 개인정보처리방침 반영 (6절).
 6. 정식 도메인 구매 후 Vercel에 연결하고 `TRACKING_BASE_URL` 변경 (글에 링크가 들어가기 전에).
 
