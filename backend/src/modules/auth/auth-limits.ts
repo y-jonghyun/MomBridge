@@ -36,3 +36,9 @@ export const loginPerIp = rateLimit({ ...common, windowMs: WINDOW_MS, limit: 30,
 
 /** 가입: 같은 IP에서 1시간에 20회 */
 export const registerPerIp = rateLimit({ ...common, windowMs: 60 * 60_000, limit: 20, keyGenerator: clientKey });
+
+/** 비밀번호 재설정 메일 요청: 같은 IP에서 15분에 5회 (메일 폭탄 방지) */
+export const resetRequestPerIp = rateLimit({ ...common, windowMs: WINDOW_MS, limit: 5, keyGenerator: clientKey });
+
+/** 재설정 링크로 새 비밀번호 설정: 같은 IP에서 15분에 20회 */
+export const resetConfirmPerIp = rateLimit({ ...common, windowMs: WINDOW_MS, limit: 20, keyGenerator: clientKey });

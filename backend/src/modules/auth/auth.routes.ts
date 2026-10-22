@@ -6,8 +6,9 @@ import { AppError } from '../../middleware/errorHandler';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import * as authService from './auth.service';
+import { confirmPasswordReset, requestPasswordReset } from './password-reset';
 import { parseInput } from '../../middleware/validate';
-import { loginPerEmail, loginPerIp, registerPerIp } from './auth-limits';
+import { loginPerEmail, loginPerIp, registerPerIp, resetConfirmPerIp, resetRequestPerIp } from './auth-limits';
 
 const router = Router();
 
@@ -39,6 +40,29 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     const token = req.body.refreshToken ?? req.cookies?.refreshToken;
     const result = await authService.refresh(token);
     res.json({ success: true, data: result });
+  } catch (e) { next(e); }
+});
+
+// ── 비밀번호 재설정 ──
+const resetRequestSchema = z.object({ email: z.string().trim().email().max(320) });
+const resetConfirmSchema = z.object({
+  token: z.string().min(20).max(200),
+  newPassword: z.string().min(6, '비밀번호는 6자 이상이어야 합니다').max(100),
+});
+
+// 계정이 없어도 같은 응답 (가입 여부를 알려 주지 않음)
+router.post('/password-reset/request', resetRequestPerIp, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await requestPasswordReset(parseInput(resetRequestSchema, req.body).email);
+    res.json({ success: true, data: { message: '가입된 이메일이면 재설정 링크를 보냈습니다. 메일함을 확인해 주세요' } });
+  } catch (e) { next(e); }
+});
+
+router.post('/password-reset/confirm', resetConfirmPerIp, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { token, newPassword } = parseInput(resetConfirmSchema, req.body);
+    await confirmPasswordReset(token, newPassword);
+    res.json({ success: true });
   } catch (e) { next(e); }
 });
 

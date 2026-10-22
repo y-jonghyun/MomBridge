@@ -7,3 +7,6 @@ dist/
 *.log
 
 ��������.txt
+
+# 프로젝트 안에 두는 로컬 개발용 Postgres 데이터 디렉터리 (절대 커밋하지 않는다)
+.pgdata-local/

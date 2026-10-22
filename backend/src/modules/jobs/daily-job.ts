@@ -3,6 +3,7 @@ import { addDays, clock, formatDay, kstDayKey } from '../../lib/clock';
 import { getSetting } from '../settings/settings';
 import { closeExpiredMissions } from '../missions/mission-lifecycle';
 import { rollupBefore } from '../reports/aggregate';
+import { deleteExpiredResetTokens } from '../auth/password-reset';
 
 export interface DailyJobResult {
   today: string;
@@ -14,6 +15,7 @@ export interface DailyJobResult {
   deletedVisitorHashes: number;
   deletedKeywordCache: number;
   deletedShareLinks: number;
+  deletedResetTokens: number;
 }
 
 /**
@@ -47,6 +49,8 @@ export async function runDailyJob(): Promise<DailyJobResult> {
     where: { OR: [{ expiresAt: { lt: addDays(clock.now(), -30) } }, { revokedAt: { lt: addDays(clock.now(), -30) } }] },
   });
 
+  const deletedResetTokens = await deleteExpiredResetTokens();
+
   return {
     today: formatDay(today),
     cutoff: formatDay(cutoff),
@@ -57,5 +61,6 @@ export async function runDailyJob(): Promise<DailyJobResult> {
     deletedVisitorHashes,
     deletedKeywordCache,
     deletedShareLinks,
+    deletedResetTokens,
   };
 }
