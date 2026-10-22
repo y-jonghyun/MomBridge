@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../../middleware/auth';
 import { prisma } from '../../config/database';
+import { env } from '../../config/env';
 import { AppError } from '../../middleware/errorHandler';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
@@ -68,7 +69,7 @@ router.patch('/me/password', authenticate, async (req: Request, res: Response, n
     const valid = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!valid) throw new AppError('INVALID_PASSWORD', 400, '현재 비밀번호가 올바르지 않습니다');
 
-    const passwordHash = await bcrypt.hash(newPassword, 12);
+    const passwordHash = await bcrypt.hash(newPassword, env.BCRYPT_ROUNDS);
     await prisma.user.update({ where: { id: req.user!.sub }, data: { passwordHash } });
     res.json({ success: true });
   } catch (e) { next(e); }
