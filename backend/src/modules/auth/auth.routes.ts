@@ -1,11 +1,13 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../../middleware/auth';
 import { prisma } from '../../config/database';
+import { env } from '../../config/env';
 import { AppError } from '../../middleware/errorHandler';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import * as authService from './auth.service';
 import { parseInput } from '../../middleware/validate';
+import { loginPerEmail, loginPerIp, registerPerIp } from './auth-limits';
 
 const router = Router();
 
@@ -18,14 +20,14 @@ const registerSchema = z.object({
   phone: z.preprocess(v => (v === '' ? undefined : v), z.string().trim().max(20).optional()),
 });
 
-router.post('/register', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/register', registerPerIp, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await authService.register(parseInput(registerSchema, req.body));
     res.status(201).json({ success: true, data: result });
   } catch (e) { next(e); }
 });
 
-router.post('/login', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/login', loginPerIp, loginPerEmail, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await authService.login(req.body);
     res.json({ success: true, data: result });
@@ -67,7 +69,7 @@ router.patch('/me/password', authenticate, async (req: Request, res: Response, n
     const valid = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!valid) throw new AppError('INVALID_PASSWORD', 400, '현재 비밀번호가 올바르지 않습니다');
 
-    const passwordHash = await bcrypt.hash(newPassword, 12);
+    const passwordHash = await bcrypt.hash(newPassword, env.BCRYPT_ROUNDS);
     await prisma.user.update({ where: { id: req.user!.sub }, data: { passwordHash } });
     res.json({ success: true });
   } catch (e) { next(e); }

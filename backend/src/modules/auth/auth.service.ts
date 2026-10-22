@@ -18,7 +18,7 @@ export async function register(body: {
   const exists = await prisma.user.findUnique({ where: { email: body.email } });
   if (exists) throw new AppError('EMAIL_EXISTS', 409, '이미 사용 중인 이메일입니다');
 
-  const passwordHash = await bcrypt.hash(body.password, 12);
+  const passwordHash = await bcrypt.hash(body.password, env.BCRYPT_ROUNDS);
   const user = await prisma.user.create({
     data: { email: body.email, passwordHash, name: body.name, role: body.role },
     select: { id: true, email: true, name: true, role: true, createdAt: true },

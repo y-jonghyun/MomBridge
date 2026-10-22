@@ -22,6 +22,20 @@ function required(key: string): string {
   return val;
 }
 
+/**
+ * 비밀번호 해시 비용(bcrypt rounds). 운영 기본값은 12.
+ * 테스트에서만 낮춰 쓴다 — 가입을 수십 번 반복하는 통합 테스트가 느려지지 않게.
+ */
+function bcryptRounds(): number {
+  const raw = (process.env.BCRYPT_ROUNDS ?? '').trim();
+  if (!raw) return 12;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 4 || n > 15) {
+    console.error('BCRYPT_ROUNDS must be an integer between 4 and 15'); process.exit(1);
+  }
+  return n;
+}
+
 export const env = {
   NODE_ENV: (process.env.NODE_ENV ?? 'development') as 'development' | 'production' | 'test',
   PORT: parseInt(process.env.PORT ?? '4000', 10),
@@ -33,6 +47,8 @@ export const env = {
   CORS_ORIGIN: (process.env.CORS_ORIGIN ?? 'http://localhost:3000').split(',').map(s => s.trim()),
   // 앞단 프록시 홉 수. Render는 프록시 1단 → 1. 프록시 없이 직접 노출하면 0
   TRUST_PROXY_HOPS: parseInt(process.env.TRUST_PROXY_HOPS ?? '1', 10),
+  // 비밀번호 해시 비용. 기본 12 — 운영에서는 12 미만으로 내릴 수 없다
+  BCRYPT_ROUNDS: bcryptRounds(),
 
   // ── 키워드 도구 (서버 전용 비밀값) ──
   // 약관 확인 전까지 기본값은 mock. naver로 바꾸면 아래 세 값이 모두 필요
@@ -62,6 +78,9 @@ if (env.KEYWORD_TOOL_PROVIDER === 'naver') {
 }
 if (env.CLICK_HASH_SECRET && env.CLICK_HASH_SECRET.length < 32) {
   console.error('CLICK_HASH_SECRET must be at least 32 characters'); process.exit(1);
+}
+if (env.NODE_ENV === 'production' && env.BCRYPT_ROUNDS < 12) {
+  console.error('BCRYPT_ROUNDS must be at least 12 in production'); process.exit(1);
 }
 
 export const isDev = () => env.NODE_ENV === 'development';

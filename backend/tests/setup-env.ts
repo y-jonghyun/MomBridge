@@ -10,3 +10,5 @@ process.env.INTERNAL_JOB_TOKEN = 'test-job-token';
 process.env.TRACKING_BASE_URL = 'https://tracking.test.example';
 process.env.FRONTEND_URL = 'https://app.test.example';
 process.env.KEYWORD_TOOL_PROVIDER = 'mock';
+// bcrypt 해시 비용은 테스트에서만 낮춘다 (운영 기본값은 env.ts의 12)
+process.env.BCRYPT_ROUNDS = '4';

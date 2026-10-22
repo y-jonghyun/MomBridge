@@ -8,6 +8,7 @@
  */
 import bcrypt from 'bcryptjs';
 import { prisma } from '../config/database';
+import { env } from '../config/env';
 import { askHidden, parseArgs } from './cli';
 
 const MIN_PASSWORD = 10;
@@ -19,7 +20,7 @@ export async function createOperator(input: { email: string; name: string; passw
   if (input.password.length < MIN_PASSWORD) throw new Error(`운영자 비밀번호는 ${MIN_PASSWORD}자 이상이어야 합니다`);
   if (await prisma.user.findUnique({ where: { email } })) throw new Error('이미 있는 이메일입니다 (기존 계정은 바꾸지 않습니다)');
 
-  const passwordHash = await bcrypt.hash(input.password, 12);
+  const passwordHash = await bcrypt.hash(input.password, env.BCRYPT_ROUNDS);
   return prisma.user.create({
     data: {
       email,
