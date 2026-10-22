@@ -66,7 +66,7 @@ export async function confirmPasswordReset(token: string, newPassword: string): 
   const now = clock.now();
   if (!row || row.usedAt || row.expiresAt <= now || !row.user.isActive || row.user.deletedAt) throw invalid;
 
-  const passwordHash = await bcrypt.hash(newPassword, 12);
+  const passwordHash = await bcrypt.hash(newPassword, env.BCRYPT_ROUNDS);
   // 같은 토큰으로 동시에 두 번 요청해도 한 번만 성공하게 usedAt이 비어 있을 때만 표시한다
   const claimed = await prisma.passwordResetToken.updateMany({ where: { id: row.id, usedAt: null }, data: { usedAt: now } });
   if (claimed.count !== 1) throw invalid;
