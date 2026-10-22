@@ -2,7 +2,7 @@
   "name": "mombridge-backend",
   "version": "1.0.0",
   "engines": {
-    "node": ">=20.0.0"
+    "node": "22.x"
   },
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only --exit-child src/server.ts",
