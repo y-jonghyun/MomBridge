@@ -24,7 +24,11 @@ export const useAuthStore = create<AuthState>()(
       refreshToken: null,
       setAuth: (user, token, refreshToken) => set({ user, token, refreshToken }),
       setTokens: (token, refreshToken) => set({ token, refreshToken }),
-      clearAuth: () => set({ user: null, token: null, refreshToken: null }),
+      clearAuth: () => {
+        // 로그아웃하면 본인 클릭 표시도 지운다 (같은 기기를 다른 사람이 쓸 수 있음)
+        if (typeof document !== 'undefined') document.cookie = 'mb_self=; Path=/r; Max-Age=0; SameSite=Lax';
+        set({ user: null, token: null, refreshToken: null });
+      },
     }),
     { name: 'mombridge-auth' }
   )

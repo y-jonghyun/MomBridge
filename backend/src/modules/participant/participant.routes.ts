@@ -5,6 +5,7 @@ import { AppError } from '../../middleware/errorHandler';
 import { getMissionKeywords } from '../missions/mission-extras';
 import { ensureTrackingLink, publicTrackingUrl } from '../tracking/links';
 import { buildParticipantStats } from '../reports/report.service';
+import { SELF_CLICK_MAX_AGE_SEC, selfClickToken } from '../tracking/self-click';
 
 const router = Router();
 router.use(authenticate, requireRole('PARTICIPANT', 'OPERATOR'));
@@ -22,6 +23,14 @@ async function getOrCreateParticipantProfile(userId: string) {
     update: {},
   });
 }
+
+// 본인 클릭 제외용 서명 값 — 프론트가 /r 경로 쿠키로 저장한다
+router.get('/self-click-token', requireRole('PARTICIPANT'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const profile = await getOrCreateParticipantProfile(req.user!.sub);
+    res.json({ success: true, data: { token: selfClickToken(profile.id), maxAgeSec: SELF_CLICK_MAX_AGE_SEC } });
+  } catch (e) { next(e); }
+});
 
 // 내 지원 목록
 router.get('/applications', async (req: Request, res: Response, next: NextFunction) => {

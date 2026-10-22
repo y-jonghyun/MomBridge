@@ -143,6 +143,7 @@ export function TrafficSummary() {
 const SETTING_LABEL: Record<string, { title: string; help: string }> = {
   'keyword.sort': { title: '키워드 정렬 기준', help: 'mode: recommended(추천 점수) | volume(검색량) | competition(경쟁 낮은 순). volumeBand: 적당한 검색량 구간, weights: 점수 가중치' },
   'submission.disclosurePhrases': { title: '대가 표시 인정 문구 (정규식)', help: "한 줄에 하나. '체험단', '선물' 등 공정위 지침상 불명확한 표현은 넣지 마세요" },
+  'click.excludeSelf': { title: '체험단원 본인 클릭 제외', help: 'true: 로그인한 체험단원이 자기 추적 링크를 누른 것은 집계하지 않음(이동은 됨) · false: 모두 집계' },
   'click.botRules': { title: '봇 제외 규칙', help: '[{"name": "규칙 이름", "pattern": "User-Agent 정규식"}] — 걸린 클릭은 집계에서 제외' },
 };
 
@@ -188,7 +189,7 @@ export function SettingsEditor() {
         <div key={i.key} className="bg-white rounded-2xl p-5 shadow-sm space-y-2">
           <p className="font-semibold text-gray-900">{SETTING_LABEL[i.key]?.title ?? i.key}</p>
           <p className="text-xs text-gray-500">{SETTING_LABEL[i.key]?.help}</p>
-          <textarea rows={8} className="w-full border rounded-lg px-3 py-2 text-xs font-mono"
+          <textarea rows={typeof i.value === 'boolean' ? 1 : 8} className="w-full border rounded-lg px-3 py-2 text-xs font-mono"
             value={drafts[i.key] ?? ''} onChange={e => setDrafts(d => ({ ...d, [i.key]: e.target.value }))} />
           <div className="flex gap-2">
             <button onClick={() => save(i.key)} className="px-4 py-2 bg-slate-700 text-white text-sm rounded-lg">저장</button>

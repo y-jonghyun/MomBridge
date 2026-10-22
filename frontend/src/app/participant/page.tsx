@@ -1,5 +1,6 @@
 ﻿'use client';
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { syncSelfClickCookie } from '@/lib/self-click';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
@@ -66,6 +67,8 @@ export default function ParticipantPage() {
     if (user.role !== 'PARTICIPANT' && user.role !== 'OPERATOR') { router.push('/'); return; }
     loadMissions(missionFilter);
     loadNotifications();
+    // 이미 로그인해 있던 체험단원도 본인 클릭 표시를 받는다 (만료 연장 겸)
+    if (user.role === 'PARTICIPANT') void syncSelfClickCookie();
   }, [user, hydrated]);
 
   async function loadNotifications() {

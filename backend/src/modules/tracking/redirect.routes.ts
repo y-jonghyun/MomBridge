@@ -8,6 +8,7 @@ import { logger } from '../../utils/logger';
 import { getSetting } from '../settings/settings';
 import { buildTrackedDestination } from './destination';
 import { getClickRecorder } from './click-recorder';
+import { verifySelfClickToken } from './self-click';
 
 /**
  * GET /r/:code — 추적 링크.
@@ -15,7 +16,7 @@ import { getClickRecorder } from './click-recorder';
  * 이동 대상은 DB에 저장된 도착 URL + UTM뿐이며, 요청의 어떤 값도 이동 대상에 쓰지 않는다.
  */
 
-interface Resolved { linkId: string; location: string }
+interface Resolved { linkId: string; participantId: string; location: string }
 
 // DB가 잠깐 불안정해도 최근에 열린 링크는 계속 이동되도록 5분 캐시
 const RESOLVE_TTL_MS = 5 * 60 * 1000;
@@ -30,10 +31,10 @@ async function resolve(code: string): Promise<Resolved | null> {
   try {
     const link = await prisma.trackingLink.findUnique({
       where: { code },
-      select: { id: true, disabledAt: true, mission: { select: { destinationUrl: true, campaignCode: true } } },
+      select: { id: true, participantId: true, disabledAt: true, mission: { select: { destinationUrl: true, campaignCode: true } } },
     });
     const value = link && !link.disabledAt && link.mission.destinationUrl
-      ? { linkId: link.id, location: buildTrackedDestination(link.mission.destinationUrl, link.mission.campaignCode, code) }
+      ? { linkId: link.id, participantId: link.participantId, location: buildTrackedDestination(link.mission.destinationUrl, link.mission.campaignCode, code) }
       : null;
     if (resolveCache.size > 10_000) resolveCache.clear();
     resolveCache.set(code, { value, at: Date.now() });
@@ -59,9 +60,10 @@ export function clientInfo(req: Request) {
       userAgent: req.get('x-mb-user-agent') ?? '',
       referer: req.get('x-mb-referer') || undefined,
       retry: Number(req.get('x-mb-retry') ?? '0') > 0,
+      selfToken: req.get('x-mb-self') || undefined,
     };
   }
-  return { ip: req.ip ?? '', userAgent: req.get('user-agent') ?? '', referer: req.get('referer') || undefined, retry: false };
+  return { ip: req.ip ?? '', userAgent: req.get('user-agent') ?? '', referer: req.get('referer') || undefined, retry: false, selfToken: undefined };
 }
 
 function page(res: Response, status: number, title: string, body: string) {
@@ -101,8 +103,10 @@ async function handle(req: Request, res: Response) {
   res.set('Cache-Control', 'no-store').set('X-Robots-Tag', 'noindex, nofollow').redirect(302, resolved.location);
 
   const info = clientInfo(req);
-  const linkId = resolved.linkId;
-  setImmediate(() => {
+  const { linkId, participantId } = resolved;
+  setImmediate(async () => {
+    // 체험단원 본인 클릭(서명된 mb_self 쿠키가 링크 주인과 같음)은 집계하지 않는다
+    if (verifySelfClickToken(info.selfToken) === participantId && await getSetting('click.excludeSelf').catch(() => true)) return;
     getClickRecorder()
       .record({ linkId, ip: info.ip, userAgent: info.userAgent, referer: info.referer, method: req.method, retry: info.retry })
       // IP·UA는 로그에 남기지 않는다

@@ -31,6 +31,7 @@ export const settingSchemas = {
   'submission.disclosurePhrases': z.array(regexString).min(1).max(50),
   'submission.disclosureTopChars': z.number().int().min(50).max(2000),
   'report.shareMaxDays': z.number().int().min(1).max(365),
+  'click.excludeSelf': z.boolean(),
 } as const;
 
 export type SettingKey = keyof typeof settingSchemas;
@@ -69,10 +70,12 @@ export const settingDefaults: { [K in SettingKey]: SettingValue<K> } = {
   ],
   'submission.disclosureTopChars': 200,
   'report.shareMaxDays': 30,
+  // 로그인한 체험단원이 자기 추적 링크를 누른 것은 집계하지 않는다
+  'click.excludeSelf': true,
 };
 
 /** 운영자 화면에서 편집할 수 있는 키 */
-export const editableSettingKeys: SettingKey[] = ['keyword.sort', 'submission.disclosurePhrases', 'click.botRules'];
+export const editableSettingKeys: SettingKey[] = ['keyword.sort', 'submission.disclosurePhrases', 'click.botRules', 'click.excludeSelf'];
 
 const CACHE_MS = 60_000;
 const cache = new Map<SettingKey, { value: unknown; at: number }>();

@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import api, { apiErrorMessage } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
+import { syncSelfClickCookie } from '@/lib/self-click';
 
 /** 로그인 후 돌아갈 경로. 다른 사이트로 보내지 않도록 같은 사이트 경로만 허용 */
 function safeNext(next: string | null): string | null {
@@ -31,6 +32,7 @@ function LoginForm() {
       const { data } = await api.post('/auth/login', form);
       setAuth(data.data.user, data.data.accessToken, data.data.refreshToken);
       const role = data.data.user.role;
+      if (role === 'PARTICIPANT') void syncSelfClickCookie();
       if (next) router.push(next);
       else if (role === 'OPERATOR') router.push('/operator');
       else if (role === 'PARTICIPANT') router.push('/participant');
