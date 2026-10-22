@@ -29,3 +29,20 @@ describe('health/ready', () => {
     expect((await request(app).get('/health')).status).toBe(200);
   });
 });
+
+describe('request body', () => {
+  it('rejects bodies over 100kb with 413 and broken JSON with 400', async () => {
+    const big = await request(app).post('/api/v1/auth/login').send({ email: 'a@b.c', password: 'x'.repeat(110_000) });
+    expect(big.status).toBe(413);
+    expect(big.body.error.code).toBe('PAYLOAD_TOO_LARGE');
+    const broken = await request(app).post('/api/v1/auth/login').set('Content-Type', 'application/json').send('{"email":');
+    expect(broken.status).toBe(400);
+    expect(broken.body.error.code).toBe('INVALID_JSON');
+  });
+
+  it('accepts a long but normal body (10,000 Korean characters)', async () => {
+    const res = await request(app).post('/api/v1/auth/register').send({ email: 'bad', password: 'pass1234', name: '가'.repeat(10_000), role: 'CLIENT' });
+    expect(res.status).toBe(400); // 본문 크기는 통과하고 입력 검증에서 걸린다
+    expect(res.body.error.code).not.toBe('PAYLOAD_TOO_LARGE');
+  });
+});
