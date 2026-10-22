@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { parseInput } from '../../middleware/validate';
 import { missionStatusSchema } from '../missions/missions.schema';
 import { ensureTrackingLink } from '../tracking/links';
+import { reportIssue } from '../../lib/monitoring';
 
 const applicationReviewSchema = z.object({
   status: z.enum(['APPROVED', 'REJECTED']),
@@ -153,6 +154,9 @@ router.patch('/payouts/:id', async (req: Request, res: Response, next: NextFunct
         ...(req.body.status === 'COMPLETED' && { completedAt: new Date() }),
       },
     });
+    if (payout.status === 'FAILED') {
+      reportIssue('Payout marked FAILED', { area: 'payout', level: 'error', extra: { payoutId: payout.id, amount: Number(payout.netAmount) } });
+    }
     res.json({ success: true, data: payout });
   } catch (e) { next(e); }
 });
