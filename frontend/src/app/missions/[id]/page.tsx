@@ -230,25 +230,22 @@ export default function MissionDetailPage() {
             </div>
           )}
 
-          {/* 주의사항 공통 */}
-          <div className="bg-white rounded-xl shadow-sm p-5">
-            <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-              <span className="w-1 h-4 bg-yellow-400 rounded-full" />방문 및 예약 안내
-            </h3>
-            <div className="space-y-2">
-              {[
-                '체험 가능 요일: 월/화/수/목/금',
-                '체험 가능 시간: 오전 11시 30분 ~ 오후 8시 30분',
-                '당일 예약 및 방문 불가',
-                '당첨자는 반드시 예약 후 방문해 주세요',
-              ].map((t, i) => (
-                <div key={i} className="flex items-start gap-2 text-sm text-gray-600">
-                  <span className="text-gray-300 shrink-0 mt-1">·</span>
-                  <span>{t}</span>
-                </div>
-              ))}
+          {/* 방문·예약 안내 — 미션별로 고객사·운영자가 입력. 없으면 숨김 */}
+          {mission.visitGuide?.trim() && (
+            <div className="bg-white rounded-xl shadow-sm p-5">
+              <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+                <span className="w-1 h-4 bg-yellow-400 rounded-full" />방문 및 예약 안내
+              </h3>
+              <div className="space-y-2">
+                {mission.visitGuide.split('\n').map((t: string) => t.trim()).filter(Boolean).map((t: string, i: number) => (
+                  <div key={i} className="flex items-start gap-2 text-sm text-gray-600">
+                    <span className="text-gray-300 shrink-0 mt-1">·</span>
+                    <span>{t}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* 댓글 영역 */}
           <div className="bg-white rounded-xl shadow-sm p-5">

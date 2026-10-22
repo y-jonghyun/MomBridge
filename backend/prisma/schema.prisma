@@ -195,6 +195,8 @@ model Mission {
   rewardAmount       Decimal         @db.Decimal(12, 2)
   rewardDescription  String?         @db.Text
   requirements       String?         @db.Text
+  /// 방문·예약 안내 (체험 가능 요일·시간, 예약 방법 등). 비어 있으면 상세 화면에 표시하지 않음
+  visitGuide         String?         @db.Text
   startDate          DateTime
   endDate            DateTime
   submissionDeadline DateTime
