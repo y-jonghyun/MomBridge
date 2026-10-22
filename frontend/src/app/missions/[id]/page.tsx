@@ -82,6 +82,7 @@ export default function MissionDetailPage() {
   const pct = Math.min(100, Math.round(((mission.currentCount ?? 0) / mission.maxParticipants) * 100));
   const backHref = user?.role === 'PARTICIPANT' ? '/participant' : user?.role === 'OPERATOR' ? '/operator' : '/missions';
   const missionIcons = MISSION_ICONS[mission.category] ?? MISSION_ICONS['SNS'];
+  const keywords: { keyword: string; role: 'MAIN' | 'SUB' }[] = mission.keywords ?? [];
 
   return (
     <div className="min-h-screen bg-gray-100 pb-20 lg:pb-0">
@@ -175,21 +176,25 @@ export default function MissionDetailPage() {
             <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{mission.description}</p>
           </div>
 
-          {/* 키워드 / 태그 */}
-          <div className="bg-white rounded-xl shadow-sm p-5">
-            <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-              <span className="w-1 h-4 bg-pink-400 rounded-full" />키워드 정보
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {[mission.regionSi, mission.regionGu, CATEGORY_LABEL[mission.category], mission.clientProfile?.businessName]
-                .filter(Boolean).map((kw: string) => (
-                  <span key={kw} className="text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full">{kw}</span>
+          {/* 키워드 — 고객사가 고른 메인·서브 키워드. 없으면 숨김 */}
+          {keywords.length > 0 && (
+            <div className="bg-white rounded-xl shadow-sm p-5">
+              <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+                <span className="w-1 h-4 bg-pink-400 rounded-full" />키워드 정보
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {keywords.map(k => (
+                  <span key={k.keyword}
+                    className={k.role === 'MAIN'
+                      ? 'text-xs bg-slate-700 text-white px-3 py-1.5 rounded-full font-semibold'
+                      : 'text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full'}>
+                    {k.role === 'MAIN' && <span className="opacity-70 mr-1">메인</span>}{k.keyword}
+                  </span>
                 ))}
-              {mission.category === 'SNS' && ['#맘브릿지', '#체험단'].map(t => (
-                <span key={t} className="text-xs bg-slate-50 text-slate-600 px-3 py-1.5 rounded-full font-medium">{t}</span>
-              ))}
+              </div>
+              <p className="text-xs text-gray-400 mt-3">메인 키워드는 제목과 본문에, 서브 키워드는 본문에 자연스럽게 넣어 주세요.</p>
             </div>
-          </div>
+          )}
 
           {/* 체험단 미션 아이콘 */}
           <div className="bg-white rounded-xl shadow-sm p-5">
