@@ -5,6 +5,7 @@ import { env } from '../../config/env';
 import { AppError } from '../../middleware/errorHandler';
 import { sendAlimTalk } from '../../utils/sms';
 import { parseInput } from '../../middleware/validate';
+import { normalizeProvince, provinceVariants } from '../../lib/regions';
 import {
   operatorCreateMissionSchema, payAndCreateMissionSchema, payExistingMissionSchema,
   missionStatusSchema, expectedMissionAmount,
@@ -28,7 +29,8 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       status: 'OPEN' as const,
       isVisible: true,
       ...(req.query.category && { category: req.query.category as never }),
-      ...(req.query.regionSi && { regionSi: String(req.query.regionSi) }),
+      // 시·도 필터는 예전 표기('서울시', '충북')로 저장된 미션도 찾는다
+      ...(req.query.regionSi && { regionSi: { in: provinceVariants(normalizeProvince(String(req.query.regionSi)) ?? String(req.query.regionSi)) } }),
       ...(req.query.regionGu && { regionGu: String(req.query.regionGu) }),
       ...(keyword && { OR: [{ title: { contains: keyword } }, { description: { contains: keyword } }] }),
     };

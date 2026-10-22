@@ -5,6 +5,7 @@ import Link from 'next/link';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { SettingsEditor, SubmissionCheckPanel, TrafficSummary } from '@/components/operator/OperatorCampaignTools';
+import ProvinceSelect from '@/components/common/ProvinceSelect';
 
 type Tab = 'overview' | 'missions' | 'applications' | 'submissions' | 'payouts' | 'users' | 'register-mission' | 'traffic' | 'settings';
 
@@ -484,15 +485,14 @@ export default function OperatorDashboard() {
                         value={registerForm.maxParticipants} onChange={e => rf('maxParticipants', e.target.value)} />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">지역 (시) *</label>
-                      <input required className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
-                        value={registerForm.regionSi} onChange={e => rf('regionSi', e.target.value)} placeholder="예: 서울시" />
+                      <label className="block text-sm font-medium text-gray-700 mb-1">지역 (시·도) *</label>
+                      <ProvinceSelect required value={registerForm.regionSi} onChange={v => rf('regionSi', v)} />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">지역 (구) *</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">지역 (시·군·구) *</label>
                     <input required className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
-                      value={registerForm.regionGu} onChange={e => rf('regionGu', e.target.value)} placeholder="예: 마포구" />
+                      value={registerForm.regionGu} onChange={e => rf('regionGu', e.target.value)} placeholder="예: 청주시 상당구, 마포구" />
                   </div>
                   <div className="grid grid-cols-3 gap-4">
                     {([['startDate', '시작일 *'], ['endDate', '종료일 *'], ['submissionDeadline', '제출 마감일 *']] as const).map(([k, l]) => (
