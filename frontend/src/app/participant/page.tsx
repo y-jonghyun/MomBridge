@@ -6,6 +6,7 @@ import Link from 'next/link';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { ReviewGuideModal, PostCheckSummary } from '@/components/campaign/ReviewGuide';
+import ProvinceSelect from '@/components/common/ProvinceSelect';
 
 type Tab = 'missions' | 'my-applications' | 'my-submissions' | 'earnings' | 'community';
 
@@ -353,32 +354,9 @@ export default function ParticipantPage() {
                 <option value="REVIEW">리뷰</option>
                 <option value="VIDEO">영상</option>
               </select>
-              <select value={missionFilter.regionSi}
-                onChange={e => { const nf = { ...missionFilter, regionSi: e.target.value }; setMissionFilter(nf); loadMissions(nf); }}
-                className="border rounded-lg px-2 py-2 text-xs sm:text-sm bg-white focus:outline-none w-full">
-                <option value="">전체 지역</option>
-                <optgroup label="특별·광역시">
-                  <option value="서울시">서울</option>
-                  <option value="부산시">부산</option>
-                  <option value="대구시">대구</option>
-                  <option value="인천시">인천</option>
-                  <option value="광주시">광주</option>
-                  <option value="대전시">대전</option>
-                  <option value="울산시">울산</option>
-                  <option value="세종시">세종</option>
-                </optgroup>
-                <optgroup label="도">
-                  <option value="경기도">경기</option>
-                  <option value="강원도">강원</option>
-                  <option value="충청북도">충북</option>
-                  <option value="충청남도">충남</option>
-                  <option value="전북도">전북</option>
-                  <option value="전라남도">전남</option>
-                  <option value="경상북도">경북</option>
-                  <option value="경상남도">경남</option>
-                  <option value="제주도">제주</option>
-                </optgroup>
-              </select>
+              <ProvinceSelect value={missionFilter.regionSi} emptyLabel="전체 지역"
+                onChange={v => { const nf = { ...missionFilter, regionSi: v }; setMissionFilter(nf); loadMissions(nf); }}
+                className="border rounded-lg px-2 py-2 text-xs sm:text-sm bg-white focus:outline-none w-full" />
               <select value={missionFilter.sort}
                 onChange={e => { const nf = { ...missionFilter, sort: e.target.value }; setMissionFilter(nf); loadMissions(nf); }}
                 className="border rounded-lg px-2 py-2 text-xs sm:text-sm bg-white focus:outline-none w-full">
