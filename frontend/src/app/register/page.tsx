@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import api from '@/lib/api';
+import api, { apiErrorMessage } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { Role } from '@/store/auth';
 import { Suspense } from 'react';
@@ -26,8 +26,7 @@ function RegisterForm() {
       setAuth(data.data.user, data.data.accessToken, data.data.refreshToken);
       router.push('/missions');
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message;
-      setError(msg ?? '회원가입에 실패했습니다');
+      setError(apiErrorMessage(err, '회원가입에 실패했습니다'));
     } finally { setLoading(false); }
   }
 
