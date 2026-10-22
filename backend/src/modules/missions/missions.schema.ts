@@ -41,6 +41,7 @@ export const missionFieldsSchema = z.object({
   rewardAmount: z.coerce.number().min(0).max(100_000_000),
   rewardDescription: optionalText(5000),
   requirements: optionalText(5000),
+  visitGuide: optionalText(2000),
   startDate: z.coerce.date(),
   endDate: z.coerce.date(),
   submissionDeadline: z.coerce.date(),

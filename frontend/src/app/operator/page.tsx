@@ -28,7 +28,7 @@ export default function OperatorDashboard() {
   const [registerForm, setRegisterForm] = useState({
     clientProfileId: '', title: '', description: '', category: 'SNS',
     rewardAmount: '', maxParticipants: '5', regionSi: '', regionGu: '',
-    startDate: '', endDate: '', submissionDeadline: '', requirements: '',
+    startDate: '', endDate: '', submissionDeadline: '', requirements: '', visitGuide: '',
     sendPaymentLink: false,
   });
   const [registerSubmitting, setRegisterSubmitting] = useState(false);
@@ -110,7 +110,7 @@ export default function OperatorDashboard() {
       setRegisterForm({
         clientProfileId: '', title: '', description: '', category: 'SNS',
         rewardAmount: '', maxParticipants: '5', regionSi: '', regionGu: '',
-        startDate: '', endDate: '', submissionDeadline: '', requirements: '',
+        startDate: '', endDate: '', submissionDeadline: '', requirements: '', visitGuide: '',
         sendPaymentLink: false,
       });
     } catch (err: any) {
@@ -507,6 +507,12 @@ export default function OperatorDashboard() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">수행 조건 (선택)</label>
                     <textarea rows={2} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none resize-none"
                       value={registerForm.requirements} onChange={e => rf('requirements', e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">방문·예약 안내 (선택)</label>
+                    <textarea rows={3} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none resize-none"
+                      value={registerForm.visitGuide} onChange={e => rf('visitGuide', e.target.value)}
+                      placeholder={'한 줄에 하나씩. 예: 체험 가능: 평일 11:30~20:30 / 당일 예약 불가'} />
                   </div>
 
                   {/* 결제 옵션 */}

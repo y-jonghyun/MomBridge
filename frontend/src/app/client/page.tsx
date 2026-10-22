@@ -18,6 +18,7 @@ const defaultForm = {
   regionSi: '', regionGu: '',
   startDate: '', endDate: '', submissionDeadline: '',
   requirements: '',
+  visitGuide: '',
   destinationUrl: '',
 };
 
@@ -407,6 +408,13 @@ function ClientPageContent() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">수행 조건 (선택)</label>
                 <textarea rows={2} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none resize-none"
                   value={form.requirements} onChange={e => f('requirements', e.target.value)} placeholder="예: 인스타그램 팔로워 500명 이상, 게시물 24시간 이상 유지" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">방문·예약 안내 (선택)</label>
+                <textarea rows={3} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none resize-none"
+                  value={form.visitGuide} onChange={e => f('visitGuide', e.target.value)}
+                  placeholder={'한 줄에 하나씩 적어 주세요. 예:\n체험 가능: 평일 11:30~20:30\n당일 예약 불가, 전화로 예약 후 방문'} />
+                <p className="text-xs text-gray-400 mt-1">비워 두면 미션 상세에 이 안내가 표시되지 않습니다.</p>
               </div>
               {form.rewardAmount && form.maxParticipants && (
                 <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
