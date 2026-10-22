@@ -2,10 +2,10 @@ import { z } from 'zod';
 
 /** 약관·방침 문서 버전(시행일). 문서를 바꾸면 여기와 프론트 /terms·/privacy의 시행일을 함께 올린다 */
 export const CONSENT_VERSION = {
-  AGE_14: '2026-10-22',
-  TERMS: '2026-10-22',
-  PRIVACY: '2026-10-22',
-  MARKETING: '2026-10-22',
+  AGE_14: '2026-10-23',
+  TERMS: '2026-10-23',
+  PRIVACY: '2026-10-23',
+  MARKETING: '2026-10-23',
 } as const;
 
 const mustAgree = (message: string) => z.literal(true, { errorMap: () => ({ message }) });

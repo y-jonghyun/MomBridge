@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
-import { Fill, LegalPage, Section } from '@/components/legal/LegalPage';
-import { TERMS_EFFECTIVE_DATE } from '@/lib/legal';
+import { BusinessValue, LegalPage, Section } from '@/components/legal/LegalPage';
+import { BUSINESS_INFO, GOVERNING_COURT, TERMS_EFFECTIVE_DATE } from '@/lib/legal';
 
 export const metadata: Metadata = { title: '이용약관 — 맘브릿지' };
 
@@ -9,7 +9,7 @@ export default function TermsPage() {
   return (
     <LegalPage title="이용약관" effectiveDate={TERMS_EFFECTIVE_DATE}>
       <Section title="제1조 (목적)">
-        <p>이 약관은 <Fill>상호</Fill>(이하 &quot;회사&quot;)가 운영하는 맘브릿지(이하 &quot;서비스&quot;)의 이용 조건과 절차, 회사와 회원의 권리·의무를 정합니다.</p>
+        <p>이 약관은 {BUSINESS_INFO.name}(이하 &quot;회사&quot;)가 운영하는 맘브릿지 서비스(이하 &quot;서비스&quot;)의 이용 조건과 절차, 회사와 회원의 권리·의무를 정합니다.</p>
       </Section>
 
       <Section title="제2조 (정의)">
@@ -52,12 +52,30 @@ export default function TermsPage() {
         <ul className="list-disc pl-5 space-y-1">
           <li>고객사는 미션 내용(제공 상품, 방문 조건 등)을 사실대로 입력하고, 선정된 체험단원에게 약속한 체험을 제공해야 합니다.</li>
           <li>미션 대금은 미션 등록 시 결제하며, 결제가 확인된 미션만 공개됩니다.</li>
-          <li>환불: <Fill>미션 공개 전·모집 중·체험 진행 후 단계별 환불 기준을 정해 기재</Fill></li>
+          <li>
+            환불 기준은 미션의 진행 단계에 따릅니다.
+            <ol className="list-decimal pl-5 mt-1 space-y-1">
+              <li>미션 공개 전 취소: 전액 환불</li>
+              <li>모집 중 취소: 선정된 체험단원이 없으면 전액 환불, 이미 선정된 경우 선정 인원분을 뺀 나머지를 환불</li>
+              <li>모집 마감 후 정원 미달: 미달 인원분 환불</li>
+              <li>선정된 체험단원이 콘텐츠를 제출하지 않거나 최종 반려된 경우: 해당 인원분 환불</li>
+              <li>콘텐츠가 승인된 인원분: 환불 불가</li>
+              <li>고객사 귀책(약속한 체험을 제공하지 않거나 미션 내용이 사실과 다른 경우): 환불 불가. 회사는 이용을 제한할 수 있습니다.</li>
+              <li>회사 귀책이나 서비스 장애로 미션을 진행할 수 없는 경우: 전액 환불</li>
+              <li>환불은 요청일로부터 영업일 7일 이내에 결제한 수단으로 취소합니다.</li>
+            </ol>
+          </li>
         </ul>
       </Section>
 
       <Section title="제8조 (체험단원 보상)">
-        <p>회사는 고객사가 확인 기준을 충족한 콘텐츠를 승인하면 체험단원에게 보상을 지급합니다. 지급액, 플랫폼 수수료, 지급 시기·방법, 세금(사업소득 원천징수 등) 처리는 <Fill>정산 정책 확정 후 기재</Fill>에 따릅니다.</p>
+        <p>회사는 고객사가 확인 기준을 충족한 콘텐츠를 승인하면 체험단원에게 보상을 지급합니다. 지급액, 지급 시기·방법, 세금 처리는 다음과 같습니다.</p>
+        <ol className="list-decimal pl-5 space-y-1">
+          <li>지급액은 미션 보상금에서 플랫폼 수수료 10%와 세금(사업소득 3.3% 원천징수)을 뺀 금액입니다.</li>
+          <li>매월 말일까지 승인된 건을 다음 달 10일에 체험단원이 등록한 계좌로 지급합니다. 지급일이 휴일이면 다음 영업일에 지급합니다.</li>
+          <li>계좌를 등록하지 않았거나 계좌 정보가 잘못된 경우, 바르게 수정될 때까지 지급을 보류합니다.</li>
+          <li>승인된 콘텐츠는 최소 6개월 동안 유지해야 합니다. 지급 전에 삭제하면 지급이 취소되고, 지급 후 6개월 안에 삭제하면 회사는 지급액의 반환을 요청할 수 있습니다.</li>
+        </ol>
       </Section>
 
       <Section title="제9조 (게시물)">
@@ -73,12 +91,18 @@ export default function TermsPage() {
       </Section>
 
       <Section title="제12조 (분쟁 해결)">
-        <p>이 약관은 대한민국 법률에 따릅니다. 서비스 이용과 관련한 분쟁은 <Fill>관할 법원</Fill>을 관할 법원으로 합니다.</p>
+        <p>이 약관은 대한민국 법률에 따릅니다. 서비스 이용과 관련한 분쟁은 {GOVERNING_COURT}을 관할 법원으로 합니다.</p>
       </Section>
 
       <Section title="부칙">
         <p>이 약관은 {TERMS_EFFECTIVE_DATE}부터 시행합니다.</p>
-        <p className="text-gray-500">사업자 정보: <Fill>상호</Fill> · 대표 <Fill>대표자</Fill> · 사업자등록번호 <Fill>번호</Fill> · 통신판매업 신고 <Fill>번호</Fill> · <Fill>주소</Fill> · 문의 <Fill>이메일</Fill></p>
+        <p className="text-gray-500">
+          사업자 정보: {BUSINESS_INFO.name} · 대표 {BUSINESS_INFO.owner}
+          {' · '}사업자등록번호 <BusinessValue value={BUSINESS_INFO.registrationNumber} />
+          {' · '}통신판매업 신고 <BusinessValue value={BUSINESS_INFO.mailOrderNumber} />
+          {' · '}<BusinessValue value={BUSINESS_INFO.address} />
+          {' · '}문의 {BUSINESS_INFO.inquiryEmail}
+        </p>
       </Section>
     </LegalPage>
   );
