@@ -11,6 +11,7 @@ import {
   missionStatusSchema, expectedMissionAmount,
 } from './missions.schema';
 import { newCampaignCode, normalizeMissionKeywords, saveMissionKeywords } from './mission-extras';
+import { recruitingCutoff } from './mission-lifecycle';
 import { logger } from '../../utils/logger';
 
 const router = Router();
@@ -28,6 +29,8 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const where: any = {
       status: 'OPEN' as const,
       isVisible: true,
+      // 일 배치가 상태를 바꾸기 전(자정~03:30)에도 마감일이 지난 미션은 보이지 않게
+      endDate: { gte: recruitingCutoff() },
       ...(req.query.category && { category: req.query.category as never }),
       // 시·도 필터는 예전 표기('서울시', '충북')로 저장된 미션도 찾는다
       ...(req.query.regionSi && { regionSi: { in: provinceVariants(normalizeProvince(String(req.query.regionSi)) ?? String(req.query.regionSi)) } }),
