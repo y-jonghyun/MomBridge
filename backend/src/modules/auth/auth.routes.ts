@@ -6,10 +6,9 @@ import { AppError } from '../../middleware/errorHandler';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import * as authService from './auth.service';
-import rateLimit from 'express-rate-limit';
 import { confirmPasswordReset, requestPasswordReset } from './password-reset';
 import { parseInput } from '../../middleware/validate';
-import { loginPerEmail, loginPerIp, registerPerIp } from './auth-limits';
+import { loginPerEmail, loginPerIp, registerPerIp, resetConfirmPerIp, resetRequestPerIp } from './auth-limits';
 
 const router = Router();
 
@@ -45,10 +44,6 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
 });
 
 // ── 비밀번호 재설정 ──
-const resetLimiter = (limit: number) => rateLimit({
-  windowMs: 15 * 60_000, limit, standardHeaders: 'draft-7', legacyHeaders: false, validate: false,
-  handler: (_req, res) => res.status(429).json({ success: false, error: { code: 'TOO_MANY_ATTEMPTS', message: '시도 횟수가 너무 많습니다. 잠시 후 다시 시도해 주세요' } }),
-});
 const resetRequestSchema = z.object({ email: z.string().trim().email().max(320) });
 const resetConfirmSchema = z.object({
   token: z.string().min(20).max(200),
@@ -56,14 +51,14 @@ const resetConfirmSchema = z.object({
 });
 
 // 계정이 없어도 같은 응답 (가입 여부를 알려 주지 않음)
-router.post('/password-reset/request', resetLimiter(5), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/password-reset/request', resetRequestPerIp, async (req: Request, res: Response, next: NextFunction) => {
   try {
     await requestPasswordReset(parseInput(resetRequestSchema, req.body).email);
     res.json({ success: true, data: { message: '가입된 이메일이면 재설정 링크를 보냈습니다. 메일함을 확인해 주세요' } });
   } catch (e) { next(e); }
 });
 
-router.post('/password-reset/confirm', resetLimiter(20), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/password-reset/confirm', resetConfirmPerIp, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { token, newPassword } = parseInput(resetConfirmSchema, req.body);
     await confirmPasswordReset(token, newPassword);
