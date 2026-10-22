@@ -21,7 +21,7 @@ export default function PrivacyPage() {
               <tr><td className={td}>가입(필수)</td><td className={td}>이메일, 비밀번호(암호화 저장), 이름, 회원 유형</td><td className={td}>회원 식별, 로그인, 공지</td></tr>
               <tr><td className={td}>고객사(선택)</td><td className={td}>상호, 사업장 주소·지역, 업종, 연락처, 사업자등록번호</td><td className={td}>미션 등록·공개, 결제 안내 문자 발송</td></tr>
               <tr><td className={td}>체험단원</td><td className={td}>활동 지역, SNS 계정 주소, 제출한 콘텐츠 주소</td><td className={td}>미션 매칭·선정, 콘텐츠 확인</td></tr>
-              <tr><td className={td}>보상 지급</td><td className={td}>은행명, 계좌번호, 예금주, 주민등록번호(원천징수 신고용, 「소득세법」 근거)</td><td className={td}>보상 지급, 세금 신고</td></tr>
+              <tr><td className={td}>보상 지급</td><td className={td}>은행명, 계좌번호, 예금주. 보상이 원천징수 대상인 경우에는 첫 지급 전에 <b>주민등록번호</b>를 별도 동의를 받아 추가로 수집하고 암호화해 보관합니다(「소득세법」 근거)</td><td className={td}>보상 지급, 세금 신고</td></tr>
               <tr><td className={td}>결제(고객사)</td><td className={td}>주문번호, 결제 금액·일시 (카드 정보는 결제대행사가 처리하며 회사는 저장하지 않음)</td><td className={td}>결제 확인, 환불</td></tr>
               <tr><td className={td}>마케팅(선택)</td><td className={td}>이메일, 연락처</td><td className={td}>이벤트·새 미션 안내 (동의한 경우만)</td></tr>
             </tbody>
@@ -41,7 +41,7 @@ export default function PrivacyPage() {
         <ul className="list-disc pl-5 space-y-1">
           <li>회원 정보: 탈퇴 시까지. 탈퇴하면 바로 파기합니다(아래 법정 보관 정보 제외).</li>
           <li>「전자상거래 등에서의 소비자보호에 관한 법률」: 계약·청약철회·대금결제 기록 5년, 소비자 불만·분쟁 처리 기록 3년</li>
-          <li>「국세기본법」·「소득세법」: 보상 지급·원천징수 관련 기록(주민등록번호 포함) 5년</li>
+          <li>「국세기본법」·「소득세법」: 보상 지급·원천징수 관련 기록 5년. 주민등록번호는 위와 같이 원천징수 대상이 되어 수집한 경우에만 보관하며, 이때에도 같은 5년이 지나면 파기합니다.</li>
           <li>「통신비밀보호법」: 서비스 접속 기록 3개월</li>
           <li>추적 링크 방문 원본 기록: 90일 (이후 개인을 알아볼 수 없는 일별 합계만 보관)</li>
         </ul>
@@ -53,13 +53,13 @@ export default function PrivacyPage() {
           <table className="w-full border-collapse text-xs sm:text-sm">
             <thead><tr><th className={th}>시점</th><th className={th}>고객사에게 제공되는 체험단원 정보</th></tr></thead>
             <tbody>
-              <tr><td className={td}>미션 지원</td><td className={td}>이름, 이메일, 활동 지역(시·구·동), 자기소개, 지원 메시지, 누적 보상 금액, 수행한 미션 수, 평점</td></tr>
-              <tr><td className={td}>콘텐츠 제출</td><td className={td}>이름, 제출한 콘텐츠 주소(SNS·블로그 글)와 설명·첨부 파일 주소, 검수 상태, 대가 표시 확인 결과</td></tr>
-              <tr><td className={td}>성과 리포트</td><td className={td}>이름, 콘텐츠 주소, 추적 링크 클릭 수·방문자 수</td></tr>
+              <tr><td className={td}>미션 지원</td><td className={td}>제공하지 않습니다 — 고객사에게는 지원 건수와 승인 건수만 보입니다</td></tr>
+              <tr><td className={td}>콘텐츠 제출</td><td className={td}>이름, 제출한 게시글 주소(SNS·블로그)와 설명, 검수 상태</td></tr>
+              <tr><td className={td}>성과 리포트</td><td className={td}>이름, 게시글 주소, 대가 표시 확인 결과, 추적 링크 클릭 수·방문자 수</td></tr>
             </tbody>
           </table>
         </div>
-        <p>고객사에게 체험단원의 <b>연락처(전화번호), 계좌 정보, SNS 계정 정보, 접속 기록은 제공하지 않습니다.</b> 고객사가 발급한 공개 공유 링크로 성과 리포트를 보는 경우에는 체험단원의 이름이 가려진 상태(예: 홍*동)로 표시됩니다.</p>
+        <p>고객사에게 체험단원의 <b>이메일, 연락처(전화번호), 활동 지역, 자기소개, 지원 메시지, 누적 보상 금액, 수행한 미션 수, 평점, 계좌 정보, SNS 계정 정보, 접속 기록은 제공하지 않습니다.</b> 제출물에 올린 사진·파일과 운영자의 검수 메모도 제공하지 않습니다. 고객사가 발급한 공개 공유 링크로 성과 리포트를 보는 경우에는 체험단원의 이름이 가려진 상태(예: 홍*동)로 표시됩니다.</p>
       </Section>
 
       <Section title="5. 처리 위탁과 국외 이전">
