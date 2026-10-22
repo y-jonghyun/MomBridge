@@ -80,6 +80,8 @@ model User {
   profileImage String?   @db.VarChar(2048)
   isActive     Boolean   @default(true)
   isVerified   Boolean   @default(false)
+  /// 올리면 그 전에 발급된 리프레시 토큰이 모두 무효가 된다 (비밀번호 변경·비활성화)
+  tokenVersion Int       @default(0)
   lastLoginAt  DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt

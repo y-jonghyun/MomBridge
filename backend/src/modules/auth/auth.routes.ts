@@ -70,8 +70,11 @@ router.patch('/me/password', authenticate, async (req: Request, res: Response, n
     if (!valid) throw new AppError('INVALID_PASSWORD', 400, '현재 비밀번호가 올바르지 않습니다');
 
     const passwordHash = await bcrypt.hash(newPassword, env.BCRYPT_ROUNDS);
-    await prisma.user.update({ where: { id: req.user!.sub }, data: { passwordHash } });
-    res.json({ success: true });
+    // 다른 기기의 세션은 끊고, 지금 세션에는 새 토큰을 준다
+    const updated = await prisma.user.update({
+      where: { id: req.user!.sub }, data: { passwordHash, tokenVersion: { increment: 1 } },
+    });
+    res.json({ success: true, data: authService.signTokens(updated) });
   } catch (e) { next(e); }
 });
 
