@@ -11,6 +11,12 @@ export const MAX_IMAGES = 5;
 export const MAX_BYTES = 5 * 1024 * 1024;
 /** 긴 변 기준으로 줄일 크기 */
 const MAX_EDGE = 1600;
+/**
+ * 디코딩할 픽셀 수 상한(4천만 화소).
+ * 파일이 5MB 이하여도 픽셀이 많으면(이른바 압축 폭탄) 디코딩에 수 GB가 들어
+ * Render 512MB 인스턴스가 그대로 죽는다. 헤더만 보고 먼저 거절한다.
+ */
+export const MAX_PIXELS = 40_000_000;
 const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 export function assertUploadable(file: { mimetype: string; size: number }) {
@@ -23,11 +29,32 @@ export function assertUploadable(file: { mimetype: string; size: number }) {
 }
 
 /**
+ * 헤더만 읽어 디코딩해도 되는 사진인지 본다 (픽셀을 풀지 않으므로 메모리를 쓰지 않는다).
+ * toWebp에도 같은 상한을 걸어 두지만, 여기서 걸러야 어떤 이유로 막혔는지 알려줄 수 있다.
+ */
+export async function assertDecodable(input: Buffer) {
+  let pixels = 0;
+  try {
+    const meta = await sharp(input, { limitInputPixels: false }).metadata();
+    pixels = (meta.width ?? 0) * (meta.height ?? 0);
+  } catch {
+    throw new AppError('UNSUPPORTED_IMAGE', 400, '사진을 읽을 수 없습니다. 다른 파일로 올려 주세요');
+  }
+  if (!pixels) throw new AppError('UNSUPPORTED_IMAGE', 400, '사진을 읽을 수 없습니다. 다른 파일로 올려 주세요');
+  if (pixels > MAX_PIXELS) {
+    throw new AppError(
+      'IMAGE_TOO_MANY_PIXELS', 400,
+      `사진의 해상도가 너무 큽니다 (${MAX_PIXELS / 1_000_000}백만 화소까지). 줄여서 올려 주세요`,
+    );
+  }
+}
+
+/**
  * 긴 변 1600px로 줄이고 webp로 바꾼다.
  * sharp는 기본적으로 메타데이터를 들고 가지 않으므로, 결과물에는 EXIF(촬영 위치 등)가 남지 않는다.
  */
 export async function toWebp(input: Buffer): Promise<Buffer> {
-  return sharp(input, { failOn: 'error' })
+  return sharp(input, { failOn: 'error', limitInputPixels: MAX_PIXELS })
     .rotate() // EXIF 방향만 반영해 돌려놓고 메타데이터는 버린다
     .resize({ width: MAX_EDGE, height: MAX_EDGE, fit: 'inside', withoutEnlargement: true })
     .webp({ quality: 82 })
@@ -53,9 +80,10 @@ export async function addMissionImage(missionId: string, file: { buffer: Buffer;
     throw new AppError('STORAGE_UNAVAILABLE', 503, '사진 저장소가 설정되지 않았습니다. 운영자에게 문의해 주세요');
   }
   assertUploadable(file);
+  await assertDecodable(file.buffer);
 
-  const count = await prisma.missionImage.count({ where: { missionId } });
-  if (count >= MAX_IMAGES) {
+  // 흔한 경우를 먼저 걸러 쓸데없는 변환·업로드를 막는다 (최종 판단은 아래 트랜잭션에서 한다)
+  if ((await prisma.missionImage.count({ where: { missionId } })) >= MAX_IMAGES) {
     throw new AppError('TOO_MANY_IMAGES', 400, `사진은 최대 ${MAX_IMAGES}장까지 올릴 수 있습니다`);
   }
 
@@ -69,9 +97,28 @@ export async function addMissionImage(missionId: string, file: { buffer: Buffer;
   const path = storagePathFor(missionId);
   const url = await uploadObject(path, webp, 'image/webp');
 
-  const image = await prisma.missionImage.create({
-    data: { missionId, url, storagePath: path, sortOrder: count },
-  });
+  let image;
+  try {
+    image = await prisma.$transaction(async tx => {
+      // 동시에 여러 장이 들어와도 5장을 넘지 않게 미션 행을 잠근 뒤 센다.
+      // (사진 행에 거는 게 아니라 미션 행에 걸어야 아직 없는 행끼리도 줄을 선다)
+      await tx.$queryRaw`SELECT id FROM missions WHERE id = ${missionId}::uuid FOR UPDATE`;
+      const count = await tx.missionImage.count({ where: { missionId } });
+      if (count >= MAX_IMAGES) {
+        throw new AppError('TOO_MANY_IMAGES', 400, `사진은 최대 ${MAX_IMAGES}장까지 올릴 수 있습니다`);
+      }
+      return tx.missionImage.create({ data: { missionId, url, storagePath: path, sortOrder: count } });
+    });
+  } catch (err) {
+    // 자리를 얻지 못했으니 방금 올린 파일은 저장소에 남기지 않는다
+    try {
+      await deleteObject(path);
+    } catch (cleanupErr) {
+      logger.warn('mission image file left in storage', { missionId, path, error: (cleanupErr as Error).message });
+    }
+    throw err;
+  }
+
   await syncThumbnail(missionId);
   return image;
 }

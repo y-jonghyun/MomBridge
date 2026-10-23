@@ -20,7 +20,7 @@
 | 추적 링크·클릭 기록·일 집계 | 다루지 않는다 |
 | 알림·동의 기록·비밀번호 재설정 토큰 | 다루지 않는다 |
 | 운영 설정(`platform_settings`) | 다루지 않는다 |
-| 미션 사진(저장소 파일) | 다루지 않는다 |
+| 미션 사진(저장소 파일) | **다룬다** — `delete` 명령이 미션을 지우기 전에 버킷 파일도 지운다 |
 
 **결론: 운영자 계정만 남기는 전체 초기화에는 별도 절차가 필요하다.** 미션 몇 건만 걷어낼 때는 기존 스크립트로 충분하다.
 
@@ -51,6 +51,7 @@ SELECT id, email, name FROM users WHERE role = 'OPERATOR' AND "isActive";
 > 아래는 **계획**이다. 실제로는 한 트랜잭션으로 묶고, 각 단계 뒤에 건수를 찍어 확인하면서 진행한다.
 
 1. **저장소 파일 먼저** — DB를 지우면 `mission_images.storagePath`를 잃어 버려 버킷에 고아 파일이 남는다.
+   (`missions:cleanup delete`로 지울 때는 스크립트가 알아서 먼저 지운다. 아래는 SQL로 전체를 비울 때의 절차다.)
    ```sql
    SELECT "storagePath" FROM mission_images;   -- 목록을 받아 두고 버킷에서 지운다
    ```

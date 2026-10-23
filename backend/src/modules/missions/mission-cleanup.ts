@@ -1,5 +1,7 @@
 import { prisma } from '../../config/database';
 import { clock } from '../../lib/clock';
+import { deleteObject, storageConfigured } from '../../lib/storage';
+import { logger } from '../../utils/logger';
 
 /**
  * 데모·임시 미션 정리 (운영 스크립트 scripts/cleanup-missions가 사용).
@@ -70,15 +72,53 @@ export async function checkDeletable(ids: string[]): Promise<DeleteCheck[]> {
   });
 }
 
+/**
+ * 미션에 딸린 사진을 저장소에서 지운다.
+ * 사진 행은 미션과 함께 CASCADE로 사라지므로, 행이 남아 있는 지금 경로를 읽어 먼저 지워야
+ * 저장소에 주인 없는 파일이 남지 않는다.
+ */
+export async function purgeMissionImageFiles(missionIds: string[]): Promise<{ removed: number; failed: number }> {
+  if (!missionIds.length) return { removed: 0, failed: 0 };
+  const images = await prisma.missionImage.findMany({
+    where: { missionId: { in: missionIds } },
+    select: { missionId: true, storagePath: true },
+  });
+  if (!images.length) return { removed: 0, failed: 0 };
+  if (!storageConfigured()) {
+    // 저장소 설정이 없으면 지울 수단이 없다 — 지우지 못한 경로를 남겨 수동으로 치울 수 있게 한다
+    logger.warn('storage not configured — mission image files left behind', { count: images.length });
+    return { removed: 0, failed: images.length };
+  }
+
+  let removed = 0, failed = 0;
+  for (const image of images) {
+    try {
+      await deleteObject(image.storagePath);
+      removed++;
+    } catch (err) {
+      failed++;
+      logger.warn('mission image file left in storage', {
+        missionId: image.missionId, path: image.storagePath, error: (err as Error).message,
+      });
+    }
+  }
+  return { removed, failed };
+}
+
 /** 삭제 가능한 미션만 지원 기록과 함께 삭제한다 (키워드·추적 링크·클릭·공유 링크는 DB에서 함께 삭제됨) */
-export async function deleteMissions(ids: string[]): Promise<{ deleted: string[]; refused: DeleteCheck[] }> {
+export async function deleteMissions(
+  ids: string[],
+): Promise<{ deleted: string[]; refused: DeleteCheck[]; imageFiles: { removed: number; failed: number } }> {
   const checks = await checkDeletable(ids);
   const deletable = checks.filter(c => c.ok).map(c => c.id);
+  let imageFiles = { removed: 0, failed: 0 };
   if (deletable.length) {
+    // DB보다 저장소를 먼저 — 행이 사라지면 어떤 파일을 지워야 할지 알 수 없다
+    imageFiles = await purgeMissionImageFiles(deletable);
     await prisma.$transaction([
       prisma.application.deleteMany({ where: { missionId: { in: deletable } } }),
       prisma.mission.deleteMany({ where: { id: { in: deletable }, paymentStatus: { not: 'PAID' }, submissions: { none: {} } } }),
     ]);
   }
-  return { deleted: deletable, refused: checks.filter(c => !c.ok) };
+  return { deleted: deletable, refused: checks.filter(c => !c.ok), imageFiles };
 }

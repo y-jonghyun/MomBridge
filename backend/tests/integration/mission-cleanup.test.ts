@@ -1,3 +1,12 @@
+/** 저장소 호출을 가로채 어떤 파일이 지워졌는지 본다 */
+const storageFiles = new Set<string>();
+jest.mock('../../src/lib/storage', () => ({
+  storageConfigured: () => true,
+  publicUrl: (path: string) => `https://storage.test.example/${path}`,
+  uploadObject: jest.fn(),
+  deleteObject: jest.fn(async (path: string) => { storageFiles.delete(path); }),
+}));
+
 import { describeDb, resetDb, prisma } from '../helpers/db';
 import { createClient, createMission, createParticipant, createTrackingLink } from '../helpers/factory';
 import { clock } from '../../src/lib/clock';
@@ -38,8 +47,21 @@ describeDb('미션 정리', () => {
     const app = await prisma.application.create({ data: { missionId: withSubmission.id, participantId: p.profile.id, status: 'APPROVED' } });
     await prisma.submission.create({ data: { missionId: withSubmission.id, applicationId: app.id, participantId: p.profile.id, contentUrl: 'https://blog.naver.com/a/1' } as never });
 
+    // 지워질 미션과 남을 미션에 각각 사진을 하나씩 둔다
+    storageFiles.clear();
+    for (const [mission, path] of [[demo, 'demo/a.webp'], [paid, 'paid/b.webp']] as const) {
+      storageFiles.add(path);
+      await prisma.missionImage.create({
+        data: { missionId: mission.id, url: `https://storage.test.example/${path}`, storagePath: path, sortOrder: 0 },
+      });
+    }
+
     const result = await deleteMissions([demo.id, paid.id, withSubmission.id, '00000000-0000-4000-8000-000000000000']);
     expect(result.deleted).toEqual([demo.id]);
+    // 지워진 미션의 사진 파일만 저장소에서 사라진다
+    expect(result.imageFiles).toEqual({ removed: 1, failed: 0 });
+    expect([...storageFiles]).toEqual(['paid/b.webp']);
+    expect(await prisma.missionImage.count({ where: { missionId: demo.id } })).toBe(0);
     expect(result.refused.map(r => r.id)).toEqual([paid.id, withSubmission.id, '00000000-0000-4000-8000-000000000000']);
     expect(await prisma.mission.findUnique({ where: { id: demo.id } })).toBeNull();
     expect(await prisma.trackingLink.count({ where: { missionId: demo.id } })).toBe(0);

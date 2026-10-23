@@ -3,7 +3,10 @@ import sharp from 'sharp';
 import app from '../../src/app';
 import { describeDb, resetDb, prisma } from '../helpers/db';
 import { createClient, createMission, createOperator, createParticipant } from '../helpers/factory';
-import { toWebp } from '../../src/modules/missions/mission-images';
+import { MAX_IMAGES, toWebp } from '../../src/modules/missions/mission-images';
+
+/** 라우터의 업로드 횟수 제한과 같은 값 */
+const UPLOAD_LIMIT = 30;
 
 /** 올라간 파일을 저장소 대신 메모리에 담아 두고 확인한다 */
 const uploaded = new Map<string, Buffer>();
@@ -46,6 +49,9 @@ describeDb('미션 사진 업로드', () => {
     missionId = mission.id;
   });
   afterAll(() => prisma.$disconnect());
+
+  const bare2 = (token: string) => request(app).post(`/api/v1/missions/${missionId}/images`)
+    .set('Authorization', `Bearer ${token}`);
 
   const post = (token: string, body: Buffer, name = 'photo.jpg', type = 'image/jpeg') =>
     request(app).post(`/api/v1/missions/${missionId}/images`)
@@ -100,6 +106,67 @@ describeDb('미션 사진 업로드', () => {
     expect(meta.width).toBe(1600);
     expect(meta.exif).toBeUndefined();
   });
+
+  it('5MB 이하라도 픽셀이 너무 많으면 거절한다 (압축 폭탄)', async () => {
+    // 단색 PNG라 파일은 작지만 8000x6000 = 4800만 화소 — 풀어 놓으면 수백 MB다
+    const bomb = await sharp({ create: { width: 8000, height: 6000, channels: 3, background: { r: 1, g: 2, b: 3 } } })
+      .png({ compressionLevel: 9 })
+      .toBuffer();
+    expect(bomb.length).toBeLessThan(5 * 1024 * 1024);
+
+    const res = await post(client.token, bomb, 'bomb.png', 'image/png');
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('IMAGE_TOO_MANY_PIXELS');
+    expect(await prisma.missionImage.count()).toBe(0);
+    expect(uploaded.size).toBe(0); // 저장소까지 가지 않는다
+  }, 30_000);
+
+  it('동시에 올려도 5장을 넘지 않는다', async () => {
+    const photo = await jpegWithExif(400, 300);
+    const results = await Promise.all(Array.from({ length: 8 }, () => post(client.token, photo)));
+
+    expect(results.filter(r => r.status === 201)).toHaveLength(MAX_IMAGES);
+    expect(results.filter(r => r.status === 400 && r.body.error.code === 'TOO_MANY_IMAGES')).toHaveLength(3);
+    expect(await prisma.missionImage.count()).toBe(MAX_IMAGES);
+
+    // 자리를 얻지 못한 요청이 올린 파일은 저장소에 남지 않는다
+    const rows = await prisma.missionImage.findMany({ select: { storagePath: true, sortOrder: true } });
+    expect(uploaded.size).toBe(MAX_IMAGES);
+    expect(rows.every(r => uploaded.has(r.storagePath))).toBe(true);
+    expect([...rows].map(r => r.sortOrder).sort()).toEqual([0, 1, 2, 3, 4]);
+  }, 30_000);
+
+  it('권한이 없으면 파일을 읽기 전에 막는다', async () => {
+    // 닫는 경계가 없는 망가진 multipart 본문. multer가 먼저 돌면 본문을 읽다 400이 나고,
+    // 권한 확인이 먼저 돌면 본문을 읽지 않으므로 403이 난다
+    const CRLF = '\r\n';
+    const broken = `------X${CRLF}Content-Disposition: form-data; name="image"; filename="a.jpg"${CRLF}${CRLF}조각난 본문`;
+    const send = (token: string) => request(app).post(`/api/v1/missions/${missionId}/images`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'multipart/form-data; boundary=----X')
+      .send(broken);
+
+    // 주인이 보내면 multer까지 가서 본문이 깨졌다는 400이 난다
+    expect((await send(client.token)).status).toBe(400);
+    // 남의 미션이면 본문을 읽기 전에 막힌다
+    expect((await send(other.token)).status).toBe(403);
+  }, 20_000);
+
+  it('한 사람이 너무 많이 올리면 429로 막는다', async () => {
+    // 제한은 파일을 읽기 전에 걸리므로, 파일 없이 보내도 횟수는 똑같이 센다
+    const bare = () => request(app).post(`/api/v1/missions/${missionId}/images`)
+      .set('Authorization', `Bearer ${client.token}`);
+
+    for (let i = 0; i < UPLOAD_LIMIT; i++) {
+      expect((await bare()).status).toBe(400); // 파일이 없어서 400 — 제한에는 걸리지 않았다
+    }
+    const over = await bare();
+    expect(over.status).toBe(429);
+    expect(over.body.error.code).toBe('TOO_MANY_UPLOADS');
+
+    // 다른 사람은 영향을 받지 않는다 (사용자별 제한)
+    expect((await bare2(operator.token)).status).toBe(400);
+  }, 60_000);
 
   it('첫 장이 대표 사진이 되고, 순서를 바꾸면 대표도 따라간다', async () => {
     const photo = await jpegWithExif(600, 400);
