@@ -4,6 +4,7 @@ import { prisma } from '../../config/database';
 import { env } from '../../config/env';
 import { AppError } from '../../middleware/errorHandler';
 import { UserRole } from '../../middleware/auth';
+import { normalizePhone } from '../../lib/phone';
 
 /** 이메일은 소문자로 저장·비교한다 (대소문자만 다른 중복 계정 방지) */
 export const normalizeEmail = (email: string) => email.trim().toLowerCase();
@@ -23,31 +24,66 @@ export function signTokens(user: TokenUser) {
 }
 
 export async function register(body: {
-  email: string; password: string; name: string; role: UserRole; phone?: string;
+  email: string; password: string; name: string; role: UserRole; phone: string;
 }) {
   const email = normalizeEmail(body.email);
+  const phone = normalizePhone(body.phone);
   if (await findUserByEmail(email)) throw new AppError('EMAIL_EXISTS', 409, '이미 사용 중인 이메일입니다');
+  if (await prisma.user.findUnique({ where: { phone } })) throw phoneTaken();
 
   const passwordHash = await bcrypt.hash(body.password, env.BCRYPT_ROUNDS);
   // 사용자와 프로필을 한 번에 만든다 (중첩 create는 한 트랜잭션) — 프로필 없는 계정이 남지 않게
-  const user = await prisma.user.create({
-    data: {
-      email, passwordHash, name: body.name, role: body.role,
-      ...(body.role === 'PARTICIPANT' && { participantProfile: { create: { regionSi: '', regionGu: '' } } }),
-      ...(body.role === 'CLIENT' && {
-        clientProfile: {
-          create: {
-            businessName: body.name, category: '', address: '', regionSi: '', regionGu: '',
-            ...(body.phone ? { contactPhone: body.phone } : {}),
-          },
-        },
-      }),
-    },
-    select: { id: true, email: true, name: true, role: true, createdAt: true, tokenVersion: true },
-  });
+  const user = await createUserWithProfile({ email, passwordHash, name: body.name, role: body.role, phone });
 
   const { tokenVersion, ...publicUser } = user;
   return { user: publicUser, ...signTokens({ ...user, tokenVersion }) };
+}
+
+/** 번호가 겹칠 때의 응답. 가입 여부를 넘겨짚지 못하도록 문구는 한 가지만 쓴다 */
+const phoneTaken = () => new AppError('PHONE_EXISTS', 409, '이미 가입된 번호예요');
+
+/** 유일 제약과 부딪히는 순간(동시 가입)에도 같은 응답을 주도록 한곳에서 만든다 */
+async function createUserWithProfile(input: {
+  email: string; passwordHash: string; name: string; role: UserRole; phone: string;
+}) {
+  try {
+    // 사용자와 프로필을 한 번에 만든다 (중첩 create는 한 트랜잭션) — 프로필 없는 계정이 남지 않게
+    return await prisma.user.create({
+      data: {
+        email: input.email, passwordHash: input.passwordHash, name: input.name, role: input.role, phone: input.phone,
+        ...(input.role === 'PARTICIPANT' && { participantProfile: { create: { regionSi: '', regionGu: '' } } }),
+        ...(input.role === 'CLIENT' && {
+          clientProfile: { create: { businessName: input.name, category: '', address: '', regionSi: '', regionGu: '' } },
+        }),
+      },
+      select: { id: true, email: true, name: true, role: true, createdAt: true, tokenVersion: true },
+    });
+  } catch (err) {
+    if (isUniqueViolation(err, 'phone')) throw phoneTaken();
+    if (isUniqueViolation(err, 'email')) throw new AppError('EMAIL_EXISTS', 409, '이미 사용 중인 이메일입니다');
+    throw err;
+  }
+}
+
+/** Prisma의 유일 제약 위반(P2002)인지, 어느 칸 때문인지 */
+export function isUniqueViolation(err: unknown, field: string): boolean {
+  const e = err as { code?: string; meta?: { target?: unknown } };
+  if (e?.code !== 'P2002') return false;
+  const target = e.meta?.target;
+  const names = Array.isArray(target) ? target.map(String) : [String(target ?? '')];
+  return names.some(n => n === field || n.endsWith(`_${field}_key`));
+}
+
+/** 내 번호 바꾸기 — 다른 사람이 쓰는 번호면 가입 때와 같은 문구로 거절한다 */
+export async function changePhone(userId: string, rawPhone: string) {
+  const phone = normalizePhone(rawPhone);
+  try {
+    await prisma.user.update({ where: { id: userId }, data: { phone, phoneVerifiedAt: null } });
+  } catch (err) {
+    if (isUniqueViolation(err, 'phone')) throw phoneTaken();
+    throw err;
+  }
+  return phone;
 }
 
 export async function login(body: { email: string; password: string }) {

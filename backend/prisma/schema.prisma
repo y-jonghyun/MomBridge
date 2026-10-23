@@ -94,7 +94,10 @@ model User {
   passwordHash String    @db.VarChar(255)
   role         UserRole
   name         String    @db.VarChar(100)
-  phone        String?   @db.VarChar(20)
+  /// 숫자만 저장한다(01012345678). 가입 때 받는 값이라 비는 경우는 스크립트로 만든 운영자 계정뿐이다
+  phone        String?   @unique @db.VarChar(20)
+  /// 문자 인증을 붙일 자리. 지금은 늘 null이다
+  phoneVerifiedAt DateTime?
   profileImage String?   @db.VarChar(2048)
   isActive     Boolean   @default(true)
   isVerified   Boolean   @default(false)
@@ -175,7 +178,6 @@ model ClientProfile {
   regionGu       String   @db.VarChar(50)
   regionDong     String?  @db.VarChar(50)
   contactEmail   String?  @db.VarChar(320)
-  contactPhone   String?  @db.VarChar(20)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

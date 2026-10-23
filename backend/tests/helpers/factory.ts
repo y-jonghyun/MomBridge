@@ -7,13 +7,17 @@ import { randomCampaignCode } from '../../src/lib/random';
 let seq = 0;
 const next = () => `${Date.now().toString(36)}${(seq++).toString(36)}`;
 
+/** 겹치지 않는 휴대폰 번호 (users.phone이 유일 제약) */
+let phoneSeq = 0;
+export const nextPhone = () => `010${String(++phoneSeq).padStart(8, '0')}`;
+
 export function tokenFor(user: { id: string; email: string; role: UserRole }) {
   return jwt.sign({ sub: user.id, email: user.email, role: user.role }, env.JWT_ACCESS_SECRET, { expiresIn: '15m' });
 }
 
 export async function createUser(role: UserRole, name = '테스트') {
   const user = await prisma.user.create({
-    data: { email: `${role.toLowerCase()}-${next()}@test.local`, passwordHash: 'x', role, name },
+    data: { email: `${role.toLowerCase()}-${next()}@test.local`, passwordHash: 'x', role, name, phone: nextPhone() },
   });
   return { user, token: tokenFor({ id: user.id, email: user.email, role }) };
 }
