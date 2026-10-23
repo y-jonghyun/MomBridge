@@ -10,7 +10,7 @@ import MissionGallery from '@/components/missions/MissionGallery';
 import { BUSINESS_LABEL, MOM_TAG_LABEL } from '@/components/missions/MissionBrowser';
 import { useBookmarks } from '@/lib/bookmarks';
 import { toLines } from '@/lib/lines';
-import { payoutLabel } from '@/lib/payout';
+import { PAYOUT_DELAY_HINT, payoutLabel } from '@/lib/payout';
 
 /** 기준: docs/design/mombridge-design/cream-editorial-v1.md 3번 '미션 상세' + Detail.html */
 
@@ -122,7 +122,11 @@ export default function MissionDetailPage() {
       current: !isOpen,
     },
     // 약관 제8조에 따른 예정일. 휴일 보정까지 서버가 계산해 내려준다 (backend/src/lib/payout.ts)
-    { label: '보상 지급', when: mission.payoutDueDate ? `늦어도 ${payoutLabel(new Date(mission.payoutDueDate))}` : null },
+    {
+      label: '보상 지급',
+      when: mission.payoutDueDate ? `${payoutLabel(new Date(mission.payoutDueDate))} 지급 예정` : null,
+      hint: mission.payoutDueDate ? PAYOUT_DELAY_HINT : null,
+    },
   ];
 
   const requirements = toLines(mission.requirements);

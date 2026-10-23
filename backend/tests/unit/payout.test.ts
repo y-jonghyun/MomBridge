@@ -33,6 +33,12 @@ describe('보상 지급일', () => {
     expect(iso(payoutDueDate(at(2027, 9, 15)))).toBe('2027-10-12');
   });
 
+  it('10일이 설날 연휴면 연휴가 끝난 뒤 영업일로 미룬다', () => {
+    // 2032년 설날은 2/11(수) → 연휴 2/10~2/12, 지급은 2/13(금)
+    expect(isBusinessDay(at(2032, 2, 10))).toBe(false);
+    expect(iso(payoutDueDate(at(2032, 1, 20)))).toBe('2032-02-13');
+  });
+
   it('공휴일 판정', () => {
     expect(isBusinessDay(at(2026, 1, 1))).toBe(false);   // 신정
     expect(isBusinessDay(at(2026, 12, 25))).toBe(false); // 성탄절(금)

@@ -13,7 +13,7 @@ import { formatPhone, isMobilePhone, phoneDigits } from '@/lib/phone';
 import { MissionCard } from '@/components/ui';
 import { toCardData, type MissionListItem } from '@/components/missions/MissionBrowser';
 import { useBookmarks } from '@/lib/bookmarks';
-import { fetchNextPayoutDate, payoutLabel } from '@/lib/payout';
+import { PAYOUT_DELAY_HINT, fetchNextPayoutDate, payoutLabel } from '@/lib/payout';
 
 /** 기준: docs/design/mombridge-design/cream-editorial-v1.md 3번 '참여자 내 활동' + Participant.html */
 
@@ -312,7 +312,7 @@ export default function ParticipantPage() {
           <span className="font-accent text-sm italic text-[#D9A27F]">This month</span>
           <p className="mt-1 text-[13px] text-[#CFC4B4]">
             {payoutDay
-              ? (pendingPay.length > 0 ? `${payoutDay}에 받을 보상` : `다음 정산일 ${payoutDay}`)
+              ? (pendingPay.length > 0 ? `${payoutDay} 지급 예정인 보상` : `다음 정산일 ${payoutDay} 지급 예정`)
               : '받을 보상'}
           </p>
           <p className="mt-1 font-serif text-hero font-bold">{won(nextAmount)}</p>
@@ -323,6 +323,9 @@ export default function ParticipantPage() {
                 ? `승인된 ${approvedAwaitingPayout}건은 정산이 잡히면 금액이 표시돼요`
                 : '아직 정산 대기 중인 건이 없어요'}
           </p>
+          {payoutDay && (
+            <p className="mt-1.5 break-keep text-[11px] leading-[1.5] text-[#A89C8C]">{PAYOUT_DELAY_HINT}</p>
+          )}
           <div className="mt-[18px] grid grid-cols-3 border-t border-[#3A332B] pt-3.5">
             {[
               { label: '지원 중', value: String(applyingCount) },
@@ -411,9 +414,14 @@ export default function ParticipantPage() {
                           <p className="text-center text-[13px] text-muted">검수 중 · 보통 2일 안에 결과가 나와요</p>
                         )}
                         {sub?.status === 'APPROVED' && (
-                          <p className="text-center text-[13px] text-muted">
-                            {payoutDay ? `${payoutDay}에 지급될 예정이에요` : '정산일에 지급될 예정이에요'}
-                          </p>
+                          <div className="text-center">
+                            <p className="text-[13px] text-muted">
+                              {payoutDay ? `${payoutDay} 지급 예정이에요` : '정산일에 지급될 예정이에요'}
+                            </p>
+                            {payoutDay && (
+                              <p className="mt-0.5 break-keep text-[11px] leading-[1.5] text-muted">{PAYOUT_DELAY_HINT}</p>
+                            )}
+                          </div>
                         )}
                         <button
                           onClick={() => setGuideMissionId(a.missionId)}

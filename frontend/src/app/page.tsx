@@ -8,7 +8,7 @@ import { BottomTabBar, BottomTabBarSpacer, MissionCard, SectionHeader, SiteHeade
 import { ArrowRightIcon, ChevronDownIcon, PinIcon, SearchIcon } from '@/components/ui/icons';
 import { CATEGORY_LABEL, EMPTY_MESSAGE, toCardData, type MissionListItem } from '@/components/missions/MissionBrowser';
 import MissionEmptyBox from '@/components/missions/MissionEmptyBox';
-import { fetchNextPayoutDate, payoutLabel } from '@/lib/payout';
+import { PAYOUT_DELAY_HINT, fetchNextPayoutDate, payoutLabel } from '@/lib/payout';
 import { useBookmarks } from '@/lib/bookmarks';
 import SiteFooter from '@/components/legal/SiteFooter';
 
@@ -143,9 +143,14 @@ export default function Home() {
 
         {isParticipant && (
           <section className="mx-5 mt-4 flex items-center justify-between gap-4 rounded-box bg-ink p-5 text-paper">
-            <div>
+            <div className="min-w-0">
               <p className="text-xs text-[#CFC4B4]">내 다음 정산일</p>
-              <p className="mt-1 font-serif text-section font-bold">{payoutDay ?? '—'}</p>
+              <p className="mt-1 font-serif text-section font-bold">
+                {payoutDay ? `${payoutDay} 지급 예정` : '—'}
+              </p>
+              {payoutDay && (
+                <p className="mt-1 break-keep text-[11px] leading-[1.5] text-[#CFC4B4]">{PAYOUT_DELAY_HINT}</p>
+              )}
             </div>
             <Link href="/participant" className="flex h-11 shrink-0 items-center rounded-control bg-paper px-4 text-[13px] font-medium text-ink">
               내 활동 보기
