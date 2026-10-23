@@ -10,7 +10,7 @@ export interface CampaignReportData {
   devices: { mobile: number; pc: number; unknown: number };
   daily: { day: string; clicks: number; uniqueVisitors: number }[];
   ranking: {
-    linkCode: string; participantName: string; postUrl: string | null; submissionStatus: string | null;
+    linkCode: string; participantName: string; postUrl: string | null;
     disclosure: string; clicks: number; uniqueVisitors: number;
   }[];
   topReferers: { domain: string; clicks: number }[];
