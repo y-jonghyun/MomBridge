@@ -6,7 +6,7 @@ import Link from 'next/link';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { ReviewGuideModal, PostCheckSummary } from '@/components/campaign/ReviewGuide';
-import ProvinceSelect from '@/components/common/ProvinceSelect';
+import MissionBrowser from '@/components/missions/MissionBrowser';
 
 type Tab = 'missions' | 'my-applications' | 'my-submissions' | 'earnings' | 'community';
 
@@ -27,7 +27,6 @@ export default function ParticipantPage() {
   const clearAuth = useAuthStore((s) => s.clearAuth);
   const [hydrated, setHydrated] = useState(false);
   const [tab, setTab] = useState<Tab>('missions');
-  const [missions, setMissions] = useState<any[]>([]);
   const [applications, setApplications] = useState<any[]>([]);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [earnings, setEarnings] = useState<any[]>([]);
@@ -66,7 +65,8 @@ export default function ParticipantPage() {
     if (!hydrated) return;
     if (!user) { router.push('/login'); return; }
     if (user.role !== 'PARTICIPANT' && user.role !== 'OPERATOR') { router.push('/'); return; }
-    loadMissions(missionFilter);
+    // 미션 목록은 MissionBrowser가 직접 불러온다
+    setLoading(false);
     loadNotifications();
     // 이미 로그인해 있던 체험단원도 본인 클릭 표시를 받는다 (만료 연장 겸)
     if (user.role === 'PARTICIPANT') void syncSelfClickCookie();
@@ -88,17 +88,6 @@ export default function ParticipantPage() {
     } catch { }
   }
 
-  async function loadMissions(f: typeof missionFilter) {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({ sort: f.sort });
-      if (f.category) params.set('category', f.category);
-      if (f.regionSi) params.set('regionSi', f.regionSi);
-      if (f.keyword) params.set('keyword', f.keyword);
-      const r = await api.get(`/missions?${params}`);
-      setMissions(r.data.data.missions);
-    } catch { } finally { setLoading(false); }
-  }
 
   const loadedTabs = useState<Set<Tab>>(() => new Set<Tab>())[0];
 
@@ -212,8 +201,6 @@ export default function ParticipantPage() {
     return new Date(date).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
   }
 
-  const [missionFilter, setMissionFilter] = useState({ category: '', regionSi: '', sort: 'NEWEST', keyword: '' });
-  const [searchInput, setSearchInput] = useState('');
 
   if (!hydrated || !user) return (
     <div className="min-h-screen bg-stone-50">
@@ -305,7 +292,7 @@ export default function ParticipantPage() {
         <div className="overflow-x-auto -mx-3 sm:mx-0 mb-4 sm:mb-6">
           <div className="flex gap-1 bg-white rounded-xl p-1 shadow-sm mx-3 sm:mx-0 min-w-max sm:min-w-0">
             {tabs.map(t => (
-              <button key={t.key} onClick={() => { setTab(t.key); if (t.key === 'missions') loadMissions(missionFilter); else loadTab(t.key); }}
+              <button key={t.key} onClick={() => { setTab(t.key); if (t.key !== 'missions') loadTab(t.key); }}
                 className={`flex-shrink-0 sm:flex-1 px-3 sm:px-2 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${tab === t.key ? 'bg-slate-700 text-white' : 'text-gray-600 hover:bg-stone-50'}`}>
                 {t.label}
               </button>
@@ -335,88 +322,10 @@ export default function ParticipantPage() {
           </div>
         )}
 
-        {/* 미션 탐색 필터 */}
+        {/* 미션 탐색 — /missions와 같은 화면·같은 MissionCard를 쓴다 */}
         {tab === 'missions' && !loading && (
-          <div className="bg-white rounded-xl shadow-sm p-4 mb-4 space-y-2">
-            <form onSubmit={e => { e.preventDefault(); const nf = { ...missionFilter, keyword: searchInput }; setMissionFilter(nf); loadMissions(nf); }} className="flex">
-              <input value={searchInput} onChange={e => setSearchInput(e.target.value)}
-                placeholder="미션 검색..."
-                className="flex-1 border rounded-l-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500" />
-              <button type="submit" className="px-3 py-2 bg-slate-700 text-white rounded-r-lg text-sm">🔍</button>
-            </form>
-            <div className="grid grid-cols-3 gap-2">
-              <select value={missionFilter.category}
-                onChange={e => { const nf = { ...missionFilter, category: e.target.value }; setMissionFilter(nf); loadMissions(nf); }}
-                className="border rounded-lg px-2 py-2 text-xs sm:text-sm bg-white focus:outline-none w-full">
-                <option value="">전체 유형</option>
-                <option value="SNS">SNS</option>
-                <option value="VISIT">방문형</option>
-                <option value="REVIEW">리뷰</option>
-                <option value="VIDEO">영상</option>
-              </select>
-              <ProvinceSelect value={missionFilter.regionSi} emptyLabel="전체 지역"
-                onChange={v => { const nf = { ...missionFilter, regionSi: v }; setMissionFilter(nf); loadMissions(nf); }}
-                className="border rounded-lg px-2 py-2 text-xs sm:text-sm bg-white focus:outline-none w-full" />
-              <select value={missionFilter.sort}
-                onChange={e => { const nf = { ...missionFilter, sort: e.target.value }; setMissionFilter(nf); loadMissions(nf); }}
-                className="border rounded-lg px-2 py-2 text-xs sm:text-sm bg-white focus:outline-none w-full">
-                <option value="NEWEST">최신순</option>
-                <option value="DEADLINE">마감임박</option>
-                <option value="REWARD">보상높은순</option>
-                <option value="POPULAR">인기순</option>
-              </select>
-            </div>
-          </div>
-        )}
-
-        {/* 미션 탐색 */}
-        {tab === 'missions' && !loading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {missions.map(m => {
-              const dday = Math.ceil((new Date(m.endDate).getTime() - Date.now()) / 86400000);
-              const catIcon: Record<string, string> = { VISIT: '📍', SNS: '📸', REVIEW: '✍️', VIDEO: '🎬' };
-              const catLabel: Record<string, string> = { VISIT: '방문인증', SNS: 'SNS', REVIEW: '리뷰', VIDEO: '영상' };
-              const catColor: Record<string, string> = { VISIT: 'bg-green-100 text-green-700', SNS: 'bg-pink-100 text-pink-700', REVIEW: 'bg-blue-100 text-blue-700', VIDEO: 'bg-red-100 text-red-700' };
-              const pct = Math.min(100, Math.round(((m.currentCount ?? 0) / m.maxParticipants) * 100));
-              return (
-                <Link key={m.id} href={`/missions/${m.id}`}
-                  className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all border border-gray-100 hover:border-slate-200">
-                  {/* 카드 상단 컬러 배너 */}
-                  <div className="h-2 bg-gradient-to-r from-stone-300 to-slate-400" />
-                  <div className="p-5">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-1.5">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${catColor[m.category] ?? 'bg-gray-100 text-gray-600'}`}>
-                          {catIcon[m.category]} {catLabel[m.category] ?? m.category}
-                        </span>
-                        {dday >= 0 && dday <= 3 && <span className="text-xs bg-red-50 text-red-500 px-2 py-0.5 rounded-full font-bold">D-{dday || 'Day'}</span>}
-                      </div>
-                      <span className="text-lg font-extrabold text-slate-600">{Number(m.rewardAmount).toLocaleString()}원</span>
-                    </div>
-                    <h3 className="font-bold text-gray-900 mb-1 text-base leading-snug line-clamp-2">{m.title}</h3>
-                    <p className="text-xs text-gray-400 mb-3">{m.clientProfile?.businessName}</p>
-                    <p className="text-sm text-gray-500 line-clamp-2 mb-4">{m.description}</p>
-                    {/* 정보 태그 */}
-                    <div className="flex flex-wrap gap-1.5 mb-3">
-                      <span className="text-xs bg-stone-50 text-gray-500 px-2 py-1 rounded-lg">📌 {m.regionSi} {m.regionGu}</span>
-                      <span className="text-xs bg-stone-50 text-gray-500 px-2 py-1 rounded-lg">👥 {m.maxParticipants}명 모집</span>
-                      <span className="text-xs bg-stone-50 text-gray-500 px-2 py-1 rounded-lg">📅 {new Date(m.endDate).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })} 마감</span>
-                    </div>
-                    {/* 신청 현황 바 */}
-                    <div>
-                      <div className="flex justify-between text-xs text-gray-400 mb-1">
-                        <span>신청 현황</span>
-                        <span className="font-semibold text-gray-600">{m.currentCount ?? 0}/{m.maxParticipants}명</span>
-                      </div>
-                      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                        <div className={`h-full rounded-full ${pct >= 90 ? 'bg-red-400' : 'bg-slate-400'}`} style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
-            {missions.length === 0 && <div className="col-span-2 text-center py-20 text-gray-400">오픈된 미션이 없습니다</div>}
+          <div className="-mx-3 sm:-mx-6">
+            <MissionBrowser />
           </div>
         )}
 
