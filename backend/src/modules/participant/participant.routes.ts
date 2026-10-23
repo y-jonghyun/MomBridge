@@ -5,6 +5,7 @@ import { AppError } from '../../middleware/errorHandler';
 import { getMissionKeywords } from '../missions/mission-extras';
 import { ensureTrackingLink, publicTrackingUrl } from '../tracking/links';
 import { buildParticipantStats } from '../reports/report.service';
+import { SELF_CLICK_MAX_AGE_SEC, selfClickToken } from '../tracking/self-click';
 
 const router = Router();
 router.use(authenticate, requireRole('PARTICIPANT', 'OPERATOR'));
@@ -23,6 +24,14 @@ async function getOrCreateParticipantProfile(userId: string) {
   });
 }
 
+// 본인 클릭 제외용 서명 값 — 프론트가 /r 경로 쿠키로 저장한다
+router.get('/self-click-token', requireRole('PARTICIPANT'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const profile = await getOrCreateParticipantProfile(req.user!.sub);
+    res.json({ success: true, data: { token: selfClickToken(profile.id), maxAgeSec: SELF_CLICK_MAX_AGE_SEC } });
+  } catch (e) { next(e); }
+});
+
 // 내 지원 목록
 router.get('/applications', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -30,7 +39,16 @@ router.get('/applications', async (req: Request, res: Response, next: NextFuncti
 
     const applications = await prisma.application.findMany({
       where: { participantId: profile.id },
-      include: { mission: { select: { title: true, rewardAmount: true, status: true } } },
+      // 진행 중 카드가 '[동] 가게 이름'과 후기 마감일을 그린다 (본인 지원 건이라 범위 밖 정보는 없다)
+      include: {
+        mission: {
+          select: {
+            title: true, rewardAmount: true, status: true, submissionDeadline: true,
+            regionGu: true, regionDong: true, thumbnailUrl: true,
+            clientProfile: { select: { businessName: true } },
+          },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     });
     res.json({ success: true, data: applications });

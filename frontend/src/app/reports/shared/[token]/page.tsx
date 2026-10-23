@@ -17,17 +17,17 @@ export default function SharedReportPage() {
   }, [token]);
 
   return (
-    <div className="min-h-screen bg-stone-50">
-      <header className="bg-white border-b px-6 py-4">
-        <h1 className="text-xl font-bold text-slate-700">맘브릿지 <span className="text-sm font-normal text-gray-500">캠페인 성과 리포트</span></h1>
+    <div className="min-h-screen bg-cream">
+      <header className="bg-paper border-b px-6 py-4">
+        <h1 className="text-xl font-bold text-ink-2">맘브릿지 <span className="text-sm font-normal text-muted">캠페인 성과 리포트</span></h1>
       </header>
       <div className="max-w-4xl mx-auto px-4 py-6">
-        {error && <div className="bg-white rounded-2xl p-10 text-center text-gray-500">{error}</div>}
+        {error && <div className="bg-paper rounded-box p-10 text-center text-muted">{error}</div>}
         {report && (
           <>
             <div className="mb-4">
-              <h2 className="text-lg font-bold text-gray-900">{report.mission.title}</h2>
-              <p className="text-xs text-gray-500 mt-1">이 공유 링크는 {new Date(report.expiresAt).toLocaleString('ko-KR')}에 만료됩니다.</p>
+              <h2 className="text-lg font-bold text-ink">{report.mission.title}</h2>
+              <p className="text-xs text-muted mt-1">이 공유 링크는 {new Date(report.expiresAt).toLocaleString('ko-KR')}에 만료됩니다.</p>
             </div>
             <CampaignReport report={report} />
           </>

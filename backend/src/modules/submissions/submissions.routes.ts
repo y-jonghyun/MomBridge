@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 import { parseNaverBlogUrl } from '../review-check/naver-blog-url';
 import { checkReviewPost } from '../review-check/review-check.service';
 import { ensureTrackingLink } from '../tracking/links';
+import { recruitingCutoff } from '../missions/mission-lifecycle';
 
 const router = Router();
 
@@ -90,7 +91,9 @@ router.post('/apply', authenticate, requireRole('PARTICIPANT'), async (req: Requ
     const input = parseInput(applySchema, req.body);
     const profile = await requireParticipantProfile(req.user!.sub);
 
-    const mission = await prisma.mission.findFirst({ where: { id: input.missionId, status: 'OPEN', isVisible: true } });
+    const mission = await prisma.mission.findFirst({
+      where: { id: input.missionId, status: 'OPEN', isVisible: true, endDate: { gte: recruitingCutoff() } },
+    });
     if (!mission) throw new AppError('NOT_FOUND', 404, '모집 중인 미션을 찾을 수 없습니다');
 
     const duplicate = await prisma.application.findUnique({

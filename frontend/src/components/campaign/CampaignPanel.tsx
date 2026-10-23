@@ -78,30 +78,30 @@ export default function CampaignPanel({ mission, defaultCategory, canShare = tru
     loadShares();
   }
 
-  const inputCls = 'border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none';
+  const inputCls = 'border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none';
 
   return (
     <div className="space-y-4">
-      {msg && <div className="text-sm bg-slate-50 border rounded-xl px-4 py-2 text-slate-700">{msg}</div>}
+      {msg && <div className="text-sm bg-cream border rounded-card px-4 py-2 text-ink-2">{msg}</div>}
 
-      <div className="bg-white rounded-2xl p-5 shadow-sm space-y-4">
-        <h4 className="font-semibold text-gray-900">캠페인 설정</h4>
+      <div className="bg-paper rounded-box p-5 space-y-4">
+        <h4 className="font-semibold text-ink">캠페인 설정</h4>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">도착 URL (예약 페이지·스마트스토어·홈페이지)</label>
+          <label className="block text-sm font-medium text-ink-2 mb-1">도착 URL (예약 페이지·스마트스토어·홈페이지)</label>
           <div className="flex gap-2">
             <input className={`${inputCls} flex-1`} value={destination} onChange={e => setDestination(e.target.value)} placeholder="https://" />
-            <button type="button" onClick={saveDestination} className="px-4 py-2 bg-slate-700 text-white text-sm rounded-lg">저장</button>
+            <button type="button" onClick={saveDestination} className="px-4 py-2 bg-ink text-paper text-sm rounded-control">저장</button>
           </div>
-          <p className="text-xs text-gray-400 mt-1">체험단원 글의 추적 링크를 누르면 이 주소로 이동합니다. 분석 도구에서 utm_source=mombridge로 확인할 수 있습니다.</p>
+          <p className="text-xs text-muted mt-1">체험단원 글의 추적 링크를 누르면 이 주소로 이동합니다. 분석 도구에서 utm_source=mombridge로 확인할 수 있습니다.</p>
         </div>
         <div>
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-gray-700">확정 키워드</p>
-            <button type="button" onClick={() => setEditKeywords(v => !v)} className="text-xs text-slate-600 underline">{editKeywords ? '닫기' : '변경'}</button>
+            <p className="text-sm font-medium text-ink-2">확정 키워드</p>
+            <button type="button" onClick={() => setEditKeywords(v => !v)} className="text-xs text-ink-2 underline">{editKeywords ? '닫기' : '변경'}</button>
           </div>
           {!editKeywords && (
-            <p className="text-sm text-gray-700 mt-1">
-              {keywords ? <>메인 <b>{keywords.main.keyword}</b>{keywords.subs.length > 0 && <> · 서브 {keywords.subs.map(s => s.keyword).join(', ')}</>}</> : <span className="text-gray-400">아직 정하지 않았습니다</span>}
+            <p className="text-sm text-ink-2 mt-1">
+              {keywords ? <>메인 <b>{keywords.main.keyword}</b>{keywords.subs.length > 0 && <> · 서브 {keywords.subs.map(s => s.keyword).join(', ')}</>}</> : <span className="text-muted">아직 정하지 않았습니다</span>}
             </p>
           )}
           {editKeywords && (
@@ -112,46 +112,46 @@ export default function CampaignPanel({ mission, defaultCategory, canShare = tru
                 value={keywords}
                 onChange={setKeywords}
               />
-              <button type="button" onClick={saveKeywords} disabled={!keywords} className="px-4 py-2 bg-slate-700 text-white text-sm rounded-lg disabled:opacity-50">키워드 저장</button>
+              <button type="button" onClick={saveKeywords} disabled={!keywords} className="px-4 py-2 bg-ink text-paper text-sm rounded-control disabled:opacity-50">키워드 저장</button>
             </div>
           )}
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl p-4 shadow-sm flex flex-wrap items-end gap-2">
-        <div><label className="block text-xs text-gray-500 mb-1">시작일</label><input type="date" className={inputCls} value={range.from} onChange={e => setRange(r => ({ ...r, from: e.target.value }))} /></div>
-        <div><label className="block text-xs text-gray-500 mb-1">종료일</label><input type="date" className={inputCls} value={range.to} onChange={e => setRange(r => ({ ...r, to: e.target.value }))} /></div>
-        <button type="button" onClick={() => loadReport()} className="px-4 py-2 border rounded-lg text-sm">조회</button>
+      <div className="bg-paper rounded-box p-4 flex flex-wrap items-end gap-2">
+        <div><label className="block text-xs text-muted mb-1">시작일</label><input type="date" className={inputCls} value={range.from} onChange={e => setRange(r => ({ ...r, from: e.target.value }))} /></div>
+        <div><label className="block text-xs text-muted mb-1">종료일</label><input type="date" className={inputCls} value={range.to} onChange={e => setRange(r => ({ ...r, to: e.target.value }))} /></div>
+        <button type="button" onClick={() => loadReport()} className="px-4 py-2 border rounded-control text-sm">조회</button>
       </div>
 
       {report && <CampaignReport report={report} />}
 
       {canShare && (
-        <div className="bg-white rounded-2xl p-5 shadow-sm space-y-3">
-          <h4 className="font-semibold text-gray-900">리포트 공유</h4>
-          <p className="text-xs text-gray-500">링크를 받은 사람은 로그인 없이 리포트를 볼 수 있습니다. 체험단원 이름은 가려집니다.</p>
+        <div className="bg-paper rounded-box p-5 space-y-3">
+          <h4 className="font-semibold text-ink">리포트 공유</h4>
+          <p className="text-xs text-muted">링크를 받은 사람은 로그인 없이 리포트를 볼 수 있습니다. 체험단원 이름은 가려집니다.</p>
           <div className="flex items-center gap-2">
             <select className={inputCls} value={shareDays} onChange={e => setShareDays(Number(e.target.value))}>
               {[1, 7, 14, 30].map(d => <option key={d} value={d}>{d}일 후 만료</option>)}
             </select>
-            <button type="button" onClick={createShare} className="px-4 py-2 bg-slate-700 text-white text-sm rounded-lg">공유 링크 만들기</button>
+            <button type="button" onClick={createShare} className="px-4 py-2 bg-ink text-paper text-sm rounded-control">공유 링크 만들기</button>
           </div>
           {newShareUrl && (
-            <div className="flex gap-2 items-center bg-stone-50 rounded-lg p-2">
-              <input readOnly className={`${inputCls} flex-1 bg-white`} value={newShareUrl} />
-              <button type="button" onClick={() => navigator.clipboard.writeText(newShareUrl)} className="px-3 py-2 border rounded-lg text-sm">복사</button>
+            <div className="flex gap-2 items-center bg-cream rounded-control p-2">
+              <input readOnly className={`${inputCls} flex-1 bg-paper`} value={newShareUrl} />
+              <button type="button" onClick={() => navigator.clipboard.writeText(newShareUrl)} className="px-3 py-2 border rounded-control text-sm">복사</button>
             </div>
           )}
-          {newShareUrl && <p className="text-xs text-amber-700">이 주소는 지금만 확인할 수 있습니다. 복사해 두세요.</p>}
+          {newShareUrl && <p className="text-xs text-clay-dark">이 주소는 지금만 확인할 수 있습니다. 복사해 두세요.</p>}
           {shares.length > 0 && (
             <ul className="text-sm divide-y">
               {shares.map(s => {
                 const expired = new Date(s.expiresAt) <= new Date();
                 return (
                   <li key={s.id} className="flex justify-between py-2">
-                    <span className="text-gray-600">{new Date(s.createdAt).toLocaleDateString('ko-KR')} 발급 · {new Date(s.expiresAt).toLocaleDateString('ko-KR')} 만료</span>
-                    {s.revokedAt ? <span className="text-gray-400">폐기됨</span> : expired ? <span className="text-gray-400">만료됨</span>
-                      : <button type="button" onClick={() => revokeShare(s.id)} className="text-red-500 text-xs">폐기</button>}
+                    <span className="text-ink-2">{new Date(s.createdAt).toLocaleDateString('ko-KR')} 발급 · {new Date(s.expiresAt).toLocaleDateString('ko-KR')} 만료</span>
+                    {s.revokedAt ? <span className="text-muted">폐기됨</span> : expired ? <span className="text-muted">만료됨</span>
+                      : <button type="button" onClick={() => revokeShare(s.id)} className="text-clay-dark text-xs">폐기</button>}
                   </li>
                 );
               })}

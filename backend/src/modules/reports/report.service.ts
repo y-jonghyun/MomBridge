@@ -95,7 +95,6 @@ export async function buildCampaignReport(missionId: string, range: Range, opts:
       linkCode: link.code,
       participantName: opts.maskNames ? maskName(name) : name,
       postUrl: submission?.snsPostUrl ?? null,
-      submissionStatus: submission?.status ?? null,
       disclosure,
       clicks: t.clicks,
       uniqueVisitors: t.uniqueVisitors,

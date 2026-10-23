@@ -1,3 +1,9 @@
+// 이 묶음은 결제 흐름 자체를 확인한다 → 공개 전 결제 잠금(config/features)은 열어 둔다
+jest.mock('../../src/config/features', () => ({
+  ...jest.requireActual('../../src/config/features'),
+  CLIENT_PAYMENT_ENABLED: true,
+}));
+
 import request from 'supertest';
 import app from '../../src/app';
 import { describeDb, resetDb, prisma } from '../helpers/db';

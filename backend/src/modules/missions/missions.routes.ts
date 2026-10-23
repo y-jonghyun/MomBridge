@@ -2,17 +2,25 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate, requireRole } from '../../middleware/auth';
 import { prisma } from '../../config/database';
 import { env } from '../../config/env';
+import { CLIENT_PAYMENT_ENABLED, paymentDisabledError } from '../../config/features';
 import { AppError } from '../../middleware/errorHandler';
 import { sendAlimTalk } from '../../utils/sms';
 import { parseInput } from '../../middleware/validate';
+import { normalizeProvince, provinceVariants } from '../../lib/regions';
 import {
   operatorCreateMissionSchema, payAndCreateMissionSchema, payExistingMissionSchema,
   missionStatusSchema, expectedMissionAmount,
 } from './missions.schema';
 import { newCampaignCode, normalizeMissionKeywords, saveMissionKeywords } from './mission-extras';
+import { recruitingCutoff } from './mission-lifecycle';
 import { logger } from '../../utils/logger';
+import { captureError, reportIssue } from '../../lib/monitoring';
+import missionImageRoutes from './mission-images.routes';
 
 const router = Router();
+
+// 미션 사진 (업로드·순서·삭제) — 고객사 본인/운영자만
+router.use('/:id/images', missionImageRoutes);
 
 // 미션 목록 조회 (공개)
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
@@ -27,8 +35,11 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const where: any = {
       status: 'OPEN' as const,
       isVisible: true,
+      // 일 배치가 상태를 바꾸기 전(자정~03:30)에도 마감일이 지난 미션은 보이지 않게
+      endDate: { gte: recruitingCutoff() },
       ...(req.query.category && { category: req.query.category as never }),
-      ...(req.query.regionSi && { regionSi: String(req.query.regionSi) }),
+      // 시·도 필터는 예전 표기('서울시', '충북')로 저장된 미션도 찾는다
+      ...(req.query.regionSi && { regionSi: { in: provinceVariants(normalizeProvince(String(req.query.regionSi)) ?? String(req.query.regionSi)) } }),
       ...(req.query.regionGu && { regionGu: String(req.query.regionGu) }),
       ...(keyword && { OR: [{ title: { contains: keyword } }, { description: { contains: keyword } }] }),
     };
@@ -42,7 +53,11 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const [missions, total] = await Promise.all([
       prisma.mission.findMany({
         where, skip, take: limit, orderBy,
-        include: { clientProfile: { select: { businessName: true, category: true } }, tags: { include: { tag: true } } },
+        include: {
+          clientProfile: { select: { businessName: true, category: true } },
+          tags: { include: { tag: true } },
+          images: { orderBy: { sortOrder: 'asc' }, select: { id: true, url: true, sortOrder: true } },
+        },
       }),
       prisma.mission.count({ where }),
     ]);
@@ -59,6 +74,9 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
       include: {
         clientProfile: { select: { businessName: true, category: true, address: true, regionSi: true, regionGu: true } },
         tags: { include: { tag: true } },
+        images: { orderBy: { sortOrder: 'asc' }, select: { id: true, url: true, sortOrder: true } },
+        // 고객사가 고른 메인·서브 키워드 (검색량 같은 내부 수치는 공개하지 않음)
+        keywords: { select: { keyword: true, role: true }, orderBy: [{ role: 'asc' }, { snapshotAt: 'asc' }] },
         _count: { select: { applications: true } },
       },
     });
@@ -98,16 +116,17 @@ router.post('/', authenticate, requireRole('OPERATOR'), async (req: Request, res
     if (sendPaymentLink) {
       const clientProfile = await prisma.clientProfile.findUnique({
         where: { id: clientProfileId },
-        select: { contactPhone: true, businessName: true },
+        select: { businessName: true, user: { select: { phone: true } } },
       });
+      const contactPhone = clientProfile?.user.phone ?? null;
       // 존재하지 않는 기본 도메인으로 결제 링크를 보내지 않도록 FRONTEND_URL이 없으면 발송하지 않는다
-      if (clientProfile?.contactPhone && !env.FRONTEND_URL) {
+      if (contactPhone && !env.FRONTEND_URL) {
         logger.error('FRONTEND_URL is not set; payment link SMS skipped', { missionId: mission.id });
-      } else if (clientProfile?.contactPhone) {
+      } else if (contactPhone) {
         const paymentUrl = `${env.FRONTEND_URL}/client`;
         const fallbackText = `[맘브릿지] ${mission.title} 미션이 등록됐습니다.\n결제 후 미션이 활성화됩니다.\n\n결제 링크: ${paymentUrl}\n(맘브릿지 로그인 후 내 미션 목록에서 확인하세요)`;
         await sendAlimTalk(
-          clientProfile.contactPhone,
+          contactPhone,
           process.env.SOLAPI_KAKAO_TEMPLATE_ID ?? '',
           { missionTitle: mission.title, paymentUrl },
           fallbackText,
@@ -122,6 +141,11 @@ router.post('/', authenticate, requireRole('OPERATOR'), async (req: Request, res
 // 결제 후 미션 생성 — CLIENT 전용 (토스페이먼츠 결제 확인)
 router.post('/pay-and-create', authenticate, requireRole('CLIENT'), async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // 사업자등록 전에는 결제를 받지 않는다 (config/features) — 미션은 운영자 대행 등록으로만 받는다
+    if (!CLIENT_PAYMENT_ENABLED) {
+      const e = paymentDisabledError();
+      throw new AppError(e.code, 503, e.message);
+    }
     // 0. 입력 검증 — 결제 승인 전에 해야 결제만 되고 미션이 안 만들어지는 일이 없다
     const { paymentKey, orderId, amount, keywords, ...missionData } = parseInput(payAndCreateMissionSchema, req.body);
     if (amount !== expectedMissionAmount(missionData.rewardAmount, missionData.maxParticipants)) {
@@ -144,12 +168,13 @@ router.post('/pay-and-create', authenticate, requireRole('CLIENT'), async (req: 
 
     if (!tossRes.ok) {
       const err = await tossRes.json().catch(() => ({}));
+      reportIssue('Toss payment confirm rejected', { area: 'payment', extra: { status: tossRes.status, code: (err as any).code, orderId } });
       throw new AppError('PAYMENT_FAILED', 400, (err as any).message ?? '결제 확인에 실패했습니다');
     }
 
     const payment = await tossRes.json() as { paymentKey: string; orderId: string; approvedAt: string };
 
-    // 2. 미션 생성
+    // 2. 미션 생성 — 여기서 실패하면 결제는 됐는데 미션이 없는 상태 → 즉시 알림(수동 환불·등록 필요)
     const mission = await prisma.mission.create({
       data: {
         ...missionData,
@@ -162,6 +187,9 @@ router.post('/pay-and-create', authenticate, requireRole('CLIENT'), async (req: 
         totalAmount: Number(amount),
         paidAt: new Date(payment.approvedAt),
       },
+    }).catch(err => {
+      captureError(err, { area: 'payment', userId: req.user!.sub, extra: { stage: 'create_after_confirm', orderId: payment.orderId, amount } });
+      throw err;
     });
     // 결제는 이미 끝났으므로 키워드 저장 실패가 미션 생성을 되돌리지 않게 한다 (생성 후 수정 가능)
     if (keywords) {
@@ -176,6 +204,11 @@ router.post('/pay-and-create', authenticate, requireRole('CLIENT'), async (req: 
 // 기존 미션 결제 확인 — CLIENT 전용 (결제 대기 중인 미션에 대해 결제 완료 처리)
 router.patch('/:id/pay', authenticate, requireRole('CLIENT'), async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // 사업자등록 전에는 결제를 받지 않는다 (config/features) — 미션은 운영자 대행 등록으로만 받는다
+    if (!CLIENT_PAYMENT_ENABLED) {
+      const e = paymentDisabledError();
+      throw new AppError(e.code, 503, e.message);
+    }
     const { paymentKey, orderId, amount } = parseInput(payExistingMissionSchema, req.body);
 
     // 0. 미션 소유권·금액 확인 — 결제 승인 전에 검사한다
@@ -203,6 +236,7 @@ router.patch('/:id/pay', authenticate, requireRole('CLIENT'), async (req: Reques
 
     if (!tossRes.ok) {
       const err = await tossRes.json().catch(() => ({}));
+      reportIssue('Toss payment confirm rejected', { area: 'payment', extra: { status: tossRes.status, code: (err as any).code, orderId } });
       throw new AppError('PAYMENT_FAILED', 400, (err as any).message ?? '결제 확인에 실패했습니다');
     }
     const payment = await tossRes.json() as { paymentKey: string; orderId: string; approvedAt: string };
@@ -217,6 +251,9 @@ router.patch('/:id/pay', authenticate, requireRole('CLIENT'), async (req: Reques
         totalAmount: Number(amount),
         paidAt: new Date(payment.approvedAt),
       },
+    }).catch(err => {
+      captureError(err, { area: 'payment', userId: req.user!.sub, extra: { stage: 'update_after_confirm', orderId: payment.orderId, missionId: req.params.id, amount } });
+      throw err;
     });
 
     res.json({ success: true, data: mission });

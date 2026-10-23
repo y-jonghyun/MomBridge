@@ -4,7 +4,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
@@ -20,6 +20,24 @@ enum MissionCategory {
   SNS
   REVIEW
   VIDEO
+}
+
+/// 업종. 유형(MissionCategory: 방문형·SNS·리뷰·영상)과는 다른 축이다
+enum BusinessCategory {
+  FOOD
+  CAFE
+  KIDS
+  BEAUTY
+  LIVING
+  ETC
+}
+
+/// '엄마 시간' 태그 — 언제·어떻게 참여할 수 있는지 (복수 선택)
+enum MomTimeTag {
+  WEEKDAY_DAY
+  WEEKEND_OK
+  KID_FRIENDLY
+  AT_HOME
 }
 
 enum MissionStatus {
@@ -76,7 +94,10 @@ model User {
   passwordHash String    @db.VarChar(255)
   role         UserRole
   name         String    @db.VarChar(100)
-  phone        String?   @db.VarChar(20)
+  /// 숫자만 저장한다(01012345678). 가입 때 받는 값이라 비는 경우는 스크립트로 만든 운영자 계정뿐이다
+  phone        String?   @unique @db.VarChar(20)
+  /// 문자 인증을 붙일 자리. 지금은 늘 null이다
+  phoneVerifiedAt DateTime?
   profileImage String?   @db.VarChar(2048)
   isActive     Boolean   @default(true)
   isVerified   Boolean   @default(false)
@@ -91,11 +112,12 @@ model User {
   clientProfile      ClientProfile?
   operatorProfile    OperatorProfile?
   notifications      Notification[]
-  auditLogs          AuditLog[]          @relation("AuditActor")
+  auditLogs          AuditLog[]           @relation("AuditActor")
   communityPosts     CommunityPost[]
   communityComments  CommunityComment[]
   communityLikes     CommunityLike[]
   passwordResets     PasswordResetToken[]
+  consents           UserConsent[]
 
   @@index([email])
   @@index([role])
@@ -121,6 +143,7 @@ model ParticipantProfile {
   applications Application[]
   submissions  Submission[]
   payouts      Payout[]
+  bookmarks    Bookmark[]
 
   @@index([regionSi, regionGu])
   @@map("participant_profiles")
@@ -156,7 +179,6 @@ model ClientProfile {
   regionGu       String   @db.VarChar(50)
   regionDong     String?  @db.VarChar(50)
   contactEmail   String?  @db.VarChar(320)
-  contactPhone   String?  @db.VarChar(20)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -184,51 +206,97 @@ model OperatorProfile {
 }
 
 model Mission {
-  id                 String          @id @default(uuid()) @db.Uuid
-  clientProfileId    String          @db.Uuid
-  title              String          @db.VarChar(200)
-  description        String          @db.Text
+  id                 String            @id @default(uuid()) @db.Uuid
+  clientProfileId    String            @db.Uuid
+  title              String            @db.VarChar(200)
+  description        String            @db.Text
   category           MissionCategory
-  status             MissionStatus   @default(DRAFT)
-  regionSi           String          @db.VarChar(50)
-  regionGu           String          @db.VarChar(50)
-  regionDong         String?         @db.VarChar(50)
-  maxParticipants    Int             @default(1)
-  currentCount       Int             @default(0)
-  rewardAmount       Decimal         @db.Decimal(12, 2)
-  rewardDescription  String?         @db.Text
-  requirements       String?         @db.Text
+  status             MissionStatus     @default(DRAFT)
+  regionSi           String            @db.VarChar(50)
+  regionGu           String            @db.VarChar(50)
+  regionDong         String?           @db.VarChar(50)
+  maxParticipants    Int               @default(1)
+  currentCount       Int               @default(0)
+  rewardAmount       Decimal           @db.Decimal(12, 2)
+  rewardDescription  String?           @db.Text
+  requirements       String?           @db.Text
+  /// 방문·예약 안내 (체험 가능 요일·시간, 예약 방법 등). 비어 있으면 상세 화면에 표시하지 않음
+  visitGuide         String?           @db.Text
   startDate          DateTime
   endDate            DateTime
   submissionDeadline DateTime
-  thumbnailUrl       String?         @db.VarChar(2048)
-  viewCount          Int             @default(0)
-  isVisible          Boolean         @default(true)
-  paymentStatus      String          @default("PENDING") @db.Text
-  totalAmount        Decimal?        @db.Decimal(12, 2)
-  paymentKey         String?         @db.VarChar(200)
-  orderId            String?         @db.VarChar(200)
-  paidAt             DateTime?       @db.Timestamp(6)
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
+  /// 대표 사진 주소. MissionImage의 첫 장과 같은 값으로 맞춰 기존 화면이 그대로 동작하게 한다
+  thumbnailUrl       String?           @db.VarChar(2048)
+  /// 업종 (맛집·카페·키즈·뷰티·생활·기타). 아직 고르지 않은 미션은 null
+  businessCategory   BusinessCategory?
+  /// 엄마 시간 태그 (복수 선택)
+  momTags            MomTimeTag[]
+  /// 방문 가능 시간 한 줄 (예: "평일 10:00~15:00")
+  visitHours         String?           @db.VarChar(100)
+  /// 선정 발표일. 없으면 상세 일정에서 그 단계를 숨긴다
+  announceDate       DateTime?
+  viewCount          Int               @default(0)
+  isVisible          Boolean           @default(true)
+  paymentStatus      String            @default("PENDING") @db.Text
+  totalAmount        Decimal?          @db.Decimal(12, 2)
+  paymentKey         String?           @db.VarChar(200)
+  orderId            String?           @db.VarChar(200)
+  paidAt             DateTime?         @db.Timestamp(6)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
   publishedAt        DateTime?
   closedAt           DateTime?
   /// DB 기본값은 마이그레이션 직후 이전 버전 코드(캠페인 코드를 모름)가 미션을 만들어도 실패하지 않게 하기 위한 것. 새 코드는 직접 지정
-  campaignCode       String          @unique @default(dbgenerated("substr(md5((random())::text), 1, 8)")) @db.VarChar(12)
-  destinationUrl     String?         @db.VarChar(2048)
+  campaignCode       String            @unique @default(dbgenerated("substr(md5((random())::text), 1, 8)")) @db.VarChar(12)
+  destinationUrl     String?           @db.VarChar(2048)
 
   clientProfile ClientProfile     @relation(fields: [clientProfileId], references: [id])
   applications  Application[]
   submissions   Submission[]
   tags          MissionTag[]
+  images        MissionImage[]
+  bookmarks     Bookmark[]
   keywords      MissionKeyword[]
   trackingLinks TrackingLink[]
   shareLinks    ReportShareLink[]
 
   @@index([status, isVisible])
+  @@index([businessCategory, status])
   @@index([regionSi, regionGu, status])
   @@index([category, status])
   @@map("missions")
+}
+
+/// 미션 사진. 미션당 최대 5장이며 sortOrder 0번이 대표 사진이다 (개수 제한은 앱에서 지킨다)
+model MissionImage {
+  id          String   @id @default(uuid()) @db.Uuid
+  missionId   String   @db.Uuid
+  /// 공개 버킷의 접근 주소
+  url         String   @db.VarChar(2048)
+  /// 버킷 안 경로. 교체·삭제할 때 저장소 파일을 지우는 데 쓴다
+  storagePath String   @db.VarChar(512)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  @@index([missionId, sortOrder])
+  @@map("mission_images")
+}
+
+/// 체험단원이 찜한 미션
+model Bookmark {
+  id            String   @id @default(uuid()) @db.Uuid
+  participantId String   @db.Uuid
+  missionId     String   @db.Uuid
+  createdAt     DateTime @default(now())
+
+  participant ParticipantProfile @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  mission     Mission            @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  @@unique([participantId, missionId])
+  @@index([participantId, createdAt])
+  @@map("bookmarks")
 }
 
 model Tag {
@@ -584,4 +652,26 @@ model PasswordResetToken {
   @@index([userId])
   @@index([expiresAt])
   @@map("password_reset_tokens")
+}
+
+enum ConsentType {
+  AGE_14
+  TERMS
+  PRIVACY
+  MARKETING
+}
+
+/// 약관·개인정보 동의 기록. 동의 시점의 문서 버전을 남긴다 (철회·재동의도 행을 추가)
+model UserConsent {
+  id        String      @id @default(uuid()) @db.Uuid
+  userId    String      @db.Uuid
+  type      ConsentType
+  version   String      @db.VarChar(20)
+  agreed    Boolean
+  createdAt DateTime    @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
+  @@map("user_consents")
 }

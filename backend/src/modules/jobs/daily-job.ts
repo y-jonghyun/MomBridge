@@ -1,12 +1,15 @@
 import { prisma } from '../../config/database';
 import { addDays, clock, formatDay, kstDayKey } from '../../lib/clock';
 import { getSetting } from '../settings/settings';
+import { closeExpiredMissions } from '../missions/mission-lifecycle';
 import { rollupBefore } from '../reports/aggregate';
 import { deleteExpiredResetTokens } from '../auth/password-reset';
 
 export interface DailyJobResult {
   today: string;
   cutoff: string;
+  missionsToInProgress: string[];
+  missionsClosed: string[];
   rolledUpRows: number;
   deletedClickEvents: number;
   deletedVisitorHashes: number;
@@ -20,11 +23,14 @@ export interface DailyJobResult {
  * 1) 어제까지의 원본을 일 집계로 롤업
  * 2) 보관 기간이 지난 원본 클릭·방문자 해시 삭제 — 해당 날짜가 롤업된 경우에만
  * 3) 오래된 키워드 캐시·만료된 공유 링크 정리
+ * 4) 모집 마감일이 지난 '모집중' 미션의 상태 전환
  */
 export async function runDailyJob(): Promise<DailyJobResult> {
   const today = kstDayKey(clock.now());
   const retentionDays = await getSetting('click.retentionDays');
   const cutoff = addDays(today, -retentionDays);
+
+  const { toInProgress, toClosed } = await closeExpiredMissions();
 
   const rolledUpRows = await rollupBefore(today);
 
@@ -48,6 +54,8 @@ export async function runDailyJob(): Promise<DailyJobResult> {
   return {
     today: formatDay(today),
     cutoff: formatDay(cutoff),
+    missionsToInProgress: toInProgress,
+    missionsClosed: toClosed,
     rolledUpRows,
     deletedClickEvents,
     deletedVisitorHashes,

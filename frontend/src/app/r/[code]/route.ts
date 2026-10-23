@@ -43,6 +43,9 @@ async function handle(req: Request, { params }: { params: Promise<{ code: string
     'x-mb-referer': req.headers.get('referer') ?? '',
     'x-mb-retry': String(retry),
   };
+  // 로그인한 체험단원 본인 클릭 표시 (서버가 서명한 값. 백엔드가 검증한다)
+  const self = req.headers.get('cookie')?.match(/(?:^|;\s*)mb_self=([^;]+)/)?.[1];
+  if (self) headers['x-mb-self'] = decodeURIComponent(self);
 
   try {
     const res = await fetch(`${backendOrigin()}/r/${code}`, {

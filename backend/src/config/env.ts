@@ -69,6 +69,12 @@ export const env = {
   INTERNAL_JOB_TOKEN: process.env.INTERNAL_JOB_TOKEN ?? '',
   // 리포트 공유 링크에 쓰는 프론트 주소. 환경변수로만 받는다
   FRONTEND_URL: originFromEnv('FRONTEND_URL'),
+
+  // ── 미션 사진 저장소 (Supabase Storage 공개 버킷) ──
+  // 서비스 키는 서버 전용. 비어 있으면 사진 업로드만 꺼지고 나머지 기능은 그대로 동작한다
+  SUPABASE_URL: (process.env.SUPABASE_URL ?? '').trim().replace(/\/+$/, ''),
+  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',
+  SUPABASE_STORAGE_BUCKET: process.env.SUPABASE_STORAGE_BUCKET || 'mission-images',
 };
 
 if (env.KEYWORD_TOOL_PROVIDER === 'naver') {

@@ -5,6 +5,9 @@ import { z } from 'zod';
 import { parseInput } from '../../middleware/validate';
 import { missionStatusSchema } from '../missions/missions.schema';
 import { ensureTrackingLink } from '../tracking/links';
+import { reportIssue } from '../../lib/monitoring';
+import { formatPhone, maskPhone } from '../../lib/phone';
+import { AppError } from '../../middleware/errorHandler';
 
 const applicationReviewSchema = z.object({
   status: z.enum(['APPROVED', 'REJECTED']),
@@ -153,11 +156,14 @@ router.patch('/payouts/:id', async (req: Request, res: Response, next: NextFunct
         ...(req.body.status === 'COMPLETED' && { completedAt: new Date() }),
       },
     });
+    if (payout.status === 'FAILED') {
+      reportIssue('Payout marked FAILED', { area: 'payout', level: 'error', extra: { payoutId: payout.id, amount: Number(payout.netAmount) } });
+    }
     res.json({ success: true, data: payout });
   } catch (e) { next(e); }
 });
 
-// 사용자 목록
+// 사용자 목록. 여러 사람의 번호가 한 화면에 보이므로 가운데 네 자리를 가린다
 router.get('/users', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const role = req.query.role as string | undefined;
@@ -165,9 +171,26 @@ router.get('/users', async (req: Request, res: Response, next: NextFunction) => 
       where: { ...(role ? { role: role as never } : {}), deletedAt: null },
       orderBy: { createdAt: 'desc' },
       take: 100,
-      select: { id: true, email: true, name: true, role: true, isActive: true, createdAt: true, lastLoginAt: true },
+      select: {
+        id: true, email: true, name: true, role: true, isActive: true, createdAt: true, lastLoginAt: true, phone: true,
+      },
     });
-    res.json({ success: true, data: users });
+    res.json({ success: true, data: users.map(u => ({ ...u, phone: maskPhone(u.phone) })) });
+  } catch (e) { next(e); }
+});
+
+// 사용자 한 명 — 번호를 전체로 보여주는 유일한 목록 밖 경로
+router.get('/users/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = await prisma.user.findFirst({
+      where: { id: req.params.id, deletedAt: null },
+      select: {
+        id: true, email: true, name: true, role: true, isActive: true, createdAt: true, lastLoginAt: true,
+        phone: true, phoneVerifiedAt: true,
+      },
+    });
+    if (!user) throw new AppError('NOT_FOUND', 404, '사용자를 찾을 수 없습니다');
+    res.json({ success: true, data: { ...user, phone: formatPhone(user.phone ?? '') || null } });
   } catch (e) { next(e); }
 });
 
@@ -190,11 +213,15 @@ router.get('/clients', async (_req: Request, res: Response, next: NextFunction) 
     const clients = await prisma.clientProfile.findMany({
       orderBy: { businessName: 'asc' },
       select: {
-        id: true, businessName: true, category: true, contactPhone: true,
-        user: { select: { id: true, name: true, email: true } },
+        id: true, businessName: true, category: true,
+        user: { select: { id: true, name: true, email: true, phone: true } },
       },
     });
-    res.json({ success: true, data: clients });
+    // 결제 링크를 어디로 보내는지 확인해야 하는 자리라 번호는 전체로 둔다 (운영자 전용 경로)
+    res.json({
+      success: true,
+      data: clients.map(c => ({ ...c, contactPhone: formatPhone(c.user.phone ?? '') || null })),
+    });
   } catch (e) { next(e); }
 });
 
