@@ -10,16 +10,20 @@ import { BottomTabBar, BottomTabBarSpacer, CategoryTabs, SiteHeader } from '@/co
 import { photoTone } from '@/components/ui/MissionCard';
 import { BellIcon, LogOutIcon } from '@/components/ui/icons';
 import { formatPhone, isMobilePhone, phoneDigits } from '@/lib/phone';
+import { MissionCard } from '@/components/ui';
+import { toCardData, type MissionListItem } from '@/components/missions/MissionBrowser';
+import { useBookmarks } from '@/lib/bookmarks';
 
 /** 기준: docs/design/mombridge-design/cream-editorial-v1.md 3번 '참여자 내 활동' + Participant.html */
 
-type Tab = 'active' | 'applications' | 'submissions' | 'payouts' | 'profile';
+type Tab = 'active' | 'applications' | 'submissions' | 'payouts' | 'bookmarks' | 'profile';
 
 const TABS = [
   { value: 'active', label: '진행 중' },
   { value: 'applications', label: '지원 현황' },
   { value: 'submissions', label: '제출 내역' },
   { value: 'payouts', label: '보상 내역' },
+  { value: 'bookmarks', label: '찜한 미션' },
   { value: 'profile', label: '내 정보' },
 ];
 
@@ -94,6 +98,10 @@ export default function ParticipantPage() {
   const [tab, setTab] = useState<Tab>('active');
   const [profileForm, setProfileForm] = useState({ name: '', phone: '' });
   const [profileSaving, setProfileSaving] = useState(false);
+  const [bookmarks, setBookmarks] = useState<MissionListItem[]>([]);
+  const savedIds = useBookmarks(s => s.ids);
+  const loadBookmarkIds = useBookmarks(s => s.load);
+  const toggleBookmark = useBookmarks(s => s.toggle);
   const [loading, setLoading] = useState(true);
 
   const [applications, setApplications] = useState<any[]>([]);
@@ -162,6 +170,13 @@ export default function ParticipantPage() {
     } finally { setProfileSaving(false); }
   }
 
+  const loadBookmarks = useCallback(async () => {
+    try {
+      const { data } = await api.get('/participant/bookmarks');
+      setBookmarks(data.data);
+    } catch { /* 찜 목록은 비어 있는 상태로 둔다 */ }
+  }, []);
+
   const loadNotifications = useCallback(async () => {
     try {
       const r = await api.get('/notifications');
@@ -177,9 +192,11 @@ export default function ParticipantPage() {
     void loadAll();
     void loadNotifications();
     void loadProfile();
+    void loadBookmarks();
+    void loadBookmarkIds();
     // 이미 로그인해 있던 체험단원도 본인 클릭 표시를 받는다 (만료 연장 겸)
     if (user.role === 'PARTICIPANT') void syncSelfClickCookie();
-  }, [user, hydrated, loadAll, loadNotifications, loadProfile, router]);
+  }, [user, hydrated, loadAll, loadNotifications, loadProfile, loadBookmarks, loadBookmarkIds, router]);
 
   async function markAllRead() {
     try {
@@ -514,6 +531,29 @@ export default function ParticipantPage() {
                     )}
                   </div>
                 </section>
+              </div>
+            )}
+
+            {/* 찜한 미션 */}
+            {tab === 'bookmarks' && (
+              <div className="px-5 pt-[18px]">
+                {bookmarks.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-[22px]">
+                    {bookmarks.map(m => (
+                      <MissionCard
+                        key={m.id} mission={toCardData(m)}
+                        saved={savedIds.has(m.id)}
+                        onToggleSave={() => {
+                          void toggleBookmark(m.id);
+                          // 이 화면에서 찜을 풀면 목록에서도 바로 빠진다
+                          setBookmarks(prev => prev.filter(x => x.id !== m.id));
+                        }}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyBox>아직 찜한 미션이 없어요. 미션 사진 위 하트를 눌러 모아 보세요.</EmptyBox>
+                )}
               </div>
             )}
 

@@ -8,18 +8,13 @@ import { BottomTabBar, BottomTabBarSpacer, MissionCard, SectionHeader, SiteHeade
 import { ArrowRightIcon, ChevronDownIcon, PinIcon, SearchIcon } from '@/components/ui/icons';
 import { CATEGORY_LABEL, EMPTY_MESSAGE, toCardData, type MissionListItem } from '@/components/missions/MissionBrowser';
 import MissionEmptyBox from '@/components/missions/MissionEmptyBox';
+import { nextPayoutLabel } from '@/lib/payout';
+import { useBookmarks } from '@/lib/bookmarks';
 import SiteFooter from '@/components/legal/SiteFooter';
 
 /** 기준: docs/design/mombridge-design/cream-editorial-v1.md 3번 '홈' + Main.html */
 
 const TYPE_TABS = [{ value: '', label: '전체' }, ...Object.entries(CATEGORY_LABEL).map(([value, label]) => ({ value, label }))];
-
-/** 보상은 매월 말일 마감 → 다음 달 10일 지급 (약관 제8조) */
-function nextPayoutLabel(now = new Date()) {
-  const d = new Date(now.getFullYear(), now.getMonth(), 10);
-  if (now.getDate() >= 10) d.setMonth(d.getMonth() + 1);
-  return `${d.getMonth() + 1}월 ${d.getDate()}일`;
-}
 
 /** 모집 대비 신청이 적은 순 — '선정이 쉬운 미션' 자리를 채운다 (문서 4번) */
 const fillRate = (m: MissionListItem) => (m.currentCount ?? 0) / Math.max(1, m.maxParticipants ?? 1);
@@ -31,8 +26,14 @@ export default function Home() {
   const [missions, setMissions] = useState<MissionListItem[]>([]);
   const [keyword, setKeyword] = useState('');
   const [loaded, setLoaded] = useState(false);
+  const savedIds = useBookmarks(s => s.ids);
+  const loadBookmarks = useBookmarks(s => s.load);
+  const toggleBookmark = useBookmarks(s => s.toggle);
 
   useEffect(() => setReady(true), []);
+  useEffect(() => {
+    if (ready && user?.role === 'PARTICIPANT') void loadBookmarks();
+  }, [ready, user, loadBookmarks]);
   useEffect(() => {
     // 공개 API라 로그인하지 않아도 미션이 보인다
     api.get('/missions?sort=DEADLINE')
@@ -45,7 +46,11 @@ export default function Home() {
   const isParticipant = signedIn && user!.role === 'PARTICIPANT';
   const showOwnerStrip = !signedIn || user!.role === 'CLIENT';
 
-  const closing = missions.slice(0, 6);
+  // 엄마 시간 태그가 들어오면서 '등원 후' 자리를 실제 기준(평일 낮)으로 채운다.
+  // 평일 낮 미션이 하나도 없으면 전과 같이 마감이 가까운 미션을 보여준다.
+  const dropOff = missions.filter(m => (m.momTags ?? []).includes('WEEKDAY_DAY')).slice(0, 6);
+  const rail = dropOff.length > 0 ? dropOff : missions.slice(0, 6);
+  const railTitle = dropOff.length > 0 ? '등원 후 다녀오기 좋은' : '마감이 가까운 미션';
   const easy = [...missions].sort((a, b) => fillRate(a) - fillRate(b)).slice(0, 3);
 
   return (
@@ -102,14 +107,23 @@ export default function Home() {
           </div>
         )}
 
-        {/* 마감이 가까운 미션. '등원 후' 분류 기준이 아직 없어 이 자리를 채운다 (문서 4번) */}
-        {closing.length > 0 && (
+        {/* 평일 낮에 다녀올 수 있는 미션 (엄마 시간 태그 기준) */}
+        {rail.length > 0 && (
           <section className="pb-2 pt-[30px]">
             <div className="px-5 pb-3.5">
-              <SectionHeader eyebrow="After drop-off" title="마감이 가까운 미션" moreHref="/missions" />
+              <SectionHeader
+                eyebrow="After drop-off" title={railTitle}
+                moreHref={dropOff.length > 0 ? '/missions?momTags=WEEKDAY_DAY' : '/missions'}
+              />
             </div>
             <div className="no-scrollbar flex gap-3 overflow-x-auto px-5 pb-1">
-              {closing.map(m => <MissionCard key={m.id} mission={toCardData(m)} variant="rail" />)}
+              {rail.map(m => (
+                <MissionCard
+                  key={m.id} mission={toCardData(m)} variant="rail"
+                  saved={savedIds.has(m.id)}
+                  onToggleSave={isParticipant ? () => void toggleBookmark(m.id) : undefined}
+                />
+              ))}
             </div>
           </section>
         )}

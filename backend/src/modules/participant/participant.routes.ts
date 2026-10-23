@@ -109,4 +109,69 @@ router.get('/payouts', async (req: Request, res: Response, next: NextFunction) =
   } catch (e) { next(e); }
 });
 
+// ── 찜 ──
+// 어느 경로든 로그인한 본인의 프로필로만 읽고 쓴다 (남의 찜은 보거나 바꿀 수 없다).
+
+/** 카드를 그리는 데 필요한 만큼만 (목록 API와 같은 범위) */
+const bookmarkMissionSelect = {
+  id: true, title: true, description: true, category: true, status: true,
+  rewardAmount: true, regionSi: true, regionGu: true, regionDong: true,
+  endDate: true, thumbnailUrl: true, currentCount: true, maxParticipants: true,
+  businessCategory: true, momTags: true,
+  clientProfile: { select: { businessName: true } },
+} as const;
+
+// 찜한 미션 목록
+router.get('/bookmarks', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const profile = await getOrCreateParticipantProfile(req.user!.sub);
+    const rows = await prisma.bookmark.findMany({
+      where: { participantId: profile.id },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true, mission: { select: bookmarkMissionSelect } },
+    });
+    res.json({ success: true, data: rows.map(r => ({ ...r.mission, bookmarkedAt: r.createdAt })) });
+  } catch (e) { next(e); }
+});
+
+// 찜한 미션 id만 — 카드 하트와 상세 버튼이 상태를 칠하는 데 쓴다
+router.get('/bookmarks/ids', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const profile = await getOrCreateParticipantProfile(req.user!.sub);
+    const rows = await prisma.bookmark.findMany({
+      where: { participantId: profile.id },
+      select: { missionId: true },
+    });
+    res.json({ success: true, data: rows.map(r => r.missionId) });
+  } catch (e) { next(e); }
+});
+
+// 찜하기 — 이미 찜했으면 그대로 성공으로 본다 (버튼을 두 번 눌러도 오류가 나지 않게)
+router.put('/bookmarks/:missionId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const profile = await getOrCreateParticipantProfile(req.user!.sub);
+    const missionId = String(req.params.missionId);
+    const mission = await prisma.mission.findUnique({ where: { id: missionId }, select: { id: true } });
+    if (!mission) throw new AppError('NOT_FOUND', 404, '미션을 찾을 수 없습니다');
+
+    await prisma.bookmark.upsert({
+      where: { participantId_missionId: { participantId: profile.id, missionId } },
+      create: { participantId: profile.id, missionId },
+      update: {},
+    });
+    res.json({ success: true, data: { bookmarked: true } });
+  } catch (e) { next(e); }
+});
+
+// 찜 해제 — 없던 것을 지워도 성공으로 본다
+router.delete('/bookmarks/:missionId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const profile = await getOrCreateParticipantProfile(req.user!.sub);
+    await prisma.bookmark.deleteMany({
+      where: { participantId: profile.id, missionId: String(req.params.missionId) },
+    });
+    res.json({ success: true, data: { bookmarked: false } });
+  } catch (e) { next(e); }
+});
+
 export default router;
