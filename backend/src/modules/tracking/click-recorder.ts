@@ -46,6 +46,7 @@ export class DbClickRecorder implements ClickRecorder {
   async record(input: ClickInput): Promise<void> {
     if (!env.CLICK_HASH_SECRET) {
       if (!warnedNoSecret) { logger.error('CLICK_HASH_SECRET is not set; click recording disabled'); warnedNoSecret = true; }
+      logger.debug('click not recorded: CLICK_HASH_SECRET is not set', { linkId: input.linkId });
       return;
     }
     const now = clock.now();
@@ -66,7 +67,13 @@ export class DbClickRecorder implements ClickRecorder {
     }
 
     const hash = visitorHash(env.CLICK_HASH_SECRET, dayKey, input.ip, input.userAgent);
-    if (visitorCounter.hit(`${input.linkId}:${hash}`, now.getTime()) > rateLimit.perVisitorPerLinkPerMin) return;
+    const hits = visitorCounter.hit(`${input.linkId}:${hash}`, now.getTime());
+    if (hits > rateLimit.perVisitorPerLinkPerMin) {
+      logger.debug('click not recorded: same visitor over the per-minute limit', {
+        linkId: input.linkId, hits, limit: rateLimit.perVisitorPerLinkPerMin,
+      });
+      return;
+    }
 
     const inserted = await prisma.clickDailyVisitor.createMany({
       data: [{ linkId: input.linkId, dayKey, visitorHash: hash }],
@@ -74,7 +81,10 @@ export class DbClickRecorder implements ClickRecorder {
     });
     const isUnique = inserted.count === 1;
     // 백엔드 기동 대기 중 첫 요청이 이미 기록됐을 수 있으므로, 재시도 요청은 오늘 처음 온 방문자일 때만 센다
-    if (input.retry && !isUnique) return;
+    if (input.retry && !isUnique) {
+      logger.debug('click not recorded: retry of a visitor already seen today', { linkId: input.linkId });
+      return;
+    }
 
     await prisma.clickEvent.create({ data: { ...base, isBot: false, isUnique } });
   }
