@@ -39,7 +39,16 @@ router.get('/applications', async (req: Request, res: Response, next: NextFuncti
 
     const applications = await prisma.application.findMany({
       where: { participantId: profile.id },
-      include: { mission: { select: { title: true, rewardAmount: true, status: true } } },
+      // 진행 중 카드가 '[동] 가게 이름'과 후기 마감일을 그린다 (본인 지원 건이라 범위 밖 정보는 없다)
+      include: {
+        mission: {
+          select: {
+            title: true, rewardAmount: true, status: true, submissionDeadline: true,
+            regionGu: true, regionDong: true, thumbnailUrl: true,
+            clientProfile: { select: { businessName: true } },
+          },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     });
     res.json({ success: true, data: applications });

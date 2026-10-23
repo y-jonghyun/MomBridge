@@ -6,3 +6,12 @@
   * { @apply box-border; }
   html { @apply scroll-smooth; }
 }
+
+@layer utilities {
+  /* 가로 스크롤은 되되 스크롤바는 보이지 않게 (탭·칩 줄) */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+}

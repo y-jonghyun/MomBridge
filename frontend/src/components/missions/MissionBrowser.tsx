@@ -4,6 +4,7 @@ import api from '@/lib/api';
 import ProvinceSelect from '@/components/common/ProvinceSelect';
 import { CategoryTabs, MissionCard, type MissionCardData } from '@/components/ui';
 import { PinIcon } from '@/components/ui/icons';
+import MissionEmptyBox from './MissionEmptyBox';
 
 /**
  * 미션 목록 화면. /missions와 참여자 홈의 '미션 탐색' 탭이 같은 이 컴포넌트를 쓴다.
@@ -41,6 +42,9 @@ const SORTS = [
   { value: 'NEWEST', label: '최신순' },
   { value: 'REWARD', label: '보상 높은순' },
 ];
+
+/** 열린 미션이 하나도 없을 때의 문구. 홈도 같은 문구를 쓴다 */
+export const EMPTY_MESSAGE = '우리 동네 미션을 준비하고 있어요.';
 
 export interface MissionFilter { category: string; regionSi: string; sort: string; keyword: string }
 export const defaultMissionFilter: MissionFilter = { category: '', regionSi: '', sort: 'NEWEST', keyword: '' };
@@ -96,6 +100,8 @@ export default function MissionBrowser({
 
   useEffect(() => { void load(filter); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
+  const filtered = !!(filter.keyword || filter.category || filter.regionSi);
+
   const apply = (next: Partial<MissionFilter>) => {
     const f = { ...filter, ...next };
     setFilter(f);
@@ -105,7 +111,7 @@ export default function MissionBrowser({
   return (
     <div>
       {/* 칩 줄 — 엄마 시간 칩(평일 낮·아이 동반·재택)은 데이터가 없어 숨긴다 */}
-      <div className="flex gap-2 overflow-x-auto px-5 pb-1">
+      <div className="no-scrollbar flex gap-2 overflow-x-auto px-5 pb-1">
         {/* 지역 칩. Chip은 button이라 select를 품을 수 없어 같은 모양의 label로 만든다 */}
         <label
           className={`flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] ${
@@ -181,23 +187,16 @@ export default function MissionBrowser({
           )}
 
           {/* 목록 끝 / 빈 목록 — 둘 다 같은 점선 상자로 이웃 지역을 권한다 */}
-          <div className="mx-5 mt-[26px] rounded-photo border border-dashed border-[#D8CBB8] bg-paper p-4 text-[13px] leading-[1.6] text-ink-2">
-            {missions.length === 0
-              ? (filter.keyword || filter.category || filter.regionSi
-                ? '조건에 맞는 미션이 없어요.'
-                : '아직 열린 미션이 없어요.')
-              : filter.regionSi
-                ? '우리 동네 미션을 다 봤어요.'
-                : '미션을 모두 봤어요.'}
-            {(filter.regionSi || filter.category || filter.keyword) && (
-              <button
-                type="button"
-                onClick={() => { setSearchInput(''); apply({ regionSi: '', category: '', keyword: '' }); }}
-                className="ml-1 font-medium text-clay underline-offset-2 hover:underline"
-              >
-                이웃 동네 미션 보기
-              </button>
-            )}
+          <div className="mx-5 mt-[26px]">
+            <MissionEmptyBox
+              message={
+                missions.length === 0
+                  ? (filtered ? '조건에 맞는 미션이 없어요.' : EMPTY_MESSAGE)
+                  : filter.regionSi ? '우리 동네 미션을 다 봤어요.' : '미션을 모두 봤어요.'
+              }
+              actionLabel={filtered ? '이웃 동네 미션 보기' : undefined}
+              onAction={() => { setSearchInput(''); apply({ regionSi: '', category: '', keyword: '' }); }}
+            />
           </div>
         </>
       )}

@@ -75,7 +75,7 @@ export function CategoryTabs({
   ariaLabel?: string;
 }) {
   return (
-    <nav aria-label={ariaLabel} className="flex gap-[22px] overflow-x-auto border-b border-line px-5">
+    <nav aria-label={ariaLabel} className="no-scrollbar flex gap-[22px] overflow-x-auto border-b border-line px-5">
       {tabs.map(t => {
         const on = t.value === value;
         return (
