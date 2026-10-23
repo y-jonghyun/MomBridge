@@ -114,7 +114,7 @@ export default function MissionCard({
         <p className="mt-2.5 text-[11px] text-sage">{m.tags.join(' · ')}</p>
       )}
       <p className="mt-[3px] text-sm font-medium leading-[1.4]">{m.place}</p>
-      {m.offer && <p className="mt-0.5 text-xs text-muted">{m.offer}</p>}
+      {m.offer && <p className="mt-0.5 line-clamp-2 text-xs text-muted">{m.offer}</p>}
       <p className="mt-1.5 text-sm font-bold text-clay">{won(m.rewardAmount)}</p>
       {applied !== null && max !== null && (
         <p className="mt-1.5 border-t border-line pt-1.5 text-[11px] text-muted">

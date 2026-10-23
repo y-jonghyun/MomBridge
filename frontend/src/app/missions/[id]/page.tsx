@@ -1,56 +1,60 @@
-﻿'use client';
+'use client';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
+import { KeywordBox, NoticeBox, ScheduleTimeline, StickyCTA, type ScheduleStep } from '@/components/ui';
+import { photoTone } from '@/components/ui/MissionCard';
+import { CameraIcon, ChevronLeftIcon, DocIcon, KeywordIcon, LinkIcon, PinIcon, ShareIcon } from '@/components/ui/icons';
+
+/** 기준: docs/design/mombridge-design/cream-editorial-v1.md 3번 '미션 상세' + Detail.html */
 
 const CATEGORY_LABEL: Record<string, string> = { VISIT: '방문형', SNS: 'SNS', REVIEW: '리뷰작성', VIDEO: '영상제작' };
-const CATEGORY_COLOR: Record<string, string> = {
-  VISIT: 'bg-green-100 text-green-700',
-  SNS: 'bg-pink-100 text-pink-700',
-  REVIEW: 'bg-blue-100 text-blue-700',
-  VIDEO: 'bg-red-100 text-red-700',
+
+/** 미션 내용 4칸. 유형별로 무엇을 해야 하는지 (아이콘은 선 아이콘, 이모지 없음) */
+const MISSION_POINTS: Record<string, { Icon: typeof CameraIcon; label: string }[]> = {
+  SNS: [
+    { Icon: CameraIcon, label: '사진 첨부' }, { Icon: DocIcon, label: '해시태그' },
+    { Icon: LinkIcon, label: 'URL 제출' }, { Icon: KeywordIcon, label: '키워드' },
+  ],
+  VISIT: [
+    { Icon: PinIcon, label: '지도 첨부' }, { Icon: CameraIcon, label: '방문 사진' },
+    { Icon: DocIcon, label: '후기 작성' }, { Icon: KeywordIcon, label: '키워드' },
+  ],
+  REVIEW: [
+    { Icon: DocIcon, label: '리뷰 작성' }, { Icon: CameraIcon, label: '사진 첨부' },
+    { Icon: LinkIcon, label: '링크 제출' }, { Icon: KeywordIcon, label: '키워드' },
+  ],
+  VIDEO: [
+    { Icon: CameraIcon, label: '영상 제작' }, { Icon: DocIcon, label: '설명 첨부' },
+    { Icon: LinkIcon, label: 'URL 제출' }, { Icon: KeywordIcon, label: '키워드' },
+  ],
 };
 
-const MISSION_ICONS: Record<string, { icon: string; label: string }[]> = {
-  SNS:    [{ icon: '#', label: '해시태그' }, { icon: '📸', label: '사진 첨부' }, { icon: '3장↑', label: '3장 이상' }, { icon: '🔗', label: 'URL 제출' }],
-  VISIT:  [{ icon: '📍', label: '지도 첨부' }, { icon: '🧾', label: '영수증 인증' }, { icon: '📸', label: '방문 사진' }, { icon: '✍️', label: '후기 작성' }],
-  REVIEW: [{ icon: '✍️', label: '리뷰 작성' }, { icon: '#', label: '해시태그' }, { icon: '🔗', label: '링크 제출' }, { icon: '📝', label: '300자 이상' }],
-  VIDEO:  [{ icon: '🎬', label: '영상 제작' }, { icon: '60초↑', label: '1분 이상' }, { icon: '🔗', label: 'URL 제출' }, { icon: '📌', label: '설명 첨부' }],
-};
+const won = (n: number) => `${Number(n).toLocaleString()}원`;
+const day = (d: string) => new Date(d).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }).replace(/\.$/, '');
 
-function DateRange({ label, start, end, color }: { label: string; start: string; end: string; color: string }) {
+function Section({ eyebrow, title, children }: { eyebrow: string; title: string; children: React.ReactNode }) {
   return (
-    <div className="mb-3">
-      <div className={`text-xs font-bold px-2 py-0.5 rounded-full inline-block mb-1.5 ${color}`}>{label}</div>
-      <div className="flex items-center gap-2 text-sm text-gray-700">
-        <span className="font-semibold">{new Date(start).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}</span>
-        <span className="text-gray-300">—</span>
-        <span className="font-semibold">{new Date(end).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}</span>
-      </div>
-    </div>
-  );
-}
-
-function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex gap-0 border-b border-gray-50 last:border-0">
-      <div className="w-32 shrink-0 py-3.5 px-4 text-sm text-gray-500 font-medium bg-stone-50">{label}</div>
-      <div className="flex-1 py-3.5 px-4 text-sm text-gray-800">{children}</div>
-    </div>
+    <section className="mt-7 px-5">
+      <span className="font-accent text-sm italic text-clay">{eyebrow}</span>
+      <h2 className="mb-3 mt-0.5 font-serif text-section-sm font-bold">{title}</h2>
+      {children}
+    </section>
   );
 }
 
 export default function MissionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const user = useAuthStore((s) => s.user);
+  const user = useAuthStore(s => s.user);
   const [mission, setMission] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [applyMsg, setApplyMsg] = useState('');
   const [applying, setApplying] = useState(false);
   const [applied, setApplied] = useState(false);
+  const [shareMsg, setShareMsg] = useState('');
 
   useEffect(() => {
     api.get(`/missions/${id}`).then(r => setMission(r.data.data)).finally(() => setLoading(false));
@@ -67,335 +71,209 @@ export default function MissionDetailPage() {
     } finally { setApplying(false); }
   }
 
+  async function handleShare() {
+    const url = typeof window !== 'undefined' ? window.location.href : '';
+    try {
+      if (navigator.share) await navigator.share({ title: mission?.title ?? '맘브릿지 미션', url });
+      else { await navigator.clipboard.writeText(url); setShareMsg('주소를 복사했어요'); setTimeout(() => setShareMsg(''), 2000); }
+    } catch { /* 사용자가 취소한 경우 */ }
+  }
+
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-stone-50">
-      <div className="w-10 h-10 border-4 border-slate-500 border-t-transparent rounded-full animate-spin" />
+    <div className="flex min-h-screen items-center justify-center bg-cream">
+      <div className="h-10 w-10 animate-spin rounded-full border-4 border-ink border-t-transparent" />
     </div>
   );
   if (!mission) return (
-    <div className="min-h-screen flex items-center justify-center bg-stone-50 text-gray-400">미션을 찾을 수 없습니다</div>
+    <div className="flex min-h-screen items-center justify-center bg-cream text-muted">미션을 찾을 수 없습니다</div>
   );
 
   const isOpen = mission.status === 'OPEN';
   const isFull = (mission.currentCount ?? 0) >= mission.maxParticipants;
   const dday = Math.ceil((new Date(mission.endDate).getTime() - Date.now()) / 86400000);
-  const pct = Math.min(100, Math.round(((mission.currentCount ?? 0) / mission.maxParticipants) * 100));
   const backHref = user?.role === 'PARTICIPANT' ? '/participant' : user?.role === 'OPERATOR' ? '/operator' : '/missions';
-  const missionIcons = MISSION_ICONS[mission.category] ?? MISSION_ICONS['SNS'];
+  const area = [mission.regionSi, mission.regionGu, mission.regionDong].filter(Boolean).join(' ');
+  const net = Math.floor(Number(mission.rewardAmount) * 0.9);
+  const points = MISSION_POINTS[mission.category] ?? MISSION_POINTS.SNS;
   const keywords: { keyword: string; role: 'MAIN' | 'SUB' }[] = mission.keywords ?? [];
+  const tone = photoTone(mission.id);
+
+  // 선정 발표일·보상 지급일은 아직 데이터가 없어 단계를 숨긴다 (문서 4번)
+  const steps: ScheduleStep[] = [
+    { label: '신청', when: `${day(mission.startDate)} – ${day(mission.endDate)}`, current: isOpen, note: isOpen && dday >= 0 ? (dday === 0 ? 'D-Day' : `D-${dday}`) : null },
+    { label: '선정 발표', when: null },
+    // 제출 마감이 모집 마감보다 앞서는 데이터도 있어, 역전되면 마감일만 보여준다
+    {
+      label: '방문 · 후기 등록',
+      when: new Date(mission.submissionDeadline) > new Date(mission.endDate)
+        ? `${day(mission.endDate)} – ${day(mission.submissionDeadline)}`
+        : `${day(mission.submissionDeadline)}까지`,
+      current: !isOpen,
+    },
+    { label: '보상 지급', when: null },
+  ];
+
+  const requirements: string[] = String(mission.requirements ?? '').split('\n').map(s => s.trim()).filter(Boolean);
+  const visitLines: string[] = String(mission.visitGuide ?? '').split('\n').map(s => s.trim()).filter(Boolean);
+
+  const ctaLabel = !user ? '로그인 후 신청하기'
+    : user.role !== 'PARTICIPANT' ? (user.role === 'OPERATOR' ? '운영자 계정' : '고객사 계정')
+    : applied ? '신청 완료'
+    : !isOpen ? '모집 종료'
+    : isFull ? '모집 마감'
+    : applying ? '신청 중...' : '미션 신청하기';
+  const ctaDisabled = !!user && (user.role !== 'PARTICIPANT' || applied || !isOpen || isFull || applying);
 
   return (
-    <div className="min-h-screen bg-gray-100 pb-20 lg:pb-0">
-      {/* 네비게이션 */}
-      <nav className="bg-white border-b px-4 sm:px-6 py-3 flex items-center gap-3 sticky top-0 z-20 shadow-sm">
-        <Link href={backHref} className="text-gray-400 hover:text-gray-700 text-sm flex items-center gap-1">← 목록</Link>
-        <span className="text-gray-200">|</span>
-        <h1 className="text-base font-bold text-slate-800">맘브릿지</h1>
-      </nav>
+    <div className="min-h-screen bg-cream pb-[88px]">
+      {/* 대표 사진. 여러 장 업로드는 아직 없어 1장만 보여주고 '1 / n' 표시는 숨긴다 */}
+      <div className={`relative flex h-[340px] items-center justify-center overflow-hidden ${mission.thumbnailUrl ? '' : tone.bg}`}>
+        {mission.thumbnailUrl
+          // eslint-disable-next-line @next/next/no-img-element
+          ? <img src={mission.thumbnailUrl} alt="" className="h-full w-full object-cover" />
+          : <span className={`text-[13px] tracking-[0.04em] ${tone.fg}`}>대표 가게 사진</span>}
+        <Link
+          href={backHref} aria-label="목록으로"
+          className="absolute left-3 top-3 flex h-11 w-11 items-center justify-center rounded-full bg-paper text-ink"
+        >
+          <ChevronLeftIcon size={20} strokeWidth={1.8} />
+        </Link>
+        <button
+          type="button" onClick={handleShare} aria-label="공유"
+          className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full bg-paper text-ink"
+        >
+          <ShareIcon size={19} />
+        </button>
+        <span aria-live="polite" className="sr-only">{shareMsg}</span>
+        {shareMsg && (
+          <span className="absolute bottom-4 right-4 rounded-full bg-ink px-3 py-1 text-xs text-paper">{shareMsg}</span>
+        )}
+      </div>
 
-      {/* 타이틀 헤더 바 */}
-      <div className="bg-white border-b px-4 sm:px-6 py-4">
-        <div className="max-w-5xl mx-auto">
-          <div className="flex items-start gap-3 flex-wrap mb-2">
-            <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${CATEGORY_COLOR[mission.category] ?? 'bg-gray-100 text-gray-600'}`}>
-              {CATEGORY_LABEL[mission.category]}
+      <div className="mx-auto max-w-shell">
+        {/* 정보 블록 */}
+        <section className="border-b border-line bg-paper px-5 pb-[22px] pt-6">
+          <div className="flex items-center gap-1.5">
+            <span className="flex h-6 items-center rounded-full border border-line px-2.5 text-[11px] font-medium text-ink-2">
+              {CATEGORY_LABEL[mission.category] ?? mission.category}
             </span>
-            {mission.category === 'VISIT' && <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">방문형</span>}
-            {isOpen && dday >= 0 && dday <= 3 && (
-              <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-red-500 text-white">마감 임박 D-{dday || 'Day'}</span>
-            )}
-            <span className="ml-auto text-xl font-extrabold text-slate-600">{Number(mission.rewardAmount).toLocaleString()}원</span>
+            {/* 엄마 시간 태그(평일 낮·아이 동반)는 데이터가 없어 숨긴다 */}
           </div>
-          <h2 className="text-xl font-bold text-gray-900 leading-tight">{mission.title}</h2>
-        </div>
-      </div>
+          <p className="mt-3.5 text-[13px] text-muted">{area}</p>
+          <h1 className="mb-1.5 mt-1 font-serif text-title-lg font-bold">{mission.clientProfile?.businessName ?? mission.title}</h1>
+          <p className="text-[15px] text-ink-2">{mission.title}</p>
 
-      {/* 메인 2컬럼 레이아웃 */}
-      <div className="max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-5 flex gap-5 items-start">
-
-        {/* ── 왼쪽 메인 컬럼 ── */}
-        <div className="flex-1 min-w-0 space-y-4">
-
-          {/* 대표 이미지 */}
-          <div className="bg-white rounded-xl overflow-hidden shadow-sm">
-            {mission.thumbnailUrl ? (
-              <img src={mission.thumbnailUrl} alt="" className="w-full h-60 object-cover" />
-            ) : (
-              <div className="w-full h-44 bg-gradient-to-br from-slate-50 to-pink-50 flex flex-col items-center justify-center">
-                <div className="text-5xl mb-2">{{ VISIT: '📍', SNS: '📸', REVIEW: '✍️', VIDEO: '🎬' }[mission.category as string] ?? '🎯'}</div>
-                <p className="text-slate-400 text-sm font-medium">{mission.clientProfile?.businessName}</p>
-              </div>
-            )}
-          </div>
-
-          {/* 참여 스텝 안내 */}
-          <div className="bg-white rounded-xl shadow-sm p-5">
-            <p className="text-sm font-bold text-gray-700 mb-1">해당 체험단은 <span className="text-slate-600">{CATEGORY_LABEL[mission.category]}</span> 체험단입니다.</p>
-            <p className="text-xs text-gray-400 mb-4">리뷰어가 해당 장소를 방문하여 서비스나 제품을 체험한 뒤, 사진과 후기를 작성합니다.</p>
-            <div className="space-y-2">
-              {[
-                { step: 'STEP1', text: `공고에서 원하는 ${CATEGORY_LABEL[mission.category]} 미션을 찾아 신청해 주세요 (하루 한 번 신청)` },
-                { step: 'STEP2', text: '체험 일정에 맞춰 방문 후 콘텐츠를 제출해 주세요' },
-                { step: 'STEP3', text: '리뷰 마감일까지 미션을 완료하고 보상을 받아가세요' },
-              ].map(({ step, text }) => (
-                <div key={step} className="flex gap-2 text-sm text-gray-600">
-                  <span className="shrink-0 font-bold text-slate-500">{step}</span>
-                  <span>{text}</span>
-                </div>
-              ))}
+          <div className="mt-[18px] flex items-end justify-between border-t border-line-soft pt-4">
+            <div>
+              <p className="text-xs text-muted">보상</p>
+              <p className="mt-0.5 text-[22px] font-bold text-clay">{won(mission.rewardAmount)}</p>
+              <p className="mt-0.5 text-xs text-muted">플랫폼 수수료 10% 공제 후 {won(net)} 지급</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-muted">신청</p>
+              <p className="mt-0.5 text-[15px] font-medium">
+                {mission.currentCount ?? 0} <span className="font-normal text-muted">/ 모집 {mission.maxParticipants}</span>
+              </p>
             </div>
           </div>
+        </section>
 
-          {/* 주요 정보 테이블 */}
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <InfoRow label="주최자">{mission.clientProfile?.businessName ?? '-'}</InfoRow>
-            <InfoRow label="제공서비스/물품">
-              <span className="font-semibold text-slate-700">{Number(mission.rewardAmount).toLocaleString()}원</span>
-              <span className="text-gray-400 text-xs ml-2">(수수료 10% 제외 후 지급)</span>
-            </InfoRow>
-            <InfoRow label="활동 지역">{mission.regionSi} {mission.regionGu}</InfoRow>
-            {mission.clientProfile?.address && (
-              <InfoRow label="방문 주소">{mission.clientProfile.address}</InfoRow>
-            )}
-            <InfoRow label="모집 인원">
-              <div>
-                <span className="font-semibold">{mission.maxParticipants}명</span>
-                <span className="text-gray-400 text-xs ml-2">현재 {mission.currentCount ?? 0}명 신청</span>
-                <div className="mt-1.5 h-1.5 bg-gray-100 rounded-full w-40 overflow-hidden">
-                  <div className={`h-full rounded-full ${pct >= 90 ? 'bg-red-400' : 'bg-slate-400'}`} style={{ width: `${pct}%` }} />
-                </div>
-              </div>
-            </InfoRow>
+        {/* 일정 */}
+        <section className="mx-5 mt-4 rounded-card border border-line bg-paper p-5">
+          <span className="font-accent text-sm italic text-clay">Schedule</span>
+          <h2 className="mb-3.5 mt-0.5 font-serif text-section-sm font-bold">일정</h2>
+          <ScheduleTimeline steps={steps} />
+        </section>
+
+        {/* 신청 전 확인 */}
+        {requirements.length > 0 && (
+          <div className="mx-5 mt-3">
+            <NoticeBox title="신청 전 꼭 확인해 주세요" items={requirements} />
           </div>
+        )}
 
-          {/* 미션 소개 */}
-          <div className="bg-white rounded-xl shadow-sm p-5">
-            <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-              <span className="w-1 h-4 bg-slate-500 rounded-full" />미션 소개
-            </h3>
-            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{mission.description}</p>
-          </div>
-
-          {/* 키워드 — 고객사가 고른 메인·서브 키워드. 없으면 숨김 */}
-          {keywords.length > 0 && (
-            <div className="bg-white rounded-xl shadow-sm p-5">
-              <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-                <span className="w-1 h-4 bg-pink-400 rounded-full" />키워드 정보
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {keywords.map(k => (
-                  <span key={k.keyword}
-                    className={k.role === 'MAIN'
-                      ? 'text-xs bg-slate-700 text-white px-3 py-1.5 rounded-full font-semibold'
-                      : 'text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full'}>
-                    {k.role === 'MAIN' && <span className="opacity-70 mr-1">메인</span>}{k.keyword}
-                  </span>
-                ))}
-              </div>
-              <p className="text-xs text-gray-400 mt-3">메인 키워드는 제목과 본문에, 서브 키워드는 본문에 자연스럽게 넣어 주세요.</p>
-            </div>
-          )}
-
-          {/* 체험단 미션 아이콘 */}
-          <div className="bg-white rounded-xl shadow-sm p-5">
-            <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <span className="w-1 h-4 bg-blue-400 rounded-full" />체험단 미션
-            </h3>
-            <div className="grid grid-cols-4 gap-3">
-              {missionIcons.map(({ icon, label }) => (
-                <div key={label} className="flex flex-col items-center gap-2 bg-stone-50 rounded-xl py-3 px-2">
-                  <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-lg shadow-sm border border-gray-100">
-                    {icon}
-                  </div>
-                  <span className="text-xs text-gray-600 text-center leading-tight">{label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 필수 체크 사항 */}
-          {mission.requirements && (
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <div className="bg-red-50 border border-red-100 rounded-xl p-5">
-                <h3 className="text-sm font-bold text-red-700 mb-3 text-center">필수 체크 사항</h3>
-                <div className="space-y-2.5">
-                  {mission.requirements.split('\n').filter(Boolean).map((line: string, i: number) => (
-                    <div key={i} className="flex items-start gap-2 text-sm text-gray-700">
-                      <span className="text-red-400 font-bold shrink-0 mt-0.5">✓</span>
-                      <span>{line}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 방문·예약 안내 — 미션별로 고객사·운영자가 입력. 없으면 숨김 */}
-          {mission.visitGuide?.trim() && (
-            <div className="bg-white rounded-xl shadow-sm p-5">
-              <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-                <span className="w-1 h-4 bg-yellow-400 rounded-full" />방문 및 예약 안내
-              </h3>
-              <div className="space-y-2">
-                {mission.visitGuide.split('\n').map((t: string) => t.trim()).filter(Boolean).map((t: string, i: number) => (
-                  <div key={i} className="flex items-start gap-2 text-sm text-gray-600">
-                    <span className="text-gray-300 shrink-0 mt-1">·</span>
-                    <span>{t}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 댓글 영역 */}
-          <div className="bg-white rounded-xl shadow-sm p-5">
-            <h3 className="text-sm font-bold text-gray-800 mb-4">댓글</h3>
-            <div className="text-center py-6 text-gray-300 text-sm">아직 댓글이 없습니다</div>
-            {user && (
-              <div className="border-t pt-4 flex gap-2">
-                <input
-                  className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
-                  placeholder="댓글을 남겨주세요"
-                />
-                <button className="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium hover:bg-slate-800">등록</button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ── 오른쪽 사이드바 (sticky, 데스크탑만) ── */}
-        <div className="hidden lg:block w-72 shrink-0 sticky top-16 space-y-4">
-
-          {/* 체험단 일정 */}
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div className="bg-gray-700 text-white text-sm font-bold px-4 py-3 flex items-center justify-between">
-              <span>체험단 일정</span>
-              <span className="text-gray-400 text-xs">▼</span>
-            </div>
-            <div className="p-4 space-y-1">
-              <DateRange label="신청 기간" start={mission.startDate} end={mission.endDate} color="bg-slate-100 text-slate-700" />
-              <DateRange label="체험 & 미션 수행" start={mission.startDate} end={mission.endDate} color="bg-pink-100 text-pink-700" />
-              <DateRange label="콘텐츠 제출 마감" start={mission.submissionDeadline} end={mission.submissionDeadline} color="bg-orange-100 text-orange-700" />
-            </div>
-
-            {/* D-Day 카운터 */}
-            <div className="mx-4 mb-4 bg-stone-50 rounded-lg py-3 text-center">
-              {dday > 0 ? (
+        {/* 방문 안내 — 지도는 자리만, 체험 시간·휴무는 데이터가 없어 숨긴다 */}
+        {(mission.clientProfile?.address || visitLines.length > 0) && (
+          <Section eyebrow="Visit" title="방문 안내">
+            <div className="flex h-[150px] items-center justify-center rounded-photo bg-[#E2DCCF] text-xs text-[#5E5A46]">지도</div>
+            <dl className="mt-3.5 grid grid-cols-[76px_1fr] gap-y-2.5 text-sm">
+              {mission.clientProfile?.address && (
                 <>
-                  <p className="text-xs text-gray-400 mb-0.5">모집 마감까지</p>
-                  <p className="text-2xl font-extrabold text-red-500">D-{dday}</p>
+                  <dt className="text-muted">주소</dt>
+                  <dd className="m-0">{mission.clientProfile.address}</dd>
                 </>
-              ) : dday === 0 ? (
-                <p className="text-lg font-extrabold text-red-500">오늘 마감!</p>
-              ) : (
-                <p className="text-lg font-bold text-gray-400">모집 종료</p>
               )}
-            </div>
+              {visitLines.length > 0 && (
+                <>
+                  <dt className="text-muted">안내</dt>
+                  <dd className="m-0 space-y-1">{visitLines.map((t, i) => <p key={i}>{t}</p>)}</dd>
+                </>
+              )}
+            </dl>
+          </Section>
+        )}
 
-            {/* 신청하기 버튼 */}
-            <div className="px-4 pb-4">
-              {user?.role === 'PARTICIPANT' && isOpen && !isFull && !applied && (
-                <div className="space-y-2">
-                  <textarea
-                    className="w-full border rounded-lg px-3 py-2 text-xs resize-none focus:outline-none focus:ring-2 focus:ring-slate-500"
-                    rows={3} placeholder="지원 동기를 간단히 적어주세요 (선택)"
-                    value={applyMsg} onChange={e => setApplyMsg(e.target.value)}
-                  />
-                  <button onClick={handleApply} disabled={applying}
-                    className="w-full bg-slate-700 text-white rounded-lg py-3 font-bold text-sm hover:bg-slate-700 disabled:opacity-50 shadow-md">
-                    {applying ? '신청 중...' : '신청하기'}
-                  </button>
-                </div>
-              )}
-              {applied && (
-                <div className="w-full bg-green-50 border border-green-200 rounded-lg py-3 text-center">
-                  <p className="text-green-700 font-bold text-sm">✓ 신청 완료!</p>
-                  <p className="text-green-500 text-xs mt-0.5">운영자 승인을 기다려 주세요</p>
-                </div>
-              )}
-              {user?.role === 'PARTICIPANT' && isFull && (
-                <button disabled className="w-full bg-gray-200 text-gray-400 rounded-lg py-3 font-bold text-sm">모집 마감</button>
-              )}
-              {user?.role === 'PARTICIPANT' && !isOpen && (
-                <button disabled className="w-full bg-gray-200 text-gray-400 rounded-lg py-3 font-bold text-sm">모집 종료</button>
-              )}
-              {!user && (
-                <Link href="/login" className="block w-full bg-slate-700 text-white rounded-lg py-3 font-bold text-sm text-center hover:bg-slate-700 shadow-md">
-                  로그인 후 신청하기
-                </Link>
-              )}
-              {(user?.role === 'CLIENT' || user?.role === 'OPERATOR') && (
-                <button disabled className="w-full bg-gray-100 text-gray-400 rounded-lg py-3 font-bold text-sm">
-                  {user.role === 'OPERATOR' ? '운영자 계정' : '고객사 계정'}
+        {/* 미션 내용 */}
+        <Section eyebrow="Mission" title="미션 내용">
+          <div className="grid grid-cols-4 gap-2">
+            {points.map(({ Icon, label }) => (
+              <div key={label} className="rounded-control border border-line bg-paper px-1 py-3.5 text-center text-xs text-ink-2">
+                <Icon size={22} strokeWidth={1.5} className="mx-auto mb-1.5 block text-clay" />
+                {label}
+              </div>
+            ))}
+          </div>
+          {mission.description && (
+            <p className="mt-3.5 whitespace-pre-line text-sm leading-relaxed text-ink-2">{mission.description}</p>
+          )}
+          <div className="mt-3.5">
+            <KeywordBox
+              main={keywords.filter(k => k.role === 'MAIN').map(k => k.keyword)}
+              sub={keywords.filter(k => k.role === 'SUB').map(k => k.keyword)}
+            />
+          </div>
+        </Section>
+
+        {/* 성과 기록 안내 */}
+        <section className="mx-5 mt-7 rounded-card bg-ink px-5 py-[18px] text-paper">
+          <p className="text-[13px] text-[#CFC4B4]">이 미션은 성과가 기록돼요</p>
+          <p className="mt-1.5 text-sm leading-[1.65]">내 후기를 보고 가게를 찾은 방문 수를 &apos;내 활동&apos;에서 확인할 수 있어요.</p>
+        </section>
+
+        {/* 지원 동기 — 선택 입력. 신청할 수 있는 참여자에게만 보인다 */}
+        {user?.role === 'PARTICIPANT' && isOpen && !isFull && !applied && (
+          <Section eyebrow="Apply" title="지원 동기">
+            <label htmlFor="apply-msg" className="sr-only">지원 동기 (선택)</label>
+            <textarea
+              id="apply-msg" rows={3} value={applyMsg} onChange={e => setApplyMsg(e.target.value)}
+              placeholder="간단히 적어 주세요 (선택)"
+              className="w-full resize-none rounded-photo border border-line bg-paper p-4 text-sm text-ink outline-none placeholder:text-muted"
+            />
+          </Section>
+        )}
+
+        {/* 댓글 — 미션 댓글 API가 아직 없어 기존과 같이 자리만 둔다 */}
+        <Section eyebrow="Comments" title="댓글">
+          <div className="rounded-card border border-line bg-paper p-5">
+            <p className="py-6 text-center text-sm text-muted">아직 댓글이 없습니다</p>
+            {user && (
+              <div className="flex gap-2 border-t border-line-soft pt-4">
+                <input
+                  disabled
+                  className="min-w-0 flex-1 rounded-control border border-line bg-cream px-3 py-2 text-sm text-ink outline-none placeholder:text-muted"
+                  placeholder="댓글 기능은 준비 중이에요"
+                />
+                <button disabled className="shrink-0 rounded-control bg-ink px-4 py-2 text-sm font-medium text-paper opacity-50">
+                  등록
                 </button>
-              )}
-            </div>
-          </div>
-
-          {/* 주최사 카드 */}
-          <div className="bg-white rounded-xl shadow-sm p-4">
-            <p className="text-xs text-gray-400 mb-2 font-medium">주최사</p>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 font-bold text-sm">
-                {(mission.clientProfile?.businessName ?? '?')[0]}
               </div>
-              <div>
-                <p className="text-sm font-bold text-gray-900">{mission.clientProfile?.businessName}</p>
-                {mission.clientProfile?.address && (
-                  <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{mission.clientProfile.address}</p>
-                )}
-              </div>
-            </div>
+            )}
           </div>
-
-          {/* 공정위 문구 */}
-          <div className="bg-white rounded-xl shadow-sm p-4 text-center">
-            <p className="text-xs text-gray-400 mb-2">공정위 문구</p>
-            <div className="bg-gray-100 rounded-lg py-4 px-3">
-              <p className="text-gray-400 text-xs">당첨된 이후 확인 가능</p>
-            </div>
-          </div>
-        </div>
+        </Section>
       </div>
 
-      {/* ── 모바일 하단 신청 바 ── */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg px-4 py-3 z-30">
-        <div className="flex items-center gap-3">
-          <div className="flex-1 min-w-0">
-            <p className="text-xs text-gray-400">보상금액</p>
-            <p className="text-base font-bold text-slate-600">{Number(mission.rewardAmount).toLocaleString()}원</p>
-          </div>
-          <div className="shrink-0 w-44">
-            {user?.role === 'PARTICIPANT' && isOpen && !isFull && !applied && (
-              <button onClick={handleApply} disabled={applying}
-                className="w-full bg-slate-700 text-white rounded-xl py-2.5 font-bold text-sm hover:bg-slate-700 disabled:opacity-50">
-                {applying ? '신청 중...' : '신청하기'}
-              </button>
-            )}
-            {applied && (
-              <div className="w-full bg-green-50 border border-green-200 rounded-xl py-2.5 text-center">
-                <p className="text-green-700 font-bold text-sm">✓ 신청 완료!</p>
-              </div>
-            )}
-            {user?.role === 'PARTICIPANT' && (isFull || !isOpen) && (
-              <button disabled className="w-full bg-gray-200 text-gray-400 rounded-xl py-2.5 font-bold text-sm">
-                {isFull ? '모집 마감' : '모집 종료'}
-              </button>
-            )}
-            {!user && (
-              <Link href="/login"
-                className="block w-full bg-slate-700 text-white rounded-xl py-2.5 font-bold text-sm text-center hover:bg-slate-800">
-                로그인 후 신청하기
-              </Link>
-            )}
-            {(user?.role === 'CLIENT' || user?.role === 'OPERATOR') && (
-              <button disabled className="w-full bg-gray-100 text-gray-400 rounded-xl py-2.5 font-bold text-sm">
-                {user.role === 'OPERATOR' ? '운영자 계정' : '고객사 계정'}
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
+      {/* 하단 고정 신청 바. 찜 기능은 아직 없어 신청 버튼만 둔다 */}
+      <StickyCTA label={ctaLabel} onPress={handleApply} disabled={ctaDisabled} />
     </div>
   );
 }

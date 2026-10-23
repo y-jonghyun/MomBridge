@@ -55,3 +55,21 @@ export const InfoIcon = (p: IconProps) => (
 export const LogOutIcon = (p: IconProps) => (
   <Svg {...p}><path d="M15 16l4-4-4-4" /><path d="M19 12H9" /><path d="M9 5H5v14h4" /></Svg>
 );
+export const ChevronLeftIcon = (p: IconProps) => (
+  <Svg {...p}><path d="M15 5l-7 7 7 7" /></Svg>
+);
+export const ShareIcon = (p: IconProps) => (
+  <Svg {...p}><path d="M12 4v11M7.5 8.5L12 4l4.5 4.5M5 13v6h14v-6" /></Svg>
+);
+export const CameraIcon = (p: IconProps) => (
+  <Svg {...p}><rect x="3.5" y="6.5" width="17" height="12" rx="2" /><circle cx="12" cy="12.5" r="3.2" /><path d="M9 6.5l1.2-2h3.6l1.2 2" /></Svg>
+);
+export const DocIcon = (p: IconProps) => (
+  <Svg {...p}><path d="M5 4h10l4 4v12H5z" /><path d="M8 11h8M8 14.5h8M8 18h5" /></Svg>
+);
+export const KeywordIcon = (p: IconProps) => (
+  <Svg {...p}><path d="M7 4v16M4 8h16M4 16h16M17 4v16" /></Svg>
+);
+export const LinkIcon = (p: IconProps) => (
+  <Svg {...p}><path d="M10 13.5a4 4 0 0 0 5.7 0l2.8-2.8a4 4 0 1 0-5.7-5.7L11.5 6.3" /><path d="M14 10.5a4 4 0 0 0-5.7 0l-2.8 2.8a4 4 0 1 0 5.7 5.7l1.3-1.3" /></Svg>
+);
