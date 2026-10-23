@@ -10,16 +10,21 @@ import { BottomTabBar, BottomTabBarSpacer, CategoryTabs, SiteHeader } from '@/co
 import { photoTone } from '@/components/ui/MissionCard';
 import { BellIcon, LogOutIcon } from '@/components/ui/icons';
 import { formatPhone, isMobilePhone, phoneDigits } from '@/lib/phone';
+import { MissionCard } from '@/components/ui';
+import { toCardData, type MissionListItem } from '@/components/missions/MissionBrowser';
+import { useBookmarks } from '@/lib/bookmarks';
+import { fetchNextPayoutDate, payoutLabel } from '@/lib/payout';
 
 /** 기준: docs/design/mombridge-design/cream-editorial-v1.md 3번 '참여자 내 활동' + Participant.html */
 
-type Tab = 'active' | 'applications' | 'submissions' | 'payouts' | 'profile';
+type Tab = 'active' | 'applications' | 'submissions' | 'payouts' | 'bookmarks' | 'profile';
 
 const TABS = [
   { value: 'active', label: '진행 중' },
   { value: 'applications', label: '지원 현황' },
   { value: 'submissions', label: '제출 내역' },
   { value: 'payouts', label: '보상 내역' },
+  { value: 'bookmarks', label: '찜한 미션' },
   { value: 'profile', label: '내 정보' },
 ];
 
@@ -44,13 +49,6 @@ function StatusBadge({ status }: { status: string }) {
 
 const won = (n: unknown) => `${Number(n ?? 0).toLocaleString()}원`;
 const dateK = (d: string) => new Date(d).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }).replace(/\.$/, '');
-
-/** 보상은 매월 말일 마감 → 다음 달 10일 지급 (약관 제8조) */
-function nextPayoutLabel(now = new Date()) {
-  const d = new Date(now.getFullYear(), now.getMonth(), 10);
-  if (now.getDate() >= 10) d.setMonth(d.getMonth() + 1);
-  return `${d.getMonth() + 1}월 ${d.getDate()}일`;
-}
 
 /** 계좌번호는 끝 4자리만 보여 준다 */
 function maskAccount(account?: string | null) {
@@ -94,6 +92,11 @@ export default function ParticipantPage() {
   const [tab, setTab] = useState<Tab>('active');
   const [profileForm, setProfileForm] = useState({ name: '', phone: '' });
   const [profileSaving, setProfileSaving] = useState(false);
+  const [bookmarks, setBookmarks] = useState<MissionListItem[]>([]);
+  const [payoutDay, setPayoutDay] = useState<string | null>(null);
+  const savedIds = useBookmarks(s => s.ids);
+  const loadBookmarkIds = useBookmarks(s => s.load);
+  const toggleBookmark = useBookmarks(s => s.toggle);
   const [loading, setLoading] = useState(true);
 
   const [applications, setApplications] = useState<any[]>([]);
@@ -162,6 +165,13 @@ export default function ParticipantPage() {
     } finally { setProfileSaving(false); }
   }
 
+  const loadBookmarks = useCallback(async () => {
+    try {
+      const { data } = await api.get('/participant/bookmarks');
+      setBookmarks(data.data);
+    } catch { /* 찜 목록은 비어 있는 상태로 둔다 */ }
+  }, []);
+
   const loadNotifications = useCallback(async () => {
     try {
       const r = await api.get('/notifications');
@@ -177,9 +187,12 @@ export default function ParticipantPage() {
     void loadAll();
     void loadNotifications();
     void loadProfile();
+    void loadBookmarks();
+    void loadBookmarkIds();
+    void fetchNextPayoutDate().then(d => setPayoutDay(d ? payoutLabel(d) : null));
     // 이미 로그인해 있던 체험단원도 본인 클릭 표시를 받는다 (만료 연장 겸)
     if (user.role === 'PARTICIPANT') void syncSelfClickCookie();
-  }, [user, hydrated, loadAll, loadNotifications, loadProfile, router]);
+  }, [user, hydrated, loadAll, loadNotifications, loadProfile, loadBookmarks, loadBookmarkIds, router]);
 
   async function markAllRead() {
     try {
@@ -298,7 +311,9 @@ export default function ParticipantPage() {
         <section className="mx-5 mt-3 rounded-box bg-ink px-5 py-[22px] text-paper">
           <span className="font-accent text-sm italic text-[#D9A27F]">This month</span>
           <p className="mt-1 text-[13px] text-[#CFC4B4]">
-            {pendingPay.length > 0 ? `${nextPayoutLabel()}에 받을 보상` : '다음 정산일 ' + nextPayoutLabel()}
+            {payoutDay
+              ? (pendingPay.length > 0 ? `${payoutDay}에 받을 보상` : `다음 정산일 ${payoutDay}`)
+              : '받을 보상'}
           </p>
           <p className="mt-1 font-serif text-hero font-bold">{won(nextAmount)}</p>
           <p className="mt-1 text-xs text-[#CFC4B4]">
@@ -396,7 +411,9 @@ export default function ParticipantPage() {
                           <p className="text-center text-[13px] text-muted">검수 중 · 보통 2일 안에 결과가 나와요</p>
                         )}
                         {sub?.status === 'APPROVED' && (
-                          <p className="text-center text-[13px] text-muted">{nextPayoutLabel()}에 지급될 예정이에요</p>
+                          <p className="text-center text-[13px] text-muted">
+                            {payoutDay ? `${payoutDay}에 지급될 예정이에요` : '정산일에 지급될 예정이에요'}
+                          </p>
                         )}
                         <button
                           onClick={() => setGuideMissionId(a.missionId)}
@@ -514,6 +531,29 @@ export default function ParticipantPage() {
                     )}
                   </div>
                 </section>
+              </div>
+            )}
+
+            {/* 찜한 미션 */}
+            {tab === 'bookmarks' && (
+              <div className="px-5 pt-[18px]">
+                {bookmarks.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-[22px]">
+                    {bookmarks.map(m => (
+                      <MissionCard
+                        key={m.id} mission={toCardData(m)}
+                        saved={savedIds.has(m.id)}
+                        onToggleSave={() => {
+                          void toggleBookmark(m.id);
+                          // 이 화면에서 찜을 풀면 목록에서도 바로 빠진다
+                          setBookmarks(prev => prev.filter(x => x.id !== m.id));
+                        }}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyBox>아직 찜한 미션이 없어요. 미션 사진 위 하트를 눌러 모아 보세요.</EmptyBox>
+                )}
               </div>
             )}
 

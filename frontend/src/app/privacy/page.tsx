@@ -68,7 +68,7 @@ export default function PrivacyPage() {
           <table className="w-full border-collapse text-xs sm:text-sm">
             <thead><tr><th className={th}>업체</th><th className={th}>업무</th><th className={th}>위치</th></tr></thead>
             <tbody>
-              <tr><td className={td}>Supabase Inc.</td><td className={td}>데이터베이스 보관</td><td className={td}>일본(도쿄)</td></tr>
+              <tr><td className={td}>Supabase Inc.</td><td className={td}>데이터베이스·사진 파일 보관</td><td className={td}>일본(도쿄)</td></tr>
               <tr><td className={td}>Render Services, Inc.</td><td className={td}>서버 운영</td><td className={td}>싱가포르</td></tr>
               <tr><td className={td}>Vercel Inc.</td><td className={td}>웹 화면 제공</td><td className={td}>미국 등</td></tr>
               <tr><td className={td}>(주)토스페이먼츠</td><td className={td}>결제 처리</td><td className={td}>대한민국</td></tr>

@@ -13,11 +13,22 @@ import {
 } from './missions.schema';
 import { newCampaignCode, normalizeMissionKeywords, saveMissionKeywords } from './mission-extras';
 import { recruitingCutoff } from './mission-lifecycle';
+import { payoutDueDate } from '../../lib/payout';
 import { logger } from '../../utils/logger';
 import { captureError, reportIssue } from '../../lib/monitoring';
 import missionImageRoutes from './mission-images.routes';
 
 const router = Router();
+
+/** 목록 필터로 받는 업종·엄마 시간 태그. 스키마의 enum과 같은 값이다 */
+const BUSINESS_CATEGORIES = ['FOOD', 'CAFE', 'KIDS', 'BEAUTY', 'LIVING', 'ETC'] as const;
+const MOM_TIME_TAGS = ['WEEKDAY_DAY', 'WEEKEND_OK', 'KID_FRIENDLY', 'AT_HOME'] as const;
+
+/** 모르는 값은 조용히 무시한다 — 필터가 잘못 와도 목록은 보여야 한다 */
+function parseEnum<T extends string>(raw: unknown, allowed: readonly T[]): T | undefined {
+  const v = String(raw ?? '');
+  return (allowed as readonly string[]).includes(v) ? (v as T) : undefined;
+}
 
 // 미션 사진 (업로드·순서·삭제) — 고객사 본인/운영자만
 router.use('/:id/images', missionImageRoutes);
@@ -31,6 +42,9 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 
     const sort = String(req.query.sort ?? 'NEWEST');
     const keyword = req.query.keyword as string | undefined;
+    const businessCategory = parseEnum(req.query.businessCategory, BUSINESS_CATEGORIES);
+    const momTags = String(req.query.momTags ?? '').split(',').map(t => t.trim())
+      .filter(t => (MOM_TIME_TAGS as readonly string[]).includes(t));
 
     const where: any = {
       status: 'OPEN' as const,
@@ -41,6 +55,10 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       // 시·도 필터는 예전 표기('서울시', '충북')로 저장된 미션도 찾는다
       ...(req.query.regionSi && { regionSi: { in: provinceVariants(normalizeProvince(String(req.query.regionSi)) ?? String(req.query.regionSi)) } }),
       ...(req.query.regionGu && { regionGu: String(req.query.regionGu) }),
+      // 업종(맛집·카페…) — 고르지 않은 미션은 걸리지 않는다
+      ...(businessCategory && { businessCategory }),
+      // 엄마 시간 태그는 여러 개를 고르면 '하나라도 맞으면' 보여준다 (좁히기보다 넓히는 쪽)
+      ...(momTags.length > 0 && { momTags: { hasSome: momTags } }),
       ...(keyword && { OR: [{ title: { contains: keyword } }, { description: { contains: keyword } }] }),
     };
 
@@ -82,7 +100,8 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
     });
     if (!mission) throw new AppError('NOT_FOUND', 404, '미션을 찾을 수 없습니다');
     await prisma.mission.update({ where: { id: req.params.id }, data: { viewCount: { increment: 1 } } });
-    res.json({ success: true, data: mission });
+    // 보상 지급 예정일은 약관 제8조대로 서버에서 계산해 내려준다 (화면이 다시 셈하지 않도록)
+    res.json({ success: true, data: { ...mission, payoutDueDate: payoutDueDate(mission.submissionDeadline) } });
   } catch (e) { next(e); }
 });
 

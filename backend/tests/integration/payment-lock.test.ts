@@ -20,7 +20,7 @@ describeDb('공개 전 결제 잠금', () => {
       .send({
         title: '미션', description: '설명', category: 'SNS', rewardAmount: 30000, maxParticipants: 5,
         regionSi: '서울', regionGu: '마포구',
-        startDate: '2026-11-01', endDate: '2026-11-14', submissionDeadline: '2026-11-10',
+        startDate: '2026-11-01', endDate: '2026-11-10', submissionDeadline: '2026-11-14',
         paymentKey: 'pk', orderId: 'oid', amount: 150000,
       });
 
@@ -56,7 +56,7 @@ describeDb('공개 전 결제 잠금', () => {
         clientProfileId: client.profile.id,
         title: '대행 등록 미션', description: '설명', category: 'SNS',
         rewardAmount: 30000, maxParticipants: 5, regionSi: '서울', regionGu: '마포구',
-        startDate: '2026-11-01', endDate: '2026-11-14', submissionDeadline: '2026-11-10',
+        startDate: '2026-11-01', endDate: '2026-11-10', submissionDeadline: '2026-11-14',
       });
 
     expect(res.status).toBe(201);

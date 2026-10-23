@@ -59,7 +59,8 @@ export async function createMission(clientProfileId: string, extra: Record<strin
       maxParticipants: 5,
       startDate: new Date(now),
       endDate: new Date(now + 14 * 86400000),
-      submissionDeadline: new Date(now + 10 * 86400000),
+      // 신청 마감(+14일) 뒤에 후기 마감이 온다 — missions.schema의 날짜 순서와 같게
+      submissionDeadline: new Date(now + 17 * 86400000),
       campaignCode: randomCampaignCode(),
       ...extra,
     } as any,

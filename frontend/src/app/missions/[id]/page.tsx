@@ -4,9 +4,13 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
-import { KeywordBox, NoticeBox, ScheduleTimeline, StickyCTA, type ScheduleStep } from '@/components/ui';
-import { photoTone } from '@/components/ui/MissionCard';
+import { KeywordBox, NoticeBox, ScheduleTimeline, StickyCTA, Tag, type ScheduleStep } from '@/components/ui';
 import { CameraIcon, ChevronLeftIcon, DocIcon, KeywordIcon, LinkIcon, PinIcon, ShareIcon } from '@/components/ui/icons';
+import MissionGallery from '@/components/missions/MissionGallery';
+import { BUSINESS_LABEL, MOM_TAG_LABEL } from '@/components/missions/MissionBrowser';
+import { useBookmarks } from '@/lib/bookmarks';
+import { toLines } from '@/lib/lines';
+import { payoutLabel } from '@/lib/payout';
 
 /** 기준: docs/design/mombridge-design/cream-editorial-v1.md 3번 '미션 상세' + Detail.html */
 
@@ -55,10 +59,16 @@ export default function MissionDetailPage() {
   const [applying, setApplying] = useState(false);
   const [applied, setApplied] = useState(false);
   const [shareMsg, setShareMsg] = useState('');
+  const savedIds = useBookmarks(s => s.ids);
+  const loadBookmarks = useBookmarks(s => s.load);
+  const toggleBookmark = useBookmarks(s => s.toggle);
+  const canSave = user?.role === 'PARTICIPANT';
 
   useEffect(() => {
     api.get(`/missions/${id}`).then(r => setMission(r.data.data)).finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => { if (canSave) void loadBookmarks(); }, [canSave, loadBookmarks]);
 
   async function handleApply() {
     if (!user) { router.push('/login'); return; }
@@ -96,12 +106,13 @@ export default function MissionDetailPage() {
   const net = Math.floor(Number(mission.rewardAmount) * 0.9);
   const points = MISSION_POINTS[mission.category] ?? MISSION_POINTS.SNS;
   const keywords: { keyword: string; role: 'MAIN' | 'SUB' }[] = mission.keywords ?? [];
-  const tone = photoTone(mission.id);
+  const images: { id: string; url: string }[] = mission.images ?? [];
+  const momTags: string[] = mission.momTags ?? [];
 
-  // 선정 발표일·보상 지급일은 아직 데이터가 없어 단계를 숨긴다 (문서 4번)
   const steps: ScheduleStep[] = [
     { label: '신청', when: `${day(mission.startDate)} – ${day(mission.endDate)}`, current: isOpen, note: isOpen && dday >= 0 ? (dday === 0 ? 'D-Day' : `D-${dday}`) : null },
-    { label: '선정 발표', when: null },
+    // 발표일을 적지 않은 미션은 이 단계를 보여주지 않는다
+    { label: '선정 발표', when: mission.announceDate ? day(mission.announceDate) : null },
     // 제출 마감이 모집 마감보다 앞서는 데이터도 있어, 역전되면 마감일만 보여준다
     {
       label: '방문 · 후기 등록',
@@ -110,11 +121,12 @@ export default function MissionDetailPage() {
         : `${day(mission.submissionDeadline)}까지`,
       current: !isOpen,
     },
-    { label: '보상 지급', when: null },
+    // 약관 제8조에 따른 예정일. 휴일 보정까지 서버가 계산해 내려준다 (backend/src/lib/payout.ts)
+    { label: '보상 지급', when: mission.payoutDueDate ? `늦어도 ${payoutLabel(new Date(mission.payoutDueDate))}` : null },
   ];
 
-  const requirements: string[] = String(mission.requirements ?? '').split('\n').map(s => s.trim()).filter(Boolean);
-  const visitLines: string[] = String(mission.visitGuide ?? '').split('\n').map(s => s.trim()).filter(Boolean);
+  const requirements = toLines(mission.requirements);
+  const visitLines = toLines(mission.visitGuide);
 
   const ctaLabel = !user ? '로그인 후 신청하기'
     : user.role !== 'PARTICIPANT' ? (user.role === 'OPERATOR' ? '운영자 계정' : '고객사 계정')
@@ -126,12 +138,8 @@ export default function MissionDetailPage() {
 
   return (
     <div className="min-h-screen bg-cream pb-[88px]">
-      {/* 대표 사진. 여러 장 업로드는 아직 없어 1장만 보여주고 '1 / n' 표시는 숨긴다 */}
-      <div className={`relative flex h-[340px] items-center justify-center overflow-hidden ${mission.thumbnailUrl ? '' : tone.bg}`}>
-        {mission.thumbnailUrl
-          // eslint-disable-next-line @next/next/no-img-element
-          ? <img src={mission.thumbnailUrl} alt="" className="h-full w-full object-cover" />
-          : <span className={`text-[13px] tracking-[0.04em] ${tone.fg}`}>대표 가게 사진</span>}
+      {/* 사진 — 여러 장이면 옆으로 넘기고 '1 / n'을 보여준다 */}
+      <MissionGallery missionId={mission.id} businessCategory={mission.businessCategory} images={images}>
         <Link
           href={backHref} aria-label="목록으로"
           className="absolute left-3 top-3 flex h-11 w-11 items-center justify-center rounded-full bg-paper text-ink"
@@ -146,9 +154,9 @@ export default function MissionDetailPage() {
         </button>
         <span aria-live="polite" className="sr-only">{shareMsg}</span>
         {shareMsg && (
-          <span className="absolute bottom-4 right-4 rounded-full bg-ink px-3 py-1 text-xs text-paper">{shareMsg}</span>
+          <span className="absolute bottom-14 right-4 rounded-full bg-ink px-3 py-1 text-xs text-paper">{shareMsg}</span>
         )}
-      </div>
+      </MissionGallery>
 
       <div className="mx-auto max-w-shell">
         {/* 정보 블록 */}
@@ -157,8 +165,17 @@ export default function MissionDetailPage() {
             <span className="flex h-6 items-center rounded-full border border-line px-2.5 text-[11px] font-medium text-ink-2">
               {CATEGORY_LABEL[mission.category] ?? mission.category}
             </span>
-            {/* 엄마 시간 태그(평일 낮·아이 동반)는 데이터가 없어 숨긴다 */}
+            {mission.businessCategory && (
+              <span className="flex h-6 items-center rounded-full border border-line px-2.5 text-[11px] font-medium text-ink-2">
+                {BUSINESS_LABEL[mission.businessCategory] ?? mission.businessCategory}
+              </span>
+            )}
           </div>
+          {momTags.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {momTags.map(t => <Tag key={t}>{MOM_TAG_LABEL[t] ?? t}</Tag>)}
+            </div>
+          )}
           <p className="mt-3.5 text-[13px] text-muted">{area}</p>
           <h1 className="mb-1.5 mt-1 font-serif text-title-lg font-bold">{mission.clientProfile?.businessName ?? mission.title}</h1>
           <p className="text-[15px] text-ink-2">{mission.title}</p>
@@ -193,7 +210,7 @@ export default function MissionDetailPage() {
         )}
 
         {/* 방문 안내 — 지도는 자리만, 체험 시간·휴무는 데이터가 없어 숨긴다 */}
-        {(mission.clientProfile?.address || visitLines.length > 0) && (
+        {(mission.clientProfile?.address || mission.visitHours || visitLines.length > 0) && (
           <Section eyebrow="Visit" title="방문 안내">
             <div className="flex h-[150px] items-center justify-center rounded-photo bg-[#E2DCCF] text-xs text-[#5E5A46]">지도</div>
             <dl className="mt-3.5 grid grid-cols-[76px_1fr] gap-y-2.5 text-sm">
@@ -201,6 +218,12 @@ export default function MissionDetailPage() {
                 <>
                   <dt className="text-muted">주소</dt>
                   <dd className="m-0">{mission.clientProfile.address}</dd>
+                </>
+              )}
+              {mission.visitHours && (
+                <>
+                  <dt className="text-muted">방문 가능</dt>
+                  <dd className="m-0">{mission.visitHours}</dd>
                 </>
               )}
               {visitLines.length > 0 && (
@@ -272,8 +295,12 @@ export default function MissionDetailPage() {
         </Section>
       </div>
 
-      {/* 하단 고정 신청 바. 찜 기능은 아직 없어 신청 버튼만 둔다 */}
-      <StickyCTA label={ctaLabel} onPress={handleApply} disabled={ctaDisabled} />
+      {/* 하단 고정: 찜 + 신청. 찜은 참여자 본인만 */}
+      <StickyCTA
+        label={ctaLabel} onPress={handleApply} disabled={ctaDisabled}
+        saved={savedIds.has(String(id))}
+        onToggleSave={canSave ? () => void toggleBookmark(String(id)) : undefined}
+      />
     </div>
   );
 }

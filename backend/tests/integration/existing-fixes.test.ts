@@ -26,7 +26,7 @@ describeDb('입력 검증', () => {
   const missionBody = {
     title: '카페 체험', description: '설명', category: 'REVIEW', regionSi: '서울', regionGu: '마포구',
     rewardAmount: 30000, maxParticipants: 5, requirements: '',
-    startDate: '2026-11-01', endDate: '2026-11-30', submissionDeadline: '2026-11-25',
+    startDate: '2026-11-01', endDate: '2026-11-20', submissionDeadline: '2026-11-30',
   };
 
   it('ignores server-controlled fields when an operator creates a mission', async () => {

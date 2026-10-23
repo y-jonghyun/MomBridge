@@ -2,9 +2,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import api from '@/lib/api';
 import ProvinceSelect from '@/components/common/ProvinceSelect';
-import { CategoryTabs, MissionCard, type MissionCardData } from '@/components/ui';
+import { CategoryTabs, Chip, MissionCard, type MissionCardData } from '@/components/ui';
 import { PinIcon } from '@/components/ui/icons';
 import MissionEmptyBox from './MissionEmptyBox';
+import { BUSINESS_CATEGORIES, MOM_TAGS } from '@/lib/mission-options';
+import { useBookmarks } from '@/lib/bookmarks';
+import { useAuthStore } from '@/store/auth';
 
 /**
  * 미션 목록 화면. /missions와 참여자 홈의 '미션 탐색' 탭이 같은 이 컴포넌트를 쓴다.
@@ -24,6 +27,8 @@ export interface MissionListItem {
   thumbnailUrl?: string | null;
   currentCount?: number | null;
   maxParticipants?: number | null;
+  businessCategory?: string | null;
+  momTags?: string[] | null;
   clientProfile?: { businessName?: string | null } | null;
 }
 
@@ -31,11 +36,14 @@ export const CATEGORY_LABEL: Record<string, string> = {
   VISIT: '방문형', SNS: 'SNS', REVIEW: '리뷰', VIDEO: '영상',
 };
 
-/** 업종 탭(맛집·카페…)은 데이터가 없어 유형 탭으로 대신한다 (문서 4번) */
-const CATEGORY_TABS = [
-  { value: '', label: '전체' },
-  ...Object.entries(CATEGORY_LABEL).map(([value, label]) => ({ value, label })),
+/** 업종 탭 (맛집·카페·키즈…). 탭 줄은 이것 하나만 둔다 */
+const BUSINESS_TABS = [
+  { value: '', label: '전체 업종' },
+  ...BUSINESS_CATEGORIES.map(([value, label]) => ({ value, label })),
 ];
+
+export const BUSINESS_LABEL: Record<string, string> = Object.fromEntries(BUSINESS_CATEGORIES);
+export const MOM_TAG_LABEL: Record<string, string> = Object.fromEntries(MOM_TAGS);
 
 const SORTS = [
   { value: 'DEADLINE', label: '마감 임박순' },
@@ -46,8 +54,13 @@ const SORTS = [
 /** 열린 미션이 하나도 없을 때의 문구. 홈도 같은 문구를 쓴다 */
 export const EMPTY_MESSAGE = '우리 동네 미션을 준비하고 있어요.';
 
-export interface MissionFilter { category: string; regionSi: string; sort: string; keyword: string }
-export const defaultMissionFilter: MissionFilter = { category: '', regionSi: '', sort: 'NEWEST', keyword: '' };
+export interface MissionFilter {
+  category: string; regionSi: string; sort: string; keyword: string;
+  businessCategory: string; momTags: string[];
+}
+export const defaultMissionFilter: MissionFilter = {
+  category: '', regionSi: '', sort: 'NEWEST', keyword: '', businessCategory: '', momTags: [],
+};
 
 /** 수수료 10%를 뺀 실수령액 (서버 계산값이 생기면 그 값으로 바꾼다) */
 const netOf = (reward: number) => Math.floor(Number(reward) * 0.9);
@@ -63,8 +76,8 @@ export function toCardData(m: MissionListItem): MissionCardData {
     netAmount: netOf(m.rewardAmount),
     categoryLabel: CATEGORY_LABEL[m.category] ?? m.category,
     dday,
-    // 엄마 시간 태그는 아직 데이터가 없어 숨긴다 (문서 4번)
-    tags: [],
+    tags: (m.momTags ?? []).map(t => MOM_TAG_LABEL[t] ?? t),
+    businessCategory: m.businessCategory,
     thumbnailUrl: m.thumbnailUrl,
     appliedCount: m.currentCount ?? null,
     maxParticipants: m.maxParticipants ?? null,
@@ -82,6 +95,11 @@ export default function MissionBrowser({
   const [searchInput, setSearchInput] = useState(initialFilter.keyword);
   const [missions, setMissions] = useState<MissionListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const user = useAuthStore(s => s.user);
+  const savedIds = useBookmarks(s => s.ids);
+  const loadBookmarks = useBookmarks(s => s.load);
+  const toggleBookmark = useBookmarks(s => s.toggle);
+  const canSave = user?.role === 'PARTICIPANT';
 
   const load = useCallback(async (f: MissionFilter) => {
     setLoading(true);
@@ -91,6 +109,8 @@ export default function MissionBrowser({
       if (f.regionSi) params.set('regionSi', f.regionSi);
       if (f.sort) params.set('sort', f.sort);
       if (f.keyword) params.set('keyword', f.keyword);
+      if (f.businessCategory) params.set('businessCategory', f.businessCategory);
+      if (f.momTags.length) params.set('momTags', f.momTags.join(','));
       const { data } = await api.get(`/missions?${params.toString()}`);
       setMissions(data.data.missions);
     } finally {
@@ -99,8 +119,14 @@ export default function MissionBrowser({
   }, []);
 
   useEffect(() => { void load(filter); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  useEffect(() => { if (canSave) void loadBookmarks(); }, [canSave, loadBookmarks]);
 
-  const filtered = !!(filter.keyword || filter.category || filter.regionSi);
+  const filtered = !!(filter.keyword || filter.category || filter.regionSi || filter.businessCategory || filter.momTags.length);
+
+  const toggleMomTag = (value: string) => {
+    const has = filter.momTags.includes(value);
+    apply({ momTags: has ? filter.momTags.filter(t => t !== value) : [...filter.momTags, value] });
+  };
 
   const apply = (next: Partial<MissionFilter>) => {
     const f = { ...filter, ...next };
@@ -110,7 +136,9 @@ export default function MissionBrowser({
 
   return (
     <div>
-      {/* 칩 줄 — 엄마 시간 칩(평일 낮·아이 동반·재택)은 데이터가 없어 숨긴다 */}
+      {/* 칩 줄 — 지역 + 유형 + 엄마 시간 태그.
+          탭 줄을 둘로 쌓지 않으려고 유형(방문형·SNS·리뷰·영상)도 이 줄에 둔다.
+          유형은 하나만, 엄마 시간 태그는 여러 개 고를 수 있다 */}
       <div className="no-scrollbar flex gap-2 overflow-x-auto px-5 pb-1">
         {/* 지역 칩. Chip은 button이라 select를 품을 수 없어 같은 모양의 label로 만든다 */}
         <label
@@ -127,14 +155,28 @@ export default function MissionBrowser({
             className="cursor-pointer appearance-none bg-transparent text-[13px] text-inherit outline-none"
           />
         </label>
+        {Object.entries(CATEGORY_LABEL).map(([value, label]) => (
+          <Chip
+            key={value} selected={filter.category === value}
+            // 같은 유형을 다시 누르면 해제된다
+            onClick={() => apply({ category: filter.category === value ? '' : value })}
+          >
+            {label}
+          </Chip>
+        ))}
+        {MOM_TAGS.map(([value, label]) => (
+          <Chip key={value} selected={filter.momTags.includes(value)} onClick={() => toggleMomTag(value)}>
+            {label}
+          </Chip>
+        ))}
       </div>
 
       <div className="mt-2.5">
         <CategoryTabs
-          tabs={CATEGORY_TABS}
-          value={filter.category}
-          onChange={v => apply({ category: v })}
-          ariaLabel="미션 유형"
+          tabs={BUSINESS_TABS}
+          value={filter.businessCategory}
+          onChange={v => apply({ businessCategory: v })}
+          ariaLabel="업종"
         />
       </div>
 
@@ -182,7 +224,13 @@ export default function MissionBrowser({
         <>
           {missions.length > 0 && (
             <div className="grid grid-cols-2 gap-x-3 gap-y-[22px] px-5 pt-2 sm:grid-cols-3 lg:grid-cols-4">
-              {missions.map(m => <MissionCard key={m.id} mission={toCardData(m)} />)}
+              {missions.map(m => (
+                <MissionCard
+                  key={m.id} mission={toCardData(m)}
+                  saved={savedIds.has(m.id)}
+                  onToggleSave={canSave ? () => void toggleBookmark(m.id) : undefined}
+                />
+              ))}
             </div>
           )}
 
@@ -195,7 +243,10 @@ export default function MissionBrowser({
                   : filter.regionSi ? '우리 동네 미션을 다 봤어요.' : '미션을 모두 봤어요.'
               }
               actionLabel={filtered ? '이웃 동네 미션 보기' : undefined}
-              onAction={() => { setSearchInput(''); apply({ regionSi: '', category: '', keyword: '' }); }}
+              onAction={() => {
+                setSearchInput('');
+                apply({ regionSi: '', category: '', keyword: '', businessCategory: '', momTags: [] });
+              }}
             />
           </div>
         </>

@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/auth';
 import { LogOutIcon } from '@/components/ui/icons';
 import MissionImageUploader, { uploadPendingImages, type PendingImage } from '@/components/missions/MissionImageUploader';
 import { BUSINESS_CATEGORIES, MOM_TAGS } from '@/lib/mission-options';
+import { missionDateError } from '@/lib/mission-dates';
 import { SettingsEditor, SubmissionCheckPanel, TrafficSummary } from '@/components/operator/OperatorCampaignTools';
 import ProvinceSelect from '@/components/common/ProvinceSelect';
 
@@ -121,6 +122,10 @@ export default function OperatorDashboard() {
 
   async function handleRegisterMission(e: React.FormEvent) {
     e.preventDefault();
+
+    const dateError = missionDateError(registerForm);
+    if (dateError) { alert(dateError); return; }
+
     setRegisterSubmitting(true);
     try {
       const { sendPaymentLink, ...missionData } = registerForm;
@@ -615,10 +620,15 @@ export default function OperatorDashboard() {
                       value={registerForm.regionGu} onChange={e => rf('regionGu', e.target.value)} placeholder="예: 청주시 상당구, 마포구" />
                   </div>
                   <div className="grid grid-cols-3 gap-4">
-                    {([['startDate', '시작일 *'], ['endDate', '종료일 *'], ['submissionDeadline', '제출 마감일 *']] as const).map(([k, l]) => (
+                    {([
+                      ['startDate', '신청 시작일 *', ''],
+                      ['endDate', '신청 마감일 *', 'startDate'],
+                      ['submissionDeadline', '후기 마감일 *', registerForm.announceDate ? 'announceDate' : 'endDate'],
+                    ] as const).map(([k, l, after]) => (
                       <div key={k}>
                         <label className="block text-sm font-medium text-ink-2 mb-1">{l}</label>
-                        <input required type="date" className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none"
+                        <input required type="date" min={after ? registerForm[after as 'startDate'] || undefined : undefined}
+                          className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none"
                           value={registerForm[k]} onChange={e => rf(k, e.target.value)} />
                       </div>
                     ))}
@@ -673,7 +683,8 @@ export default function OperatorDashboard() {
 
                   <div>
                     <label htmlFor="op-announce" className="mb-1 block text-sm font-medium text-ink-2">선정 발표일</label>
-                    <input id="op-announce" type="date" className="w-full rounded-control border border-line bg-paper px-3 py-2 text-sm"
+                    <input id="op-announce" type="date" min={registerForm.endDate || undefined}
+                      className="w-full rounded-control border border-line bg-paper px-3 py-2 text-sm"
                       value={registerForm.announceDate} onChange={e => rf('announceDate', e.target.value)} />
                   </div>
 

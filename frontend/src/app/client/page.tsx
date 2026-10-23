@@ -14,6 +14,7 @@ import { BUSINESS_CATEGORIES, MOM_TAGS } from '@/lib/mission-options';
 import { formatPhone, isMobilePhone, phoneDigits } from '@/lib/phone';
 import { ClientPerformanceCard, MissionProgress, clientMissionStage } from '@/components/client/ClientOverview';
 import { CLIENT_PAYMENT_ENABLED } from '@/lib/features';
+import { missionDateError } from '@/lib/mission-dates';
 import { BUSINESS_INFO } from '@/lib/legal';
 
 type Tab = 'my-missions' | 'create' | 'results' | 'profile';
@@ -219,6 +220,11 @@ function ClientPageContent() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
+
+    // 결제 창을 띄우기 전에 날짜 순서부터 본다 (서버도 같은 순서로 막는다)
+    const dateError = missionDateError(form);
+    if (dateError) { alert(dateError); return; }
+
     setSubmitting(true);
 
     const clientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY;
@@ -474,10 +480,16 @@ function ClientPageContent() {
                   value={form.regionGu} onChange={e => f('regionGu', e.target.value)} placeholder="예: 청주시 상당구, 마포구" />
               </div>
               <div className="grid grid-cols-3 gap-4">
-                {([['startDate', '시작일 *'], ['endDate', '종료일 *'], ['submissionDeadline', '제출 마감일 *']] as const).map(([k, l]) => (
+                {([
+                  ['startDate', '신청 시작일 *', ''],
+                  ['endDate', '신청 마감일 *', 'startDate'],
+                  // 후기 마감은 선정 발표일(있으면) 뒤, 없으면 신청 마감 뒤
+                  ['submissionDeadline', '후기 마감일 *', form.announceDate ? 'announceDate' : 'endDate'],
+                ] as const).map(([k, l, after]) => (
                   <div key={k}>
                     <label className="block text-sm font-medium text-ink-2 mb-1">{l}</label>
-                    <input required type="date" className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none"
+                    <input required type="date" min={after ? form[after as 'startDate'] || undefined : undefined}
+                      className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none"
                       value={form[k]} onChange={e => f(k, e.target.value)} />
                   </div>
                 ))}
@@ -520,7 +532,8 @@ function ClientPageContent() {
 
               <div>
                 <label htmlFor="client-announce" className="mb-1 block text-sm font-medium text-ink-2">선정 발표일</label>
-                <input id="client-announce" type="date" className="w-full rounded-control border border-line bg-paper px-3 py-2 text-sm"
+                <input id="client-announce" type="date" min={form.endDate || undefined}
+                  className="w-full rounded-control border border-line bg-paper px-3 py-2 text-sm"
                   value={form.announceDate} onChange={e => f('announceDate', e.target.value)} />
                 <p className="mt-1 text-xs text-muted">비워 두면 상세 일정에서 이 단계를 보여주지 않습니다.</p>
               </div>
