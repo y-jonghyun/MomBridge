@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { env } from './config/env';
+import { corsOrigin } from './config/cors';
 import { prisma } from './config/database';
 import { errorHandler } from './middleware/errorHandler';
 import routes from './routes';
@@ -14,7 +15,7 @@ const app = express();
 app.set('trust proxy', env.TRUST_PROXY_HOPS);
 
 app.use(helmet());
-app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
+app.use(cors({ origin: corsOrigin, credentials: true }));
 // 파일 업로드 없이 텍스트만 받는다(가장 긴 필드가 1만 자 ≈ 30KB). 큰 본문이 필요한 라우트가 생기면 그 라우트에만 따로 지정
 const BODY_LIMIT = '100kb';
 app.use(express.json({ limit: BODY_LIMIT }));
