@@ -10,6 +10,9 @@ import api from '@/lib/api';
  * 미션 상세는 `mission.payoutDueDate`, 홈·내 활동 카드는 아래 fetchNextPayoutDate.
  */
 
+/** 지급일 아래에 함께 보여 주는 단서 — 승인이 늦어지면 약관상 지급도 다음 달로 넘어간다 */
+export const PAYOUT_DELAY_HINT = '검수가 늦어지면 다음 달로 미뤄질 수 있어요';
+
 /** "11월 10일" */
 export const payoutLabel = (d: Date) => `${d.getMonth() + 1}월 ${d.getDate()}일`;
 

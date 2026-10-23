@@ -31,6 +31,7 @@
     "express-rate-limit": "^7.1.5",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
+    "korean-lunar-calendar": "^0.4.0",
     "multer": "^2.5.0",
     "sharp": "^0.35.5",
     "winston": "^3.11.0",
