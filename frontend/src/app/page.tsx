@@ -8,7 +8,7 @@ import { BottomTabBar, BottomTabBarSpacer, MissionCard, SectionHeader, SiteHeade
 import { ArrowRightIcon, ChevronDownIcon, PinIcon, SearchIcon } from '@/components/ui/icons';
 import { CATEGORY_LABEL, EMPTY_MESSAGE, toCardData, type MissionListItem } from '@/components/missions/MissionBrowser';
 import MissionEmptyBox from '@/components/missions/MissionEmptyBox';
-import { nextPayoutLabel } from '@/lib/payout';
+import { fetchNextPayoutDate, payoutLabel } from '@/lib/payout';
 import { useBookmarks } from '@/lib/bookmarks';
 import SiteFooter from '@/components/legal/SiteFooter';
 
@@ -26,13 +26,17 @@ export default function Home() {
   const [missions, setMissions] = useState<MissionListItem[]>([]);
   const [keyword, setKeyword] = useState('');
   const [loaded, setLoaded] = useState(false);
+  const [payoutDay, setPayoutDay] = useState<string | null>(null);
   const savedIds = useBookmarks(s => s.ids);
   const loadBookmarks = useBookmarks(s => s.load);
   const toggleBookmark = useBookmarks(s => s.toggle);
 
   useEffect(() => setReady(true), []);
   useEffect(() => {
-    if (ready && user?.role === 'PARTICIPANT') void loadBookmarks();
+    if (ready && user?.role === 'PARTICIPANT') {
+      void loadBookmarks();
+      void fetchNextPayoutDate().then(d => setPayoutDay(d ? payoutLabel(d) : null));
+    }
   }, [ready, user, loadBookmarks]);
   useEffect(() => {
     // 공개 API라 로그인하지 않아도 미션이 보인다
@@ -141,7 +145,7 @@ export default function Home() {
           <section className="mx-5 mt-4 flex items-center justify-between gap-4 rounded-box bg-ink p-5 text-paper">
             <div>
               <p className="text-xs text-[#CFC4B4]">내 다음 정산일</p>
-              <p className="mt-1 font-serif text-section font-bold">{nextPayoutLabel()}</p>
+              <p className="mt-1 font-serif text-section font-bold">{payoutDay ?? '—'}</p>
             </div>
             <Link href="/participant" className="flex h-11 shrink-0 items-center rounded-control bg-paper px-4 text-[13px] font-medium text-ink">
               내 활동 보기

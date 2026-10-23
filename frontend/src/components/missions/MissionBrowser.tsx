@@ -36,13 +36,7 @@ export const CATEGORY_LABEL: Record<string, string> = {
   VISIT: '방문형', SNS: 'SNS', REVIEW: '리뷰', VIDEO: '영상',
 };
 
-/** 유형 탭 (방문형·SNS·리뷰·영상) */
-const CATEGORY_TABS = [
-  { value: '', label: '전체' },
-  ...Object.entries(CATEGORY_LABEL).map(([value, label]) => ({ value, label })),
-];
-
-/** 업종 탭 (맛집·카페·키즈…) — 유형과는 다른 축이라 줄을 따로 둔다 */
+/** 업종 탭 (맛집·카페·키즈…). 탭 줄은 이것 하나만 둔다 */
 const BUSINESS_TABS = [
   { value: '', label: '전체 업종' },
   ...BUSINESS_CATEGORIES.map(([value, label]) => ({ value, label })),
@@ -142,7 +136,9 @@ export default function MissionBrowser({
 
   return (
     <div>
-      {/* 칩 줄 — 지역 + 엄마 시간 태그 (여러 개 고르면 하나라도 맞는 미션을 보여준다) */}
+      {/* 칩 줄 — 지역 + 유형 + 엄마 시간 태그.
+          탭 줄을 둘로 쌓지 않으려고 유형(방문형·SNS·리뷰·영상)도 이 줄에 둔다.
+          유형은 하나만, 엄마 시간 태그는 여러 개 고를 수 있다 */}
       <div className="no-scrollbar flex gap-2 overflow-x-auto px-5 pb-1">
         {/* 지역 칩. Chip은 button이라 select를 품을 수 없어 같은 모양의 label로 만든다 */}
         <label
@@ -159,6 +155,15 @@ export default function MissionBrowser({
             className="cursor-pointer appearance-none bg-transparent text-[13px] text-inherit outline-none"
           />
         </label>
+        {Object.entries(CATEGORY_LABEL).map(([value, label]) => (
+          <Chip
+            key={value} selected={filter.category === value}
+            // 같은 유형을 다시 누르면 해제된다
+            onClick={() => apply({ category: filter.category === value ? '' : value })}
+          >
+            {label}
+          </Chip>
+        ))}
         {MOM_TAGS.map(([value, label]) => (
           <Chip key={value} selected={filter.momTags.includes(value)} onClick={() => toggleMomTag(value)}>
             {label}
@@ -167,15 +172,6 @@ export default function MissionBrowser({
       </div>
 
       <div className="mt-2.5">
-        <CategoryTabs
-          tabs={CATEGORY_TABS}
-          value={filter.category}
-          onChange={v => apply({ category: v })}
-          ariaLabel="미션 유형"
-        />
-      </div>
-
-      <div className="mt-1">
         <CategoryTabs
           tabs={BUSINESS_TABS}
           value={filter.businessCategory}

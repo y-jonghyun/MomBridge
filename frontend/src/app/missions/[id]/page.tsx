@@ -9,7 +9,8 @@ import { CameraIcon, ChevronLeftIcon, DocIcon, KeywordIcon, LinkIcon, PinIcon, S
 import MissionGallery from '@/components/missions/MissionGallery';
 import { BUSINESS_LABEL, MOM_TAG_LABEL } from '@/components/missions/MissionBrowser';
 import { useBookmarks } from '@/lib/bookmarks';
-import { nextPayoutLabel } from '@/lib/payout';
+import { toLines } from '@/lib/lines';
+import { payoutLabel } from '@/lib/payout';
 
 /** 기준: docs/design/mombridge-design/cream-editorial-v1.md 3번 '미션 상세' + Detail.html */
 
@@ -120,12 +121,12 @@ export default function MissionDetailPage() {
         : `${day(mission.submissionDeadline)}까지`,
       current: !isOpen,
     },
-    // 약관 제8조: 매월 말일 마감 → 다음 달 10일 지급
-    { label: '보상 지급', when: `${nextPayoutLabel(new Date(mission.submissionDeadline))} 예정` },
+    // 약관 제8조에 따른 예정일. 휴일 보정까지 서버가 계산해 내려준다 (backend/src/lib/payout.ts)
+    { label: '보상 지급', when: mission.payoutDueDate ? `늦어도 ${payoutLabel(new Date(mission.payoutDueDate))}` : null },
   ];
 
-  const requirements: string[] = String(mission.requirements ?? '').split('\n').map(s => s.trim()).filter(Boolean);
-  const visitLines: string[] = String(mission.visitGuide ?? '').split('\n').map(s => s.trim()).filter(Boolean);
+  const requirements = toLines(mission.requirements);
+  const visitLines = toLines(mission.visitGuide);
 
   const ctaLabel = !user ? '로그인 후 신청하기'
     : user.role !== 'PARTICIPANT' ? (user.role === 'OPERATOR' ? '운영자 계정' : '고객사 계정')

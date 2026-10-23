@@ -6,6 +6,7 @@ import { getMissionKeywords } from '../missions/mission-extras';
 import { ensureTrackingLink, publicTrackingUrl } from '../tracking/links';
 import { buildParticipantStats } from '../reports/report.service';
 import { SELF_CLICK_MAX_AGE_SEC, selfClickToken } from '../tracking/self-click';
+import { nextPayoutDate } from '../../lib/payout';
 
 const router = Router();
 router.use(authenticate, requireRole('PARTICIPANT', 'OPERATOR'));
@@ -92,6 +93,13 @@ router.get('/reviews/stats', async (req: Request, res: Response, next: NextFunct
   try {
     const profile = await getOrCreateParticipantProfile(req.user!.sub);
     res.json({ success: true, data: await buildParticipantStats(profile.id) });
+  } catch (e) { next(e); }
+});
+
+// 다음 정산일 (약관 제8조). 규칙이 한 곳에만 있도록 화면이 아니라 서버가 계산한다
+router.get('/payout-schedule', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    res.json({ success: true, data: { nextPayoutDate: nextPayoutDate() } });
   } catch (e) { next(e); }
 });
 

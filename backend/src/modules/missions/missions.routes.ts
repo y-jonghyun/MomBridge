@@ -13,6 +13,7 @@ import {
 } from './missions.schema';
 import { newCampaignCode, normalizeMissionKeywords, saveMissionKeywords } from './mission-extras';
 import { recruitingCutoff } from './mission-lifecycle';
+import { payoutDueDate } from '../../lib/payout';
 import { logger } from '../../utils/logger';
 import { captureError, reportIssue } from '../../lib/monitoring';
 import missionImageRoutes from './mission-images.routes';
@@ -99,7 +100,8 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
     });
     if (!mission) throw new AppError('NOT_FOUND', 404, '미션을 찾을 수 없습니다');
     await prisma.mission.update({ where: { id: req.params.id }, data: { viewCount: { increment: 1 } } });
-    res.json({ success: true, data: mission });
+    // 보상 지급 예정일은 약관 제8조대로 서버에서 계산해 내려준다 (화면이 다시 셈하지 않도록)
+    res.json({ success: true, data: { ...mission, payoutDueDate: payoutDueDate(mission.submissionDeadline) } });
   } catch (e) { next(e); }
 });
 

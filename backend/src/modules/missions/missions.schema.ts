@@ -67,8 +67,27 @@ export const missionFieldsSchema = z.object({
   keywords: missionKeywordsSchema.optional(),
 });
 
-const checkDateOrder = (v: { startDate: Date; endDate: Date }, ctx: z.RefinementCtx) => {
-  if (v.endDate < v.startDate) ctx.addIssue({ code: 'custom', path: ['endDate'], message: '종료일은 시작일 이후여야 합니다' });
+/**
+ * 날짜 순서: 신청 시작 ≤ 신청 마감 ≤ 선정 발표 ≤ 후기 마감.
+ * 선정 발표일은 선택이라, 비어 있으면 그 자리를 건너뛰고 앞뒤만 본다.
+ */
+export const checkDateOrder = (
+  v: { startDate: Date; endDate: Date; announceDate?: Date | null; submissionDeadline: Date },
+  ctx: z.RefinementCtx,
+) => {
+  if (v.endDate < v.startDate) {
+    ctx.addIssue({ code: 'custom', path: ['endDate'], message: '신청 마감일은 신청 시작일 이후여야 합니다' });
+  }
+  if (v.announceDate) {
+    if (v.announceDate < v.endDate) {
+      ctx.addIssue({ code: 'custom', path: ['announceDate'], message: '선정 발표일은 신청 마감일 이후여야 합니다' });
+    }
+    if (v.submissionDeadline < v.announceDate) {
+      ctx.addIssue({ code: 'custom', path: ['submissionDeadline'], message: '후기 마감일은 선정 발표일 이후여야 합니다' });
+    }
+  } else if (v.submissionDeadline < v.endDate) {
+    ctx.addIssue({ code: 'custom', path: ['submissionDeadline'], message: '후기 마감일은 신청 마감일 이후여야 합니다' });
+  }
 };
 
 export const operatorCreateMissionSchema = missionFieldsSchema.extend({
