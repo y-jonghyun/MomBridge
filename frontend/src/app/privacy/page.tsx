@@ -18,8 +18,8 @@ export default function PrivacyPage() {
           <table className="w-full border-collapse text-xs sm:text-sm">
             <thead><tr><th className={th}>구분</th><th className={th}>항목</th><th className={th}>목적</th></tr></thead>
             <tbody>
-              <tr><td className={td}>가입(필수)</td><td className={td}>이메일, 비밀번호(암호화 저장), 이름, 회원 유형</td><td className={td}>회원 식별, 로그인, 공지</td></tr>
-              <tr><td className={td}>고객사(선택)</td><td className={td}>상호, 사업장 주소·지역, 업종, 연락처, 사업자등록번호</td><td className={td}>미션 등록·공개, 결제 안내 문자 발송</td></tr>
+              <tr><td className={td}>가입(필수)</td><td className={td}>이메일, 비밀번호(암호화 저장), 이름, 회원 유형, <b>휴대폰 번호</b></td><td className={td}>회원 식별, 로그인, 공지, <b>선정·정산 안내, 중복 가입 방지</b></td></tr>
+              <tr><td className={td}>고객사(선택)</td><td className={td}>상호, 사업장 주소·지역, 업종, 사업자등록번호</td><td className={td}>미션 등록·공개, 결제 안내 문자 발송</td></tr>
               <tr><td className={td}>체험단원</td><td className={td}>활동 지역, SNS 계정 주소, 제출한 콘텐츠 주소</td><td className={td}>미션 매칭·선정, 콘텐츠 확인</td></tr>
               <tr><td className={td}>보상 지급</td><td className={td}>은행명, 계좌번호, 예금주. 보상이 원천징수 대상인 경우에는 첫 지급 전에 <b>주민등록번호</b>를 별도 동의를 받아 추가로 수집하고 암호화해 보관합니다(「소득세법」 근거)</td><td className={td}>보상 지급, 세금 신고</td></tr>
               <tr><td className={td}>결제(고객사)</td><td className={td}>주문번호, 결제 금액·일시 (카드 정보는 결제대행사가 처리하며 회사는 저장하지 않음)</td><td className={td}>결제 확인, 환불</td></tr>
