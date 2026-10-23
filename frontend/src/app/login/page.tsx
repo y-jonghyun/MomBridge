@@ -5,6 +5,7 @@ import Link from 'next/link';
 import api, { apiErrorMessage } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { syncSelfClickCookie } from '@/lib/self-click';
+import AuthShell, { authButtonClass, authInputClass } from '@/components/auth/AuthShell';
 
 /** 로그인 후 돌아갈 경로. 다른 사이트로 보내지 않도록 같은 사이트 경로만 허용 */
 function safeNext(next: string | null): string | null {
@@ -45,46 +46,46 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-stone-50">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-sm p-8">
-        <h1 className="text-2xl font-bold text-center mb-2">맘브릿지</h1>
-        <p className="text-gray-500 text-center mb-8">로그인</p>
+    <AuthShell
+      title="로그인"
+      footer={
+        <>
+          <p><Link href="/forgot-password" className="text-muted">비밀번호를 잊으셨나요?</Link></p>
+          <p>계정이 없으신가요? <Link href="/register" className="font-medium text-clay">회원가입</Link></p>
+        </>
+      }
+    >
+      <>
         {expired && !error && (
-          <p className="mb-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">로그인이 만료됐습니다. 다시 로그인해 주세요.</p>
+          <p className="mb-4 rounded-control bg-clay-tint px-3 py-2 text-sm text-clay-dark">로그인이 만료됐습니다. 다시 로그인해 주세요.</p>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">이메일</label>
+            <label htmlFor="login-email" className="mb-1 block text-[13px] text-muted">이메일</label>
             <input
-              type="email" required
-              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+              id="login-email" type="email" required
+              className={authInputClass}
               value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">비밀번호</label>
+            <label htmlFor="login-password" className="mb-1 block text-[13px] text-muted">비밀번호</label>
             <input
-              type="password" required
-              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+              id="login-password" type="password" required
+              className={authInputClass}
               value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })}
             />
           </div>
-          {error && <p className="text-red-500 text-sm">{error}</p>}
+          {error && <p className="text-clay-dark text-sm">{error}</p>}
           <button
             type="submit" disabled={loading}
-            className="w-full bg-slate-700 text-white rounded-lg py-2 font-semibold hover:bg-slate-700 disabled:opacity-50"
+            className={authButtonClass}
           >
             {loading ? '로그인 중...' : '로그인'}
           </button>
         </form>
-        <p className="text-center text-sm text-gray-500 mt-4">
-          <Link href="/forgot-password" className="text-gray-500 hover:text-slate-700">비밀번호를 잊으셨나요?</Link>
-        </p>
-        <p className="text-center text-sm text-gray-500 mt-2">
-          계정이 없으신가요? <Link href="/register" className="text-slate-600 font-medium">회원가입</Link>
-        </p>
-      </div>
-    </div>
+      </>
+    </AuthShell>
   );
 }
