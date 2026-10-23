@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { BottomTabBar, BottomTabBarSpacer } from '@/components/ui';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 
@@ -15,9 +16,9 @@ const CATEGORIES = [
 ];
 
 const ROLE_BADGE: Record<string, string> = {
-  OPERATOR: 'bg-slate-100 text-slate-700',
-  PARTICIPANT: 'bg-blue-50 text-blue-600',
-  CLIENT: 'bg-orange-50 text-orange-600',
+  OPERATOR: 'bg-clay-tint text-ink-2',
+  PARTICIPANT: 'bg-sage-tint text-sage',
+  CLIENT: 'bg-clay-tint text-clay-dark',
 };
 const ROLE_LABEL: Record<string, string> = { OPERATOR: '운영자', PARTICIPANT: '참여자', CLIENT: '고객사' };
 
@@ -108,25 +109,25 @@ export default function CommunityPage() {
   if (!hydrated) return null;
 
   return (
-    <div className="min-h-screen bg-stone-50">
+    <div className="min-h-screen bg-cream">
       {/* 헤더 */}
-      <header className="bg-white border-b sticky top-0 z-20 shadow-sm">
+      <header className="bg-paper border-b sticky top-0 z-20">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link href={backHref} className="text-gray-400 hover:text-gray-700 text-sm">←</Link>
-            <h1 className="text-lg font-bold text-slate-800">맘브릿지</h1>
-            <span className="text-gray-200">|</span>
-            <span className="text-sm font-semibold text-gray-700">커뮤니티</span>
+            <Link href={backHref} className="text-muted hover:text-ink-2 text-sm">←</Link>
+            <h1 className="text-lg font-bold text-ink">맘브릿지</h1>
+            <span className="text-line">|</span>
+            <span className="text-sm font-semibold text-ink-2">커뮤니티</span>
           </div>
           <div className="flex items-center gap-3">
             {user && (
               <button onClick={() => setShowWrite(true)}
-                className="px-4 py-1.5 bg-slate-700 text-white rounded-lg text-sm font-semibold hover:bg-slate-800">
-                ✏️ 글 작성
+                className="px-4 py-1.5 bg-ink text-paper rounded-control text-sm font-semibold hover:bg-ink">
+                글 작성
               </button>
             )}
             {!user && (
-              <Link href="/login" className="text-sm text-slate-600 font-semibold">로그인</Link>
+              <Link href="/login" className="text-sm text-ink-2 font-semibold">로그인</Link>
             )}
           </div>
         </div>
@@ -135,7 +136,7 @@ export default function CommunityPage() {
         <div className="max-w-5xl mx-auto px-4 flex gap-1 pb-0 overflow-x-auto">
           {CATEGORIES.map(c => (
             <button key={c.key} onClick={() => { setCategory(c.key); loadPosts(1, c.key, sort, keyword); }}
-              className={`shrink-0 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${category === c.key ? 'border-slate-600 text-slate-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+              className={`shrink-0 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${category === c.key ? 'border-ink text-ink-2' : 'border-transparent text-muted hover:text-ink-2'}`}>
               {c.label}
             </button>
           ))}
@@ -149,11 +150,11 @@ export default function CommunityPage() {
 
           {/* 탭 + 검색 + 정렬 */}
           <div className="flex items-center gap-3 mb-4 flex-wrap">
-            <div className="flex bg-white border rounded-lg overflow-hidden shadow-sm">
+            <div className="flex bg-paper border rounded-control overflow-hidden">
               {(['LIST', 'BEST', 'MY'] as const).map(t => (
                 <button key={t} onClick={() => setTab(t)}
-                  className={`px-4 py-2 text-sm font-medium transition-colors ${tab === t ? 'bg-slate-700 text-white' : 'text-gray-500 hover:bg-stone-50'}`}>
-                  {t === 'LIST' ? '전체' : t === 'BEST' ? '🔥 BEST' : '내 글'}
+                  className={`px-4 py-2 text-sm font-medium transition-colors ${tab === t ? 'bg-ink text-paper' : 'text-muted hover:bg-cream'}`}>
+                  {t === 'LIST' ? '전체' : t === 'BEST' ? 'BEST' : '내 글'}
                 </button>
               ))}
             </div>
@@ -162,13 +163,13 @@ export default function CommunityPage() {
               <input
                 value={searchInput} onChange={e => setSearchInput(e.target.value)}
                 placeholder="게시글 검색..."
-                className="flex-1 border rounded-l-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 min-w-0"
+                className="min-w-0 flex-1 rounded-l-control border border-line bg-paper px-3 py-2 text-sm outline-none"
               />
-              <button type="submit" className="px-3 py-2 bg-slate-700 text-white rounded-r-lg text-sm hover:bg-slate-800">🔍</button>
+              <button type="submit" className="shrink-0 whitespace-nowrap rounded-r-control bg-ink px-4 py-2 text-sm text-paper">검색</button>
             </form>
 
             <select value={sort} onChange={e => { setSort(e.target.value as SortKey); loadPosts(1, category, e.target.value as SortKey, keyword); }}
-              className="border rounded-lg px-3 py-2 text-sm focus:outline-none bg-white shadow-sm">
+              className="border rounded-control px-3 py-2 text-sm focus:outline-none bg-paper">
               <option value="NEWEST">최신순</option>
               <option value="POPULAR">인기순</option>
               <option value="VIEWS">조회순</option>
@@ -180,84 +181,84 @@ export default function CommunityPage() {
             <div className="space-y-3">
               {bestPosts.map((p, i) => (
                 <Link key={p.id} href={`/community/${p.id}`}
-                  className="bg-white rounded-xl shadow-sm p-4 flex gap-4 items-start hover:shadow-md transition-all border border-gray-100 hover:border-slate-200 block">
-                  <div className={`text-2xl font-black w-8 text-center shrink-0 ${i === 0 ? 'text-yellow-500' : i === 1 ? 'text-gray-400' : i === 2 ? 'text-orange-400' : 'text-gray-300'}`}>
+                  className="bg-paper rounded-card p-4 flex gap-4 items-start hover: transition-all border border-line-soft hover:border-line block">
+                  <div className={`text-2xl font-black w-8 text-center shrink-0 ${i === 0 ? 'text-clay' : i === 1 ? 'text-muted' : i === 2 ? 'text-clay' : 'text-muted'}`}>
                     {i + 1}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{p.category}</span>
+                      <span className="text-xs bg-cream text-muted px-2 py-0.5 rounded-full">{p.category}</span>
                     </div>
-                    <p className="font-semibold text-gray-900 truncate">{p.title}</p>
-                    <p className="text-sm text-gray-500 line-clamp-1 mt-0.5">{p.content}</p>
-                    <div className="flex gap-3 mt-2 text-xs text-gray-400">
-                      <span>❤️ {p._count?.likes ?? p.likeCount}</span>
-                      <span>💬 {p._count?.comments}</span>
-                      <span>👁 {p.viewCount}</span>
+                    <p className="font-semibold text-ink truncate">{p.title}</p>
+                    <p className="text-sm text-muted line-clamp-1 mt-0.5">{p.content}</p>
+                    <div className="flex gap-3 mt-2 text-xs text-muted">
+                      <span>공감 {p._count?.likes ?? p.likeCount}</span>
+                      <span>댓글 {p._count?.comments}</span>
+                      <span>조회 {p.viewCount}</span>
                       <span>{p.user?.name}</span>
                     </div>
                   </div>
                 </Link>
               ))}
-              {bestPosts.length === 0 && <div className="text-center py-20 text-gray-300 bg-white rounded-xl">게시글이 없습니다</div>}
+              {bestPosts.length === 0 && <div className="text-center py-20 text-muted bg-paper rounded-card">게시글이 없습니다</div>}
             </div>
           )}
 
           {/* 내 글 탭 */}
           {tab === 'MY' && !user && (
-            <div className="text-center py-20 bg-white rounded-xl text-gray-400">
+            <div className="text-center py-20 bg-paper rounded-card text-muted">
               <p className="mb-3">로그인 후 내 글을 확인할 수 있습니다</p>
-              <Link href="/login" className="px-5 py-2 bg-slate-700 text-white rounded-lg text-sm font-semibold">로그인</Link>
+              <Link href="/login" className="px-5 py-2 bg-ink text-paper rounded-control text-sm font-semibold">로그인</Link>
             </div>
           )}
 
           {/* 게시글 목록 테이블 */}
           {(tab === 'LIST' || (tab === 'MY' && user)) && (
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+            <div className="bg-paper rounded-card overflow-hidden border border-line-soft">
               {loading && (
                 <div className="flex justify-center py-16">
-                  <div className="w-6 h-6 border-slate-500 border-t-transparent rounded-full animate-spin border-4" />
+                  <div className="w-6 h-6 border-ink border-t-transparent rounded-full animate-spin border-4" />
                 </div>
               )}
               {/* 모바일: 카드형 */}
               {!loading && (
                 <div className="lg:hidden divide-y">
                   {(tab === 'LIST' ? posts : myPosts).map(p => (
-                    <Link key={p.id} href={`/community/${p.id}`} className="flex items-start gap-3 px-4 py-3 hover:bg-slate-50">
-                      <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full shrink-0 mt-0.5 min-w-[56px] text-center">{p.category}</span>
+                    <Link key={p.id} href={`/community/${p.id}`} className="flex items-start gap-3 px-4 py-3 hover:bg-cream">
+                      <span className="text-xs bg-cream text-muted px-2 py-0.5 rounded-full shrink-0 mt-0.5 min-w-[56px] text-center">{p.category}</span>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-gray-900 line-clamp-2">{p.title}</p>
-                        <p className="text-xs text-gray-400 mt-1">{p.user?.name} · {timeAgo(p.createdAt)} · 👁 {p.viewCount} · ❤️ {p.likeCount}</p>
+                        <p className="text-sm font-medium text-ink line-clamp-2">{p.title}</p>
+                        <p className="text-xs text-muted mt-1">{p.user?.name} · {timeAgo(p.createdAt)} · 조회 {p.viewCount} · 공감 {p.likeCount}</p>
                       </div>
                     </Link>
                   ))}
                   {(tab === 'LIST' ? posts : myPosts).length === 0 && (
-                    <div className="text-center py-16 text-gray-300 text-sm">{tab === 'MY' ? '작성한 글이 없습니다' : '게시글이 없습니다'}</div>
+                    <div className="text-center py-16 text-muted text-sm">{tab === 'MY' ? '작성한 글이 없습니다' : '게시글이 없습니다'}</div>
                   )}
                 </div>
               )}
               {/* 데스크탑: 테이블형 */}
               {!loading && (
                 <div className="hidden lg:block">
-                  <div className="grid grid-cols-[80px_1fr_80px_70px_60px_60px] gap-2 px-4 py-2.5 bg-stone-50 border-b text-xs font-semibold text-gray-500">
+                  <div className="grid grid-cols-[80px_1fr_80px_70px_60px_60px] gap-2 px-4 py-2.5 bg-cream border-b text-xs font-semibold text-muted">
                     <span>분류</span><span>제목</span><span>작성자</span><span>작성일</span><span className="text-center">조회</span><span className="text-center">좋아요</span>
                   </div>
                   {(tab === 'LIST' ? posts : myPosts).map(p => (
                     <Link key={p.id} href={`/community/${p.id}`}
-                      className="grid grid-cols-[80px_1fr_80px_70px_60px_60px] gap-2 px-4 py-3 border-b last:border-0 hover:bg-slate-50 transition-colors items-center group">
-                      <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full truncate">{p.category}</span>
+                      className="grid grid-cols-[80px_1fr_80px_70px_60px_60px] gap-2 px-4 py-3 border-b last:border-0 hover:bg-cream transition-colors items-center group">
+                      <span className="text-xs bg-cream text-muted px-2 py-0.5 rounded-full truncate">{p.category}</span>
                       <div className="min-w-0">
-                        <span className="text-sm font-medium text-gray-900 group-hover:text-slate-700 line-clamp-1">{p.title}</span>
-                        {p._count?.comments > 0 && <span className="text-xs text-slate-500 ml-1.5">[{p._count.comments}]</span>}
+                        <span className="text-sm font-medium text-ink group-hover:text-ink-2 line-clamp-1">{p.title}</span>
+                        {p._count?.comments > 0 && <span className="text-xs text-muted ml-1.5">[{p._count.comments}]</span>}
                       </div>
-                      <span className="text-xs text-gray-500 truncate">{p.user?.name}</span>
-                      <span className="text-xs text-gray-400">{timeAgo(p.createdAt)}</span>
-                      <span className="text-xs text-gray-400 text-center">{p.viewCount}</span>
-                      <span className="text-xs text-red-400 text-center">❤️ {p.likeCount}</span>
+                      <span className="text-xs text-muted truncate">{p.user?.name}</span>
+                      <span className="text-xs text-muted">{timeAgo(p.createdAt)}</span>
+                      <span className="text-xs text-muted text-center">{p.viewCount}</span>
+                      <span className="text-xs text-clay-dark text-center">공감 {p.likeCount}</span>
                     </Link>
                   ))}
                   {(tab === 'LIST' ? posts : myPosts).length === 0 && (
-                    <div className="text-center py-16 text-gray-300 text-sm">{tab === 'MY' ? '작성한 글이 없습니다' : '게시글이 없습니다'}</div>
+                    <div className="text-center py-16 text-muted text-sm">{tab === 'MY' ? '작성한 글이 없습니다' : '게시글이 없습니다'}</div>
                   )}
                 </div>
               )}
@@ -269,7 +270,7 @@ export default function CommunityPage() {
             <div className="flex justify-center gap-1 mt-4">
               {Array.from({ length: Math.ceil(total / 15) }, (_, i) => i + 1).map(p => (
                 <button key={p} onClick={() => loadPosts(p, category, sort, keyword)}
-                  className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${page === p ? 'bg-slate-700 text-white' : 'bg-white text-gray-600 hover:bg-stone-50 border'}`}>
+                  className={`w-8 h-8 rounded-control text-sm font-medium transition-colors ${page === p ? 'bg-ink text-paper' : 'bg-paper text-ink-2 hover:bg-cream border'}`}>
                   {p}
                 </button>
               ))}
@@ -281,51 +282,51 @@ export default function CommunityPage() {
         <div className="hidden lg:block w-64 shrink-0 space-y-4">
           {/* 글 작성 CTA */}
           {user ? (
-            <div className="bg-white rounded-xl shadow-sm p-4">
+            <div className="bg-paper rounded-card p-4">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-9 h-9 bg-slate-100 rounded-full flex items-center justify-center text-slate-700 font-bold text-sm">
+                <div className="w-9 h-9 bg-clay-tint rounded-full flex items-center justify-center text-ink-2 font-bold text-sm">
                   {user.name[0]}
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">{user.name}</p>
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${ROLE_BADGE[user.role] ?? 'bg-gray-100'}`}>{ROLE_LABEL[user.role]}</span>
+                  <p className="text-sm font-semibold text-ink">{user.name}</p>
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${ROLE_BADGE[user.role] ?? 'bg-cream'}`}>{ROLE_LABEL[user.role]}</span>
                 </div>
               </div>
               <button onClick={() => setShowWrite(true)}
-                className="w-full py-2.5 bg-slate-700 text-white rounded-lg text-sm font-bold hover:bg-slate-800">
-                ✏️ 글 작성하기
+                className="w-full py-2.5 bg-ink text-paper rounded-control text-sm font-bold hover:bg-ink">
+                글 작성하기
               </button>
             </div>
           ) : (
-            <div className="bg-white rounded-xl shadow-sm p-4 text-center">
-              <p className="text-sm text-gray-500 mb-3">로그인하고 커뮤니티에 참여하세요!</p>
-              <Link href="/login" className="block w-full py-2.5 bg-slate-700 text-white rounded-lg text-sm font-bold hover:bg-slate-800">로그인</Link>
+            <div className="bg-paper rounded-card p-4 text-center">
+              <p className="text-sm text-muted mb-3">로그인하고 커뮤니티에 참여하세요!</p>
+              <Link href="/login" className="block w-full py-2.5 bg-ink text-paper rounded-control text-sm font-bold hover:bg-ink">로그인</Link>
             </div>
           )}
 
           {/* BEST 게시글 사이드 위젯 */}
-          <div className="bg-white rounded-xl shadow-sm p-4">
-            <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-1.5">
-              <span>🔥</span> 인기 게시글
+          <div className="bg-paper rounded-card p-4">
+            <h3 className="text-sm font-bold text-ink mb-3 flex items-center gap-1.5">
+              인기 게시글
             </h3>
             <div className="space-y-2.5">
               {bestPosts.slice(0, 5).map((p, i) => (
                 <Link key={p.id} href={`/community/${p.id}`} className="flex gap-2 items-start group">
-                  <span className={`text-xs font-black w-4 shrink-0 ${i < 3 ? 'text-orange-500' : 'text-gray-300'}`}>{i + 1}</span>
-                  <p className="text-xs text-gray-700 group-hover:text-slate-600 line-clamp-2 flex-1">{p.title}</p>
+                  <span className={`text-xs font-black w-4 shrink-0 ${i < 3 ? 'text-clay' : 'text-muted'}`}>{i + 1}</span>
+                  <p className="text-xs text-ink-2 group-hover:text-ink-2 line-clamp-2 flex-1">{p.title}</p>
                 </Link>
               ))}
-              {bestPosts.length === 0 && <p className="text-xs text-gray-300">아직 게시글이 없습니다</p>}
+              {bestPosts.length === 0 && <p className="text-xs text-muted">아직 게시글이 없습니다</p>}
             </div>
           </div>
 
           {/* 카테고리 통계 */}
-          <div className="bg-white rounded-xl shadow-sm p-4">
-            <h3 className="text-sm font-bold text-gray-800 mb-3">카테고리</h3>
+          <div className="bg-paper rounded-card p-4">
+            <h3 className="text-sm font-bold text-ink mb-3">카테고리</h3>
             <div className="space-y-1.5">
               {CATEGORIES.filter(c => c.key !== 'ALL').map(c => (
                 <button key={c.key} onClick={() => { setCategory(c.key); setTab('LIST'); loadPosts(1, c.key, sort, keyword); }}
-                  className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition-colors ${category === c.key ? 'bg-slate-50 text-slate-700 font-semibold' : 'text-gray-600 hover:bg-stone-50'}`}>
+                  className={`w-full text-left px-3 py-1.5 rounded-control text-sm transition-colors ${category === c.key ? 'bg-cream text-ink-2 font-semibold' : 'text-ink-2 hover:bg-cream'}`}>
                   {c.label}
                 </button>
               ))}
@@ -337,16 +338,16 @@ export default function CommunityPage() {
       {/* 글 작성 모달 */}
       {showWrite && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl">
+          <div className="bg-paper rounded-box w-full max-w-2xl">
             <div className="flex items-center justify-between px-6 py-4 border-b">
-              <h2 className="text-lg font-bold text-gray-900">게시글 작성</h2>
-              <button onClick={() => setShowWrite(false)} className="text-gray-400 hover:text-gray-700 text-xl">×</button>
+              <h2 className="text-lg font-bold text-ink">게시글 작성</h2>
+              <button onClick={() => setShowWrite(false)} className="text-muted hover:text-ink-2 text-xl">×</button>
             </div>
             <form onSubmit={handleWrite} className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">카테고리 *</label>
-                  <select required className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
+                  <label className="block text-sm font-medium text-ink-2 mb-1">카테고리 *</label>
+                  <select required className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none"
                     value={writeForm.category} onChange={e => setWriteForm(f => ({ ...f, category: e.target.value }))}>
                     {CATEGORIES.filter(c => c.key !== 'ALL').map(c => (
                       <option key={c.key} value={c.key}>{c.label}</option>
@@ -354,27 +355,27 @@ export default function CommunityPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">작성자</label>
-                  <div className="border rounded-lg px-3 py-2 text-sm bg-stone-50 text-gray-500">{user?.name}</div>
+                  <label className="block text-sm font-medium text-ink-2 mb-1">작성자</label>
+                  <div className="border rounded-control px-3 py-2 text-sm bg-cream text-muted">{user?.name}</div>
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">제목 *</label>
-                <input required className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
+                <label className="block text-sm font-medium text-ink-2 mb-1">제목 *</label>
+                <input required className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none"
                   value={writeForm.title} onChange={e => setWriteForm(f => ({ ...f, title: e.target.value }))}
                   placeholder="제목을 입력하세요" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">내용 *</label>
-                <textarea required rows={8} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none resize-none"
+                <label className="block text-sm font-medium text-ink-2 mb-1">내용 *</label>
+                <textarea required rows={8} className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none resize-none"
                   value={writeForm.content} onChange={e => setWriteForm(f => ({ ...f, content: e.target.value }))}
                   placeholder="내용을 입력하세요" />
               </div>
               <div className="flex justify-end gap-3">
                 <button type="button" onClick={() => setShowWrite(false)}
-                  className="px-5 py-2.5 border rounded-lg text-sm text-gray-600 hover:bg-stone-50">취소</button>
+                  className="px-5 py-2.5 border rounded-control text-sm text-ink-2 hover:bg-cream">취소</button>
                 <button type="submit" disabled={submitting}
-                  className="px-6 py-2.5 bg-slate-700 text-white rounded-lg text-sm font-bold hover:bg-slate-700 disabled:opacity-50">
+                  className="px-6 py-2.5 bg-ink text-paper rounded-control text-sm font-bold hover:bg-ink disabled:opacity-50">
                   {submitting ? '등록 중...' : '등록하기'}
                 </button>
               </div>
@@ -382,6 +383,8 @@ export default function CommunityPage() {
           </div>
         </div>
       )}
+      <BottomTabBarSpacer />
+      <BottomTabBar />
     </div>
   );
 }

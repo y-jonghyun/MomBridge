@@ -1,150 +1,163 @@
-﻿'use client';
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { syncSelfClickCookie } from '@/lib/self-click';
+'use client';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
+import { syncSelfClickCookie } from '@/lib/self-click';
 import { useAuthStore } from '@/store/auth';
-import { ReviewGuideModal, PostCheckSummary } from '@/components/campaign/ReviewGuide';
-import MissionBrowser from '@/components/missions/MissionBrowser';
+import { PostCheckSummary, ReviewGuideModal } from '@/components/campaign/ReviewGuide';
+import { BottomTabBar, BottomTabBarSpacer, CategoryTabs, SiteHeader } from '@/components/ui';
+import { photoTone } from '@/components/ui/MissionCard';
+import { BellIcon, LogOutIcon } from '@/components/ui/icons';
 
-type Tab = 'missions' | 'my-applications' | 'my-submissions' | 'earnings' | 'community';
+/** 기준: docs/design/mombridge-design/cream-editorial-v1.md 3번 '참여자 내 활동' + Participant.html */
+
+type Tab = 'active' | 'applications' | 'submissions' | 'payouts';
+
+const TABS = [
+  { value: 'active', label: '진행 중' },
+  { value: 'applications', label: '지원 현황' },
+  { value: 'submissions', label: '제출 내역' },
+  { value: 'payouts', label: '보상 내역' },
+];
 
 const STATUS_LABEL: Record<string, string> = {
-  PENDING: '검토중', APPROVED: '승인', REJECTED: '반려', CANCELED: '취소',
-  SUBMITTED: '제출완료', REVISION: '수정요청',
-  PENDING_PAYOUT: '정산대기', COMPLETED: '지급완료',
+  PENDING: '검토 중', APPROVED: '승인', REJECTED: '반려', CANCELED: '취소',
+  SUBMITTED: '검수 중', REVISION: '수정 요청',
+  PENDING_PAYOUT: '정산 대기', COMPLETED: '지급 완료',
 };
-const STATUS_COLOR: Record<string, string> = {
-  PENDING: 'bg-yellow-100 text-yellow-700', APPROVED: 'bg-green-100 text-green-700',
-  REJECTED: 'bg-red-100 text-red-600', SUBMITTED: 'bg-blue-100 text-blue-700',
-  COMPLETED: 'bg-slate-100 text-slate-700',
-};
+
+/** 상태 배지 — 진행·확인 필요는 clay, 완료는 sage, 그 밖은 선 */
+function StatusBadge({ status }: { status: string }) {
+  const tone =
+    status === 'APPROVED' || status === 'COMPLETED' ? 'bg-sage-tint text-sage'
+    : status === 'REJECTED' || status === 'CANCELED' ? 'border border-line text-muted'
+    : 'bg-clay-tint text-clay-dark';
+  return (
+    <span className={`flex h-[26px] shrink-0 items-center rounded-full px-2.5 text-xs ${tone}`}>
+      {STATUS_LABEL[status] ?? status}
+    </span>
+  );
+}
+
+const won = (n: unknown) => `${Number(n ?? 0).toLocaleString()}원`;
+const dateK = (d: string) => new Date(d).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }).replace(/\.$/, '');
+
+/** 보상은 매월 말일 마감 → 다음 달 10일 지급 (약관 제8조) */
+function nextPayoutLabel(now = new Date()) {
+  const d = new Date(now.getFullYear(), now.getMonth(), 10);
+  if (now.getDate() >= 10) d.setMonth(d.getMonth() + 1);
+  return `${d.getMonth() + 1}월 ${d.getDate()}일`;
+}
+
+/** 계좌번호는 끝 4자리만 보여 준다 */
+function maskAccount(account?: string | null) {
+  const digits = String(account ?? '').replace(/\D/g, '');
+  return digits.length >= 4 ? `****-${digits.slice(-4)}` : '****';
+}
+
+const STAGES = ['선정', '방문', '후기 제출', '검수', '지급'];
+
+/** 지원·제출·정산 상태를 5단계 중 어디인지로 바꾼다 */
+function stageIndex(sub: any, payout: any) {
+  if (payout?.status === 'COMPLETED') return 4;
+  if (sub?.status === 'APPROVED') return 4;
+  if (sub?.status === 'SUBMITTED') return 3;
+  return 2; // 아직 제출 전이거나 수정 요청 — '후기 제출' 단계
+}
+
+function StageBar({ current }: { current: number }) {
+  return (
+    <ol aria-label="진행 단계" className="m-0 mt-[18px] grid list-none grid-cols-5 gap-1 p-0">
+      {STAGES.map((label, i) => {
+        const done = i < current;
+        const now = i === current;
+        return (
+          <li key={label} className={`text-center text-[11px] ${now ? 'font-bold text-clay' : done ? 'text-ink' : 'text-muted'}`}>
+            <span className={`mb-1.5 block h-1 rounded ${done ? 'bg-clay' : now ? 'bg-[#E3C2AC]' : 'bg-line'}`} />
+            {label}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
 
 export default function ParticipantPage() {
   const router = useRouter();
-  const user = useAuthStore((s) => s.user);
-  const clearAuth = useAuthStore((s) => s.clearAuth);
+  const user = useAuthStore(s => s.user);
+  const clearAuth = useAuthStore(s => s.clearAuth);
+
   const [hydrated, setHydrated] = useState(false);
-  const [tab, setTab] = useState<Tab>('missions');
+  const [tab, setTab] = useState<Tab>('active');
+  const [loading, setLoading] = useState(true);
+
   const [applications, setApplications] = useState<any[]>([]);
   const [submissions, setSubmissions] = useState<any[]>([]);
-  const [earnings, setEarnings] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [communityPosts, setCommunityPosts] = useState<any[]>([]);
-  const [communityCategory, setCommunityCategory] = useState('ALL');
-  const [communitySort, setCommunitySort] = useState('NEWEST');
-  const [showWriteModal, setShowWriteModal] = useState(false);
-  const [writeForm, setWriteForm] = useState({ category: '체험후기', title: '', content: '' });
-  const [submittingPost, setSubmittingPost] = useState(false);
+  const [payouts, setPayouts] = useState<any[]>([]);
+  const [reviewStats, setReviewStats] = useState<Record<string, { clicks: number; uniqueVisitors: number }>>({});
+
   const [submitModal, setSubmitModal] = useState<any>(null);
   const [submitForm, setSubmitForm] = useState({ description: '', snsPostUrl: '' });
   const [submittingContent, setSubmittingContent] = useState(false);
-  const [submittedMissionIds, setSubmittedMissionIds] = useState<Set<string>>(new Set());
   const [guideMissionId, setGuideMissionId] = useState<string | null>(null);
   const [checkResult, setCheckResult] = useState<any>(null);
-  const [reviewStats, setReviewStats] = useState<Record<string, { clicks: number; uniqueVisitors: number }>>({});
+
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+  const [showNotif, setShowNotif] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
-        setShowNotifDropdown(false);
-      }
+    function onClickOutside(e: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setShowNotif(false);
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
   }, []);
 
   useEffect(() => { setHydrated(true); }, []);
+
+  const loadAll = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [appR, subR, payR, statsR] = await Promise.all([
+        api.get('/participant/applications'),
+        api.get('/submissions/my'),
+        api.get('/participant/payouts'),
+        api.get('/participant/reviews/stats').catch(() => ({ data: { data: [] } })),
+      ]);
+      setApplications(appR.data.data);
+      setSubmissions(subR.data.data);
+      setPayouts(payR.data.data);
+      setReviewStats(Object.fromEntries(statsR.data.data.map((x: any) => [x.missionId, x])));
+    } catch { /* 각 목록은 비어 있는 상태로 둔다 */ } finally { setLoading(false); }
+  }, []);
+
+  const loadNotifications = useCallback(async () => {
+    try {
+      const r = await api.get('/notifications');
+      setNotifications(r.data.data.notifications);
+      setUnreadCount(r.data.data.unreadCount);
+    } catch { /* 알림은 없어도 화면이 동작한다 */ }
+  }, []);
 
   useEffect(() => {
     if (!hydrated) return;
     if (!user) { router.push('/login'); return; }
     if (user.role !== 'PARTICIPANT' && user.role !== 'OPERATOR') { router.push('/'); return; }
-    // 미션 목록은 MissionBrowser가 직접 불러온다
-    setLoading(false);
-    loadNotifications();
+    void loadAll();
+    void loadNotifications();
     // 이미 로그인해 있던 체험단원도 본인 클릭 표시를 받는다 (만료 연장 겸)
     if (user.role === 'PARTICIPANT') void syncSelfClickCookie();
-  }, [user, hydrated]);
-
-  async function loadNotifications() {
-    try {
-      const r = await api.get('/notifications');
-      setNotifications(r.data.data.notifications);
-      setUnreadCount(r.data.data.unreadCount);
-    } catch { }
-  }
+  }, [user, hydrated, loadAll, loadNotifications, router]);
 
   async function markAllRead() {
     try {
       await api.patch('/notifications/read-all');
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
       setUnreadCount(0);
-    } catch { }
-  }
-
-
-  const loadedTabs = useState<Set<Tab>>(() => new Set<Tab>())[0];
-
-  const loadTab = useCallback(async (t: Tab, force = false) => {
-    setTab(t);
-    if (!force && loadedTabs.has(t)) return;
-    setLoading(true);
-    try {
-      if (t === 'my-applications') {
-        const [appR, subR] = await Promise.all([
-          api.get('/participant/applications'),
-          api.get('/submissions/my'),
-        ]);
-        setApplications(appR.data.data);
-        setSubmittedMissionIds(new Set(subR.data.data.map((s: any) => s.missionId)));
-      }
-      if (t === 'my-submissions') {
-        const [r, stats] = await Promise.all([
-          api.get('/submissions/my'),
-          api.get('/participant/reviews/stats').catch(() => ({ data: { data: [] } })),
-        ]);
-        setSubmissions(r.data.data);
-        setReviewStats(Object.fromEntries(stats.data.data.map((x: any) => [x.missionId, x])));
-      }
-      if (t === 'earnings') {
-        const r = await api.get('/participant/payouts');
-        setEarnings(r.data.data);
-      }
-      if (t === 'community') {
-        const r = await api.get('/community/posts?limit=20&sort=NEWEST');
-        setCommunityPosts(r.data.data.posts);
-      }
-      loadedTabs.add(t);
-    } catch { } finally { setLoading(false); }
-  }, [loadedTabs]);
-
-  async function loadCommunity(cat = communityCategory, sort = communitySort) {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({ limit: '20', sort });
-      if (cat !== 'ALL') params.set('category', cat);
-      const r = await api.get(`/community/posts?${params}`);
-      setCommunityPosts(r.data.data.posts);
-    } catch { } finally { setLoading(false); }
-  }
-
-  async function handleWritePost(e: React.FormEvent) {
-    e.preventDefault();
-    setSubmittingPost(true);
-    try {
-      await api.post('/community/posts', writeForm);
-      setShowWriteModal(false);
-      setWriteForm({ category: '체험후기', title: '', content: '' });
-      loadCommunity();
-    } catch (err: any) {
-      alert(err?.response?.data?.error?.message ?? '작성 실패');
-    } finally { setSubmittingPost(false); }
+    } catch { /* 실패해도 목록은 그대로 둔다 */ }
   }
 
   async function handleSubmitContent(e: React.FormEvent) {
@@ -152,16 +165,12 @@ export default function ParticipantPage() {
     if (!submitModal) return;
     setSubmittingContent(true);
     try {
-      let saved: any;
-      if (submitModal.resubmitId) {
-        saved = (await api.patch(`/submissions/${submitModal.resubmitId}/resubmit`, submitForm)).data.data;
-        loadTab('my-submissions', true);
-      } else {
-        saved = (await api.post('/submissions', { missionId: submitModal.missionId, ...submitForm })).data.data;
-        setSubmittedMissionIds(prev => { const s = new Set(prev); s.add(submitModal.missionId); return s; });
-      }
+      const saved = submitModal.resubmitId
+        ? (await api.patch(`/submissions/${submitModal.resubmitId}/resubmit`, submitForm)).data.data
+        : (await api.post('/submissions', { missionId: submitModal.missionId, ...submitForm })).data.data;
       setSubmitModal(null);
       setSubmitForm({ description: '', snsPostUrl: '' });
+      await loadAll();
       if (saved?.postCheckResult) setCheckResult(saved);
       else alert('제출 완료! 운영자 검수 후 정산됩니다.');
     } catch (err: any) {
@@ -169,374 +178,339 @@ export default function ParticipantPage() {
     } finally { setSubmittingContent(false); }
   }
 
-  async function applyMission(missionId: string, message: string) {
-    await api.post('/submissions/apply', { missionId, message });
-    alert('지원 완료!');
-  }
+  const subByMission = new Map(submissions.map(s => [s.missionId, s]));
+  const payoutByMission = new Map(payouts.map(p => [p.submission?.missionId, p]));
 
-  const totalEarned = earnings.filter(e => e.status === 'COMPLETED').reduce((sum, e) => sum + Number(e.netAmount), 0);
-  const pendingEarned = earnings.filter(e => e.status === 'PENDING').reduce((sum, e) => sum + Number(e.netAmount), 0);
-
-  const tabs = [
-    { key: 'missions' as Tab, label: '미션 탐색' },
-    { key: 'community' as Tab, label: '💬 커뮤니티' },
-    { key: 'my-applications' as Tab, label: '내 지원 현황' },
-    { key: 'my-submissions' as Tab, label: '제출 내역' },
-    { key: 'earnings' as Tab, label: '수익 현황' },
-  ];
-
-  const COMM_CATS = [
-    { key: 'ALL', label: '전체' }, { key: '체험후기', label: '체험후기' },
-    { key: '미션팁', label: '미션팁' }, { key: '지역정보', label: '지역정보' },
-    { key: '자유게시판', label: '자유게시판' }, { key: '질문', label: '질문' },
-  ];
-
-  function commTimeAgo(date: string) {
-    const diff = Date.now() - new Date(date).getTime();
-    const m = Math.floor(diff / 60000);
-    if (m < 1) return '방금';
-    if (m < 60) return `${m}분 전`;
-    const h = Math.floor(m / 60);
-    if (h < 24) return `${h}시간 전`;
-    return new Date(date).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
-  }
-
+  const pendingPay = payouts.filter(p => p.status !== 'COMPLETED');
+  const nextAmount = pendingPay.reduce((sum, p) => sum + Number(p.netAmount ?? 0), 0);
+  const totalEarned = payouts.filter(p => p.status === 'COMPLETED').reduce((sum, p) => sum + Number(p.netAmount ?? 0), 0);
+  const applyingCount = applications.filter(a => a.status === 'PENDING').length;
+  const activeApps = applications.filter(a => a.status === 'APPROVED' && payoutByMission.get(a.missionId)?.status !== 'COMPLETED');
+  /** 계좌는 지급 기록에만 남는다 — 가장 최근 것을 보여 준다 */
+  const account = payouts.find(p => p.bankAccount);
 
   if (!hydrated || !user) return (
-    <div className="min-h-screen bg-stone-50">
-      <div className="bg-white border-b px-4 py-3 flex items-center justify-between">
-        <div className="h-6 w-24 bg-gray-200 rounded animate-pulse" />
-        <div className="h-5 w-16 bg-gray-200 rounded animate-pulse" />
-      </div>
-      <div className="max-w-5xl mx-auto px-3 py-4 space-y-4">
-        <div className="grid grid-cols-3 gap-2">
-          {[1,2,3].map(i => <div key={i} className="bg-white rounded-xl p-4 h-20 animate-pulse bg-gray-100" />)}
-        </div>
-        <div className="bg-white rounded-xl h-12 animate-pulse" />
-        {[1,2,3].map(i => <div key={i} className="bg-white rounded-2xl h-48 animate-pulse" />)}
+    <div className="min-h-screen bg-cream">
+      <div className="mx-auto max-w-shell space-y-4 px-5 py-6">
+        <div className="h-8 w-32 animate-pulse rounded bg-line-soft" />
+        <div className="h-44 animate-pulse rounded-box bg-line-soft" />
+        <div className="h-11 animate-pulse rounded bg-line-soft" />
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-stone-50">
-      <header className="bg-white border-b px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <h1 className="text-base sm:text-xl font-bold text-slate-700 whitespace-nowrap shrink-0">맘브릿지</h1>
-          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium whitespace-nowrap shrink-0">참여자</span>
-          {user.role === 'OPERATOR' && (
-            <Link href="/operator" className="text-xs text-gray-400 hover:text-slate-600 border border-gray-200 px-2 py-1 rounded-full whitespace-nowrap shrink-0">← 운영자</Link>
-          )}
-        </div>
-        <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-          <span className="text-xs sm:text-sm text-gray-500 hidden sm:block">{user.name}님</span>
-          {/* 알림 벨 */}
-          <div className="relative" ref={notifRef}>
-            <button
-              onClick={() => { setShowNotifDropdown(v => !v); if (!showNotifDropdown) loadNotifications(); }}
-              className="relative p-1.5 text-gray-400 hover:text-slate-700 transition-colors">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-              {unreadCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-0.5">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
-              )}
-            </button>
-            {/* 알림 드롭다운 */}
-            {showNotifDropdown && (
-              <div className="absolute right-0 top-9 w-80 bg-white rounded-2xl shadow-xl border border-stone-200 z-50 overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-3 border-b">
-                  <span className="font-semibold text-sm text-gray-900">알림</span>
-                  {unreadCount > 0 && (
-                    <button onClick={markAllRead} className="text-xs text-slate-500 hover:text-slate-700">전체 읽음</button>
-                  )}
-                </div>
-                <div className="max-h-80 overflow-y-auto divide-y">
-                  {notifications.length === 0 ? (
-                    <div className="py-10 text-center text-sm text-gray-400">알림이 없습니다</div>
-                  ) : notifications.map(n => (
-                    <div key={n.id} className={`px-4 py-3 ${n.isRead ? 'bg-white' : 'bg-slate-50'}`}>
-                      <p className={`text-sm font-medium ${n.isRead ? 'text-gray-600' : 'text-gray-900'}`}>{n.title}</p>
-                      <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{n.body}</p>
-                      <p className="text-[11px] text-gray-300 mt-1">{new Date(n.createdAt).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
+    <div className="min-h-screen bg-cream">
+      <SiteHeader showSearch={false} showMyLink={false} />
+
+      <div className="mx-auto max-w-shell">
+        <header className="flex items-center justify-between gap-2 px-5 pb-1 pt-3.5">
+          <div className="flex min-w-0 items-center gap-2">
+            <h1 className="font-serif text-title font-bold">내 활동</h1>
+            {user.role === 'OPERATOR' && (
+              <Link href="/operator" className="shrink-0 rounded-full border border-line px-2 py-1 text-xs text-muted">
+                운영자
+              </Link>
             )}
           </div>
-          <button onClick={() => { clearAuth(); router.push('/login'); }} className="text-xs sm:text-sm text-gray-400 hover:text-red-500 whitespace-nowrap">로그아웃</button>
-        </div>
-      </header>
-
-      <div className="max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
-        {/* 수익 요약 */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-6">
-          <div className="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-5 shadow-sm text-center">
-            <p className="text-xs sm:text-sm text-gray-500 mb-1">누적 수익</p>
-            <p className="text-base sm:text-2xl font-bold text-slate-600">{totalEarned.toLocaleString()}원</p>
-          </div>
-          <div className="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-5 shadow-sm text-center">
-            <p className="text-xs sm:text-sm text-gray-500 mb-1">정산 대기</p>
-            <p className="text-base sm:text-2xl font-bold text-yellow-500">{pendingEarned.toLocaleString()}원</p>
-          </div>
-          <div className="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-5 shadow-sm text-center">
-            <p className="text-xs sm:text-sm text-gray-500 mb-1">완료 미션</p>
-            <p className="text-base sm:text-2xl font-bold text-green-600">{earnings.filter(e => e.status === 'COMPLETED').length}건</p>
-          </div>
-        </div>
-
-        {/* 탭 */}
-        <div className="overflow-x-auto -mx-3 sm:mx-0 mb-4 sm:mb-6">
-          <div className="flex gap-1 bg-white rounded-xl p-1 shadow-sm mx-3 sm:mx-0 min-w-max sm:min-w-0">
-            {tabs.map(t => (
-              <button key={t.key} onClick={() => { setTab(t.key); if (t.key !== 'missions') loadTab(t.key); }}
-                className={`flex-shrink-0 sm:flex-1 px-3 sm:px-2 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${tab === t.key ? 'bg-slate-700 text-white' : 'text-gray-600 hover:bg-stone-50'}`}>
-                {t.label}
+          <div className="flex shrink-0 items-center gap-1">
+            <div className="relative" ref={notifRef}>
+              <button
+                type="button" aria-label="알림"
+                onClick={() => { setShowNotif(v => !v); if (!showNotif) void loadNotifications(); }}
+                className="relative flex h-11 w-11 items-center justify-center text-ink"
+              >
+                <BellIcon />
+                {unreadCount > 0 && (
+                  <span className="absolute right-1.5 top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-clay px-1 text-[10px] font-bold text-paper">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
               </button>
-            ))}
-          </div>
-        </div>
-
-        {loading && (
-          <div className="space-y-3">
-            {[1,2,3].map(i => (
-              <div key={i} className="bg-white rounded-2xl p-5 shadow-sm animate-pulse">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="space-y-2 flex-1">
-                    <div className="h-4 bg-gray-200 rounded w-3/4" />
-                    <div className="h-3 bg-gray-100 rounded w-1/2" />
-                  </div>
-                  <div className="h-6 w-16 bg-gray-200 rounded-full ml-4" />
-                </div>
-                <div className="h-3 bg-gray-100 rounded w-full mb-2" />
-                <div className="h-3 bg-gray-100 rounded w-5/6" />
-                <div className="flex gap-2 mt-4">
-                  <div className="h-6 w-20 bg-gray-100 rounded-lg" />
-                  <div className="h-6 w-20 bg-gray-100 rounded-lg" />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* 미션 탐색 — /missions와 같은 화면·같은 MissionCard를 쓴다 */}
-        {tab === 'missions' && !loading && (
-          <div className="-mx-3 sm:-mx-6">
-            <MissionBrowser />
-          </div>
-        )}
-
-        {/* 내 지원 현황 */}
-        {tab === 'my-applications' && !loading && (
-          <div className="space-y-3">
-            {applications.map(a => (
-              <div key={a.id} className="bg-white rounded-2xl p-5 shadow-sm">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0 mr-3">
-                    <p className="font-semibold text-gray-900">{a.mission?.title}</p>
-                    <p className="text-sm text-gray-500 mt-1">지원일: {new Date(a.createdAt).toLocaleDateString('ko-KR')}</p>
-                    {a.rejectionReason && <p className="text-sm text-red-500 mt-1">반려 사유: {a.rejectionReason}</p>}
-                  </div>
-                  <div className="text-right shrink-0">
-                    <span className={`px-3 py-1.5 rounded-full text-sm font-medium ${STATUS_COLOR[a.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                      {STATUS_LABEL[a.status] ?? a.status}
-                    </span>
-                    <p className="text-sm font-bold text-slate-600 mt-1">{Number(a.mission?.rewardAmount).toLocaleString()}원</p>
-                  </div>
-                </div>
-                {a.status === 'APPROVED' && (
-                  <div className="mt-3 pt-3 border-t border-gray-100 space-y-2">
-                    <button onClick={() => setGuideMissionId(a.missionId)}
-                      className="w-full py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50">
-                      📋 작성 가이드 · 추적 링크 복사
-                    </button>
-                    {submittedMissionIds.has(a.missionId) ? (
-                      <div className="flex items-center gap-2 text-sm text-green-600 font-medium">
-                        <span>✓ 콘텐츠 제출 완료</span>
-                        <span className="text-xs text-gray-400">— 운영자 검수 중</span>
-                      </div>
-                    ) : (
-                      <button onClick={() => setSubmitModal(a)}
-                        className="w-full py-2.5 bg-slate-700 text-white text-sm font-bold rounded-xl hover:bg-slate-800">
-                        📤 콘텐츠 제출하기
-                      </button>
+              {showNotif && (
+                <div className="absolute right-0 top-11 z-50 w-80 overflow-hidden rounded-card border border-line bg-paper shadow-lg">
+                  <div className="flex items-center justify-between border-b border-line-soft px-4 py-3">
+                    <span className="text-sm font-medium">알림</span>
+                    {unreadCount > 0 && (
+                      <button onClick={markAllRead} className="text-xs text-muted">전체 읽음</button>
                     )}
                   </div>
-                )}
-              </div>
-            ))}
-            {applications.length === 0 && <div className="text-center py-20 text-gray-400 bg-white rounded-2xl">지원한 미션이 없습니다</div>}
-          </div>
-        )}
-
-        {/* 제출 내역 */}
-        {tab === 'my-submissions' && !loading && (
-          <div className="space-y-3">
-            {submissions.map(s => (
-              <div key={s.id} className="bg-white rounded-2xl p-5 shadow-sm">
-                <div className="flex items-start justify-between mb-2">
-                  <p className="font-semibold text-gray-900">{s.mission?.title}</p>
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${STATUS_COLOR[s.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                    {STATUS_LABEL[s.status] ?? s.status}
-                  </span>
-                </div>
-                {s.description && <p className="text-sm text-gray-600 bg-stone-50 rounded-lg p-3 mt-2">{s.description}</p>}
-                {s.reviewNote && <p className="text-sm text-blue-600 mt-2">검수 메모: {s.reviewNote}</p>}
-                {s.rejectionReason && <p className="text-sm text-red-500 mt-2">반려 사유: {s.rejectionReason}</p>}
-                <p className="text-xs text-gray-400 mt-2">제출: {new Date(s.submittedAt).toLocaleDateString('ko-KR')}</p>
-                {reviewStats[s.missionId] && (
-                  <p className="text-sm text-gray-700 mt-2">내 글로 들어온 방문 <b className="tabular-nums">{reviewStats[s.missionId].clicks}</b>회 · 고유 방문자 <b className="tabular-nums">{reviewStats[s.missionId].uniqueVisitors}</b>명
-                    <span className="block text-xs text-gray-400">추적 링크를 눌러 넘어온 방문만 집계됩니다. 블로그 조회수와는 다릅니다.</span></p>
-                )}
-                {s.postCheckResult && <div className="mt-2 border-t pt-2"><PostCheckSummary submission={s} /></div>}
-                {s.status === 'REVISION' && s.revisionCount < s.maxRevisions && (
-                  <button onClick={() => {
-                    setSubmitForm({ description: s.description ?? '', snsPostUrl: s.snsPostUrl ?? '' });
-                    setSubmitModal({ ...s, resubmitId: s.id });
-                  }}
-                    className="mt-3 w-full py-2.5 bg-slate-700 text-white text-sm font-bold rounded-xl hover:bg-slate-800">
-                    ✏️ 수정해서 재제출하기 ({s.revisionCount}/{s.maxRevisions})
-                  </button>
-                )}
-              </div>
-            ))}
-            {submissions.length === 0 && <div className="text-center py-20 text-gray-400 bg-white rounded-2xl">제출한 콘텐츠가 없습니다</div>}
-          </div>
-        )}
-
-        {/* 수익 현황 */}
-        {tab === 'earnings' && !loading && (
-          <div className="space-y-3">
-            {earnings.map(e => (
-              <div key={e.id} className="bg-white rounded-2xl p-5 shadow-sm flex items-center justify-between">
-                <div>
-                  <p className="font-semibold text-gray-900">{e.submission?.mission?.title}</p>
-                  <p className="text-sm text-gray-500 mt-1">{new Date(e.createdAt).toLocaleDateString('ko-KR')}</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-bold text-green-600 text-lg">{Number(e.netAmount).toLocaleString()}원</p>
-                  <p className="text-xs text-gray-400">수수료 -{Number(e.platformFee).toLocaleString()}원</p>
-                  <span className={`mt-1 inline-block px-2 py-0.5 rounded-full text-xs font-medium ${e.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                    {e.status === 'COMPLETED' ? '지급완료' : '정산대기'}
-                  </span>
-                </div>
-              </div>
-            ))}
-            {earnings.length === 0 && <div className="text-center py-20 text-gray-400 bg-white rounded-2xl">수익 내역이 없습니다</div>}
-          </div>
-        )}
-
-        {/* 커뮤니티 */}
-        {tab === 'community' && (
-          <div>
-            {/* 카테고리 필터 + 글쓰기 */}
-            <div className="bg-white rounded-xl shadow-sm mb-4 px-4 py-3 space-y-2">
-              {/* 1행: 카테고리 가로 스크롤 */}
-              <div className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-hide">
-                {COMM_CATS.map(c => (
-                  <button key={c.key}
-                    onClick={() => { setCommunityCategory(c.key); loadCommunity(c.key, communitySort); }}
-                    className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${communityCategory === c.key ? 'bg-slate-700 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-                    {c.label}
-                  </button>
-                ))}
-              </div>
-              {/* 2행: 정렬 + 글쓰기 */}
-              <div className="flex items-center justify-between">
-                <select value={communitySort}
-                  onChange={e => { setCommunitySort(e.target.value); loadCommunity(communityCategory, e.target.value); }}
-                  className="border rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none">
-                  <option value="NEWEST">최신순</option>
-                  <option value="POPULAR">인기순</option>
-                  <option value="VIEWS">조회순</option>
-                </select>
-                <button onClick={() => setShowWriteModal(true)}
-                  className="px-4 py-1.5 bg-slate-700 text-white rounded-lg text-xs font-bold hover:bg-slate-800">
-                  ✏️ 글쓰기
-                </button>
-              </div>
-            </div>
-
-            {/* 게시글 목록 */}
-            {loading && <div className="flex justify-center py-16"><div className="w-6 h-6 border-4 border-slate-500 border-t-transparent rounded-full animate-spin" /></div>}
-            {!loading && (
-              <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
-                {/* 모바일: 카드형 */}
-                <div className="sm:hidden divide-y">
-                  {communityPosts.map(p => (
-                    <Link key={p.id} href={`/community/${p.id}`} className="flex items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
-                      <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full shrink-0 mt-0.5 min-w-[56px] text-center">{p.category}</span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-gray-900 line-clamp-2">{p.title}</p>
-                        <p className="text-xs text-gray-400 mt-1">{p.user?.name} · {commTimeAgo(p.createdAt)} · 👁 {p.viewCount} · ❤️ {p.likeCount}</p>
+                  <div className="max-h-80 divide-y divide-line-soft overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <p className="py-10 text-center text-sm text-muted">알림이 없습니다</p>
+                    ) : notifications.map(n => (
+                      <div key={n.id} className={`px-4 py-3 ${n.isRead ? '' : 'bg-cream'}`}>
+                        <p className={`text-sm ${n.isRead ? 'text-ink-2' : 'font-medium text-ink'}`}>{n.title}</p>
+                        <p className="mt-0.5 text-xs leading-relaxed text-muted">{n.body}</p>
                       </div>
-                    </Link>
-                  ))}
-                  {communityPosts.length === 0 && <div className="text-center py-16 text-gray-300 text-sm">게시글이 없습니다</div>}
-                </div>
-                {/* 데스크탑: 테이블형 */}
-                <div className="hidden sm:block">
-                  <div className="grid grid-cols-[90px_1fr_72px_64px_48px_48px] gap-2 px-4 py-2.5 bg-stone-50 border-b text-xs font-semibold text-gray-500">
-                    <span>분류</span><span>제목</span><span>작성자</span><span>작성일</span><span className="text-center">조회</span><span className="text-center">좋아요</span>
+                    ))}
                   </div>
-                  {communityPosts.map(p => (
-                    <Link key={p.id} href={`/community/${p.id}`}
-                      className="grid grid-cols-[90px_1fr_72px_64px_48px_48px] gap-2 px-4 py-3 border-b last:border-0 hover:bg-slate-50 transition-colors items-center group">
-                      <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full truncate">{p.category}</span>
-                      <div className="min-w-0">
-                        <span className="text-sm font-medium text-gray-900 group-hover:text-slate-700 line-clamp-1">{p.title}</span>
-                        {p._count?.comments > 0 && <span className="text-xs text-slate-400 ml-1">[{p._count.comments}]</span>}
-                      </div>
-                      <span className="text-xs text-gray-500 truncate">{p.user?.name}</span>
-                      <span className="text-xs text-gray-400">{commTimeAgo(p.createdAt)}</span>
-                      <span className="text-xs text-gray-400 text-center">{p.viewCount}</span>
-                      <span className="text-xs text-red-400 text-center">❤️{p.likeCount}</span>
-                    </Link>
-                  ))}
-                  {communityPosts.length === 0 && <div className="text-center py-16 text-gray-300 text-sm">게시글이 없습니다</div>}
                 </div>
+              )}
+            </div>
+            <button
+              type="button" aria-label="로그아웃"
+              onClick={() => { clearAuth(); router.push('/login'); }}
+              className="flex h-11 w-11 items-center justify-center text-muted"
+            >
+              <LogOutIcon size={20} />
+            </button>
+          </div>
+        </header>
+
+        {/* 이번 달 요약 */}
+        <section className="mx-5 mt-3 rounded-box bg-ink px-5 py-[22px] text-paper">
+          <span className="font-accent text-sm italic text-[#D9A27F]">This month</span>
+          <p className="mt-1 text-[13px] text-[#CFC4B4]">{nextPayoutLabel()}에 받을 보상</p>
+          <p className="mt-1 font-serif text-hero font-bold">{won(nextAmount)}</p>
+          <p className="mt-1 text-xs text-[#CFC4B4]">수수료·세금 공제 후 · 승인된 미션 {pendingPay.length}건</p>
+          <div className="mt-[18px] grid grid-cols-3 border-t border-[#3A332B] pt-3.5">
+            {[
+              { label: '지원 중', value: String(applyingCount) },
+              { label: '진행 중', value: String(activeApps.length) },
+              { label: '누적 보상', value: won(totalEarned) },
+            ].map(s => (
+              <div key={s.label}>
+                <p className="text-xs text-[#CFC4B4]">{s.label}</p>
+                <p className="mt-0.5 text-lg font-bold">{s.value}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <div className="mt-[22px]">
+          <CategoryTabs tabs={TABS} value={tab} onChange={v => setTab(v as Tab)} ariaLabel="내 활동 메뉴" />
+        </div>
+
+        {loading ? (
+          <div className="space-y-3 px-5 pt-[18px]">
+            {[1, 2].map(i => <div key={i} className="h-36 animate-pulse rounded-card bg-line-soft" />)}
+          </div>
+        ) : (
+          <>
+            {/* 진행 중 */}
+            {tab === 'active' && (
+              <div className="space-y-3 px-5 pt-[18px]">
+                {activeApps.map(a => {
+                  const sub = subByMission.get(a.missionId);
+                  const payout = payoutByMission.get(a.missionId);
+                  const current = stageIndex(sub, payout);
+                  const stats = reviewStats[a.missionId];
+                  const tone = photoTone(a.missionId);
+                  const deadline = a.mission?.submissionDeadline;
+                  const dday = deadline ? Math.ceil((new Date(deadline).getTime() - Date.now()) / 86400000) : null;
+                  return (
+                    <section key={a.id} className="rounded-card border border-line bg-paper p-[18px]">
+                      <div className="flex items-center gap-3">
+                        <div className={`h-14 w-14 shrink-0 rounded-control ${tone.bg}`} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[15px] font-medium">
+                            {a.mission?.clientProfile?.businessName
+                              ? `[${a.mission.regionDong || a.mission.regionGu}] ${a.mission.clientProfile.businessName}`
+                              : a.mission?.title}
+                          </p>
+                          <p className="mt-[3px] text-xs text-muted">
+                            {deadline ? <>후기 마감 {dateK(deadline)}{dday !== null && dday >= 0 && <> · <b className="font-medium text-clay">D-{dday}</b></>}</> : '일정 미정'}
+                          </p>
+                        </div>
+                        {sub && <StatusBadge status={sub.status} />}
+                      </div>
+
+                      <StageBar current={current} />
+
+                      {stats && (
+                        <div className="mt-3.5 rounded-control bg-cream p-3.5">
+                          <p className="text-xs text-muted">내 후기로 들어온 방문</p>
+                          <p className="mt-1 text-[15px]">
+                            <b className="text-xl">{stats.clicks}</b>회{' '}
+                            <span className="text-[13px] text-muted">· 고유 방문자 {stats.uniqueVisitors}명</span>
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="mt-4 space-y-2">
+                        {!sub && (
+                          <button
+                            onClick={() => { setSubmitForm({ description: '', snsPostUrl: '' }); setSubmitModal(a); }}
+                            className="flex h-12 w-full items-center justify-center rounded-control bg-clay text-sm font-bold text-paper"
+                          >
+                            후기 링크 제출하기
+                          </button>
+                        )}
+                        {sub?.status === 'REVISION' && sub.revisionCount < sub.maxRevisions && (
+                          <button
+                            onClick={() => {
+                              setSubmitForm({ description: sub.description ?? '', snsPostUrl: sub.snsPostUrl ?? '' });
+                              setSubmitModal({ ...sub, resubmitId: sub.id });
+                            }}
+                            className="flex h-12 w-full items-center justify-center rounded-control bg-clay text-sm font-bold text-paper"
+                          >
+                            수정해서 다시 제출하기 ({sub.revisionCount}/{sub.maxRevisions})
+                          </button>
+                        )}
+                        {sub?.status === 'SUBMITTED' && (
+                          <p className="text-center text-[13px] text-muted">검수 중 · 보통 2일 안에 결과가 나와요</p>
+                        )}
+                        {sub?.status === 'APPROVED' && (
+                          <p className="text-center text-[13px] text-muted">{nextPayoutLabel()}에 지급될 예정이에요</p>
+                        )}
+                        <button
+                          onClick={() => setGuideMissionId(a.missionId)}
+                          className="flex h-11 w-full items-center justify-center rounded-control border border-line text-sm text-ink-2"
+                        >
+                          작성 가이드 · 추적 링크 복사
+                        </button>
+                      </div>
+                    </section>
+                  );
+                })}
+                {activeApps.length === 0 && (
+                  <EmptyBox>진행 중인 미션이 없어요. <Link href="/missions" className="font-medium text-clay">미션 둘러보기</Link></EmptyBox>
+                )}
               </div>
             )}
-          </div>
+
+            {/* 지원 현황 */}
+            {tab === 'applications' && (
+              <div className="space-y-3 px-5 pt-[18px]">
+                {applications.map(a => (
+                  <section key={a.id} className="rounded-card border border-line bg-paper p-[18px]">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[15px] font-medium">{a.mission?.title}</p>
+                        <p className="mt-1 text-xs text-muted">지원일 {dateK(a.createdAt)}</p>
+                        {a.rejectionReason && <p className="mt-1 text-[13px] text-clay-dark">반려 사유: {a.rejectionReason}</p>}
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <StatusBadge status={a.status} />
+                        <p className="mt-1 text-sm font-bold text-clay">{won(a.mission?.rewardAmount)}</p>
+                      </div>
+                    </div>
+                  </section>
+                ))}
+                {applications.length === 0 && <EmptyBox>지원한 미션이 없어요.</EmptyBox>}
+              </div>
+            )}
+
+            {/* 제출 내역 */}
+            {tab === 'submissions' && (
+              <div className="space-y-3 px-5 pt-[18px]">
+                {submissions.map(s => (
+                  <section key={s.id} className="rounded-card border border-line bg-paper p-[18px]">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="min-w-0 flex-1 text-[15px] font-medium">{s.mission?.title}</p>
+                      <StatusBadge status={s.status} />
+                    </div>
+                    {s.description && <p className="mt-2 rounded-control bg-cream p-3 text-[13px] text-ink-2">{s.description}</p>}
+                    {s.reviewNote && <p className="mt-2 text-[13px] text-ink-2">검수 메모: {s.reviewNote}</p>}
+                    {s.rejectionReason && <p className="mt-2 text-[13px] text-clay-dark">반려 사유: {s.rejectionReason}</p>}
+                    <p className="mt-2 text-xs text-muted">제출 {dateK(s.submittedAt)}</p>
+                    {reviewStats[s.missionId] && (
+                      <div className="mt-2.5 rounded-control bg-cream p-3.5">
+                        <p className="text-xs text-muted">내 후기로 들어온 방문</p>
+                        <p className="mt-1 text-[15px]">
+                          <b className="text-xl">{reviewStats[s.missionId].clicks}</b>회{' '}
+                          <span className="text-[13px] text-muted">· 고유 방문자 {reviewStats[s.missionId].uniqueVisitors}명</span>
+                        </p>
+                        <p className="mt-1 text-[11px] text-muted">추적 링크를 눌러 넘어온 방문만 집계됩니다. 블로그 조회수와는 다릅니다.</p>
+                      </div>
+                    )}
+                    {s.postCheckResult && <div className="mt-2 border-t border-line-soft pt-2"><PostCheckSummary submission={s} /></div>}
+                    {s.status === 'REVISION' && s.revisionCount < s.maxRevisions && (
+                      <button
+                        onClick={() => {
+                          setSubmitForm({ description: s.description ?? '', snsPostUrl: s.snsPostUrl ?? '' });
+                          setSubmitModal({ ...s, resubmitId: s.id });
+                        }}
+                        className="mt-3 flex h-12 w-full items-center justify-center rounded-control bg-clay text-sm font-bold text-paper"
+                      >
+                        수정해서 다시 제출하기 ({s.revisionCount}/{s.maxRevisions})
+                      </button>
+                    )}
+                  </section>
+                ))}
+                {submissions.length === 0 && <EmptyBox>제출한 콘텐츠가 없어요.</EmptyBox>}
+              </div>
+            )}
+
+            {/* 보상 내역 */}
+            {tab === 'payouts' && (
+              <div className="px-5 pt-[18px]">
+                <div className="space-y-3">
+                  {payouts.map(p => (
+                    <section key={p.id} className="flex items-center justify-between gap-3 rounded-card border border-line bg-paper p-[18px]">
+                      <div className="min-w-0">
+                        <p className="truncate text-[15px] font-medium">{p.submission?.mission?.title}</p>
+                        <p className="mt-1 text-xs text-muted">{dateK(p.createdAt)}</p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-lg font-bold text-clay">{won(p.netAmount)}</p>
+                        <p className="text-xs text-muted">수수료 -{won(p.platformFee)}</p>
+                        <div className="mt-1 flex justify-end"><StatusBadge status={p.status} /></div>
+                      </div>
+                    </section>
+                  ))}
+                  {payouts.length === 0 && <EmptyBox>아직 보상 내역이 없어요.</EmptyBox>}
+                </div>
+
+                {/* 계좌는 지급 기록에만 남는다 — 등록·변경 기능은 아직 없다 */}
+                <section className="mt-7">
+                  <span className="font-accent text-sm italic text-clay">Payout</span>
+                  <h2 className="mb-3 mt-0.5 font-serif text-section-sm font-bold">보상 받을 계좌</h2>
+                  <div className="rounded-photo border border-line bg-paper p-4">
+                    {account ? (
+                      <>
+                        <p className="text-sm font-medium">[{account.bankName ?? '은행'}] {maskAccount(account.bankAccount)}</p>
+                        <p className="mt-0.5 text-xs text-muted">예금주 {account.accountHolder ?? '-'}</p>
+                      </>
+                    ) : (
+                      <p className="text-[13px] leading-[1.6] text-muted">
+                        아직 등록된 계좌가 없어요. 첫 지급 전에 운영자가 계좌를 확인해 드려요.
+                      </p>
+                    )}
+                  </div>
+                </section>
+              </div>
+            )}
+          </>
         )}
       </div>
 
       {/* 콘텐츠 제출 모달 */}
       {submitModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b">
-              <div>
-                <h2 className="text-base font-bold text-gray-900">{submitModal.resubmitId ? '콘텐츠 재제출' : '콘텐츠 제출'}</h2>
-                <p className="text-xs text-gray-400 mt-0.5">{submitModal.mission?.title}</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4">
+          <div className="w-full max-w-lg rounded-box bg-paper">
+            <div className="flex items-center justify-between border-b border-line px-5 py-4">
+              <div className="min-w-0">
+                <h2 className="font-serif text-section-sm font-bold">{submitModal.resubmitId ? '콘텐츠 다시 제출' : '후기 링크 제출'}</h2>
+                <p className="mt-0.5 truncate text-xs text-muted">{submitModal.mission?.title}</p>
               </div>
-              <button onClick={() => setSubmitModal(null)} className="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
+              <button onClick={() => setSubmitModal(null)} aria-label="닫기" className="h-11 w-11 shrink-0 text-xl text-muted">×</button>
             </div>
-            <form onSubmit={handleSubmitContent} className="p-6 space-y-4">
+            <form onSubmit={handleSubmitContent} className="space-y-4 p-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">활동 내용 *</label>
-                <textarea required rows={4}
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none resize-none"
-                  value={submitForm.description}
+                <label htmlFor="sub-desc" className="mb-1 block text-[13px] text-muted">활동 내용 *</label>
+                <textarea
+                  id="sub-desc" required rows={4} value={submitForm.description}
                   onChange={e => setSubmitForm(f => ({ ...f, description: e.target.value }))}
-                  placeholder="미션 수행 내용을 작성해주세요" />
+                  placeholder="미션 수행 내용을 적어 주세요"
+                  className="w-full resize-none rounded-control border border-line bg-cream p-3 text-sm outline-none"
+                />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">게시물 URL (블로그 리뷰 미션은 네이버 블로그 글 주소 필수)</label>
+                <label htmlFor="sub-url" className="mb-1 block text-[13px] text-muted">
+                  게시물 주소 (블로그 리뷰 미션은 네이버 블로그 글 주소 필수)
+                </label>
                 <input
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
-                  value={submitForm.snsPostUrl}
+                  id="sub-url" value={submitForm.snsPostUrl}
                   onChange={e => setSubmitForm(f => ({ ...f, snsPostUrl: e.target.value }))}
-                  placeholder="https://blog.naver.com/아이디/글번호" />
+                  placeholder="https://blog.naver.com/아이디/글번호"
+                  className="w-full rounded-control border border-line bg-cream p-3 text-sm outline-none"
+                />
               </div>
               <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setSubmitModal(null)}
-                  className="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-stone-50">취소</button>
-                <button type="submit" disabled={submittingContent}
-                  className="px-6 py-2 bg-slate-700 text-white rounded-lg text-sm font-bold hover:bg-slate-700 disabled:opacity-50">
+                <button type="button" onClick={() => setSubmitModal(null)} className="h-11 rounded-control border border-line px-4 text-sm text-ink-2">취소</button>
+                <button type="submit" disabled={submittingContent} className="h-11 rounded-control bg-clay px-6 text-sm font-bold text-paper disabled:opacity-50">
                   {submittingContent ? '제출 중...' : '제출하기'}
                 </button>
               </div>
@@ -547,59 +521,26 @@ export default function ParticipantPage() {
 
       {guideMissionId && <ReviewGuideModal missionId={guideMissionId} onClose={() => setGuideMissionId(null)} />}
 
-      {/* 제출 직후 자동 확인 결과 */}
       {checkResult && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
-            <h2 className="text-base font-bold text-gray-900">제출 완료 · 자동 확인 결과</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4">
+          <div className="w-full max-w-md space-y-4 rounded-box bg-paper p-5">
+            <h2 className="font-serif text-section-sm font-bold">제출 완료 · 자동 확인 결과</h2>
             <PostCheckSummary submission={checkResult} />
-            <button onClick={() => setCheckResult(null)} className="w-full py-2.5 bg-slate-700 text-white text-sm font-bold rounded-xl">확인</button>
+            <button onClick={() => setCheckResult(null)} className="h-12 w-full rounded-control bg-ink text-sm font-bold text-paper">확인</button>
           </div>
         </div>
       )}
 
-      {/* 글쓰기 모달 */}
-      {showWriteModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-xl shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b">
-              <h2 className="text-base font-bold text-gray-900">게시글 작성</h2>
-              <button onClick={() => setShowWriteModal(false)} className="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
-            </div>
-            <form onSubmit={handleWritePost} className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">카테고리</label>
-                  <select required className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
-                    value={writeForm.category} onChange={e => setWriteForm(f => ({ ...f, category: e.target.value }))}>
-                    {COMM_CATS.filter(c => c.key !== 'ALL').map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">작성자</label>
-                  <div className="border rounded-lg px-3 py-2 text-sm bg-stone-50 text-gray-400">{user.name}</div>
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">제목</label>
-                <input required className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
-                  value={writeForm.title} onChange={e => setWriteForm(f => ({ ...f, title: e.target.value }))} placeholder="제목을 입력하세요" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">내용</label>
-                <textarea required rows={7} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none resize-none"
-                  value={writeForm.content} onChange={e => setWriteForm(f => ({ ...f, content: e.target.value }))} placeholder="내용을 입력하세요" />
-              </div>
-              <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setShowWriteModal(false)} className="px-4 py-2 border rounded-lg text-sm text-gray-500 hover:bg-stone-50">취소</button>
-                <button type="submit" disabled={submittingPost} className="px-6 py-2 bg-slate-700 text-white rounded-lg text-sm font-bold hover:bg-slate-700 disabled:opacity-50">
-                  {submittingPost ? '등록 중...' : '등록'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <BottomTabBarSpacer />
+      <BottomTabBar />
     </div>
+  );
+}
+
+function EmptyBox({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="rounded-photo border border-dashed border-[#D8CBB8] bg-paper p-4 text-[13px] leading-[1.6] text-ink-2">
+      {children}
+    </p>
   );
 }

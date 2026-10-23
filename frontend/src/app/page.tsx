@@ -6,7 +6,8 @@ import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { BottomTabBar, BottomTabBarSpacer, MissionCard, SectionHeader, SiteHeader } from '@/components/ui';
 import { ArrowRightIcon, ChevronDownIcon, PinIcon, SearchIcon } from '@/components/ui/icons';
-import { CATEGORY_LABEL, toCardData, type MissionListItem } from '@/components/missions/MissionBrowser';
+import { CATEGORY_LABEL, EMPTY_MESSAGE, toCardData, type MissionListItem } from '@/components/missions/MissionBrowser';
+import MissionEmptyBox from '@/components/missions/MissionEmptyBox';
 
 /** 기준: docs/design/mombridge-design/cream-editorial-v1.md 3번 '홈' + Main.html */
 
@@ -28,13 +29,15 @@ export default function Home() {
   const [ready, setReady] = useState(false);
   const [missions, setMissions] = useState<MissionListItem[]>([]);
   const [keyword, setKeyword] = useState('');
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => setReady(true), []);
   useEffect(() => {
     // 공개 API라 로그인하지 않아도 미션이 보인다
     api.get('/missions?sort=DEADLINE')
       .then(({ data }) => setMissions(data.data.missions))
-      .catch(() => setMissions([]));
+      .catch(() => setMissions([]))
+      .finally(() => setLoaded(true));
   }, []);
 
   const signedIn = ready && !!user;
@@ -90,6 +93,13 @@ export default function Home() {
             </Link>
           ))}
         </nav>
+
+        {/* 공개된 미션이 하나도 없으면 탭 아래가 비어 보이지 않게 /missions와 같은 안내를 둔다 */}
+        {loaded && missions.length === 0 && (
+          <div className="mx-5 mt-[26px]">
+            <MissionEmptyBox message={EMPTY_MESSAGE} actionLabel="다른 지역 미션 보기" actionHref="/missions" />
+          </div>
+        )}
 
         {/* 마감이 가까운 미션. '등원 후' 분류 기준이 아직 없어 이 자리를 채운다 (문서 4번) */}
         {closing.length > 0 && (
