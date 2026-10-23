@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import api from '@/lib/api';
+import { BottomTabBar, BottomTabBarSpacer, SiteHeader } from '@/components/ui';
 
 interface Mission {
   id: string; title: string; description: string;
@@ -22,20 +23,14 @@ export default function MissionsPage() {
     api.get('/missions').then(({ data }) => setMissions(data.data.missions)).finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-4 border-slate-500 border-t-transparent rounded-full animate-spin" /></div>;
+  if (loading) return <div className="min-h-screen bg-cream flex items-center justify-center"><div className="w-8 h-8 border-4 border-ink border-t-transparent rounded-full animate-spin" /></div>;
 
   return (
-    <div className="min-h-screen bg-stone-50">
-      <nav className="bg-white border-b px-6 py-4 flex items-center justify-between">
-        <Link href="/" className="text-xl font-bold text-slate-800">맘브릿지</Link>
-        <div className="flex gap-3">
-          <Link href="/login" className="text-sm text-gray-600 hover:text-gray-900">로그인</Link>
-          <Link href="/register" className="text-sm bg-slate-700 text-white px-4 py-2 rounded-lg">가입</Link>
-        </div>
-      </nav>
+    <div className="min-h-screen bg-cream">
+      <SiteHeader />
 
-      <div className="max-w-5xl mx-auto px-6 py-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">미션 탐색</h1>
+      <div className="mx-auto max-w-shell px-5 pb-8">
+        <h1 className="mb-6 font-serif text-title font-bold text-ink">미션 탐색</h1>
 
         {missions.length === 0 ? (
           <div className="text-center py-20 text-gray-400">
@@ -64,6 +59,9 @@ export default function MissionsPage() {
           </div>
         )}
       </div>
+
+      <BottomTabBarSpacer />
+      <BottomTabBar />
     </div>
   );
 }
