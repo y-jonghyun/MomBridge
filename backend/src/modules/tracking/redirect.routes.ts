@@ -106,7 +106,16 @@ async function handle(req: Request, res: Response) {
   const { linkId, participantId } = resolved;
   setImmediate(async () => {
     // 체험단원 본인 클릭(서명된 mb_self 쿠키가 링크 주인과 같음)은 집계하지 않는다
-    if (verifySelfClickToken(info.selfToken) === participantId && await getSetting('click.excludeSelf').catch(() => true)) return;
+    if (verifySelfClickToken(info.selfToken) === participantId) {
+      // 설정을 못 읽으면 집계하지 않는 쪽(기본값)으로 둔다. 다만 조용히 넘어가지 않고 남긴다
+      let excludeSelf = true;
+      try {
+        excludeSelf = await getSetting('click.excludeSelf');
+      } catch (err) {
+        logger.warn('click.excludeSelf lookup failed; defaulting to excluding the click', { code, error: (err as Error).message });
+      }
+      if (excludeSelf) { logger.debug('click skipped: own link click with click.excludeSelf on', { code }); return; }
+    }
     getClickRecorder()
       .record({ linkId, ip: info.ip, userAgent: info.userAgent, referer: info.referer, method: req.method, retry: info.retry })
       // IP·UA는 로그에 남기지 않는다
