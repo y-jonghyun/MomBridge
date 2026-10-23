@@ -2,13 +2,14 @@ import request from 'supertest';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import app from '../../src/app';
+import { nextPhone } from '../helpers/factory';
 import { env } from '../../src/config/env';
 import { describeDb, resetDb, prisma } from '../helpers/db';
 import { createOperator } from '../../src/scripts/create-operator';
 
 const api = request(app);
 const register = (email: string, role = 'PARTICIPANT') =>
-  api.post('/api/v1/auth/register').send({ email, password: 'pass1234', name: '맘', role });
+  api.post('/api/v1/auth/register').send({ email, password: 'pass1234', name: '맘', role, phone: nextPhone() });
 const refresh = (refreshToken: string) => api.post('/api/v1/auth/refresh').send({ refreshToken });
 
 describeDb('세션 · 이메일 정규화', () => {

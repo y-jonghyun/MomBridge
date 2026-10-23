@@ -11,6 +11,7 @@ import ProvinceSelect from '@/components/common/ProvinceSelect';
 import { CategoryTabs, SiteHeader } from '@/components/ui';
 import MissionImageUploader, { uploadPendingImages, type PendingImage } from '@/components/missions/MissionImageUploader';
 import { BUSINESS_CATEGORIES, MOM_TAGS } from '@/lib/mission-options';
+import { formatPhone, isMobilePhone, phoneDigits } from '@/lib/phone';
 import { ClientPerformanceCard, MissionProgress, clientMissionStage } from '@/components/client/ClientOverview';
 
 type Tab = 'my-missions' | 'create' | 'results' | 'profile';
@@ -133,7 +134,7 @@ function ClientPageContent() {
       setProfileForm(prev => ({
         ...prev,
         name: userR.data.data.user.name ?? '',
-        phone: profileR.data.data.contactPhone ?? '',
+        phone: formatPhone(userR.data.data.user.phone ?? ''),
       }));
       setClientInfo(profileR.data.data);
     } catch { /* 무시 */ }
@@ -145,7 +146,10 @@ function ClientPageContent() {
     try {
       const tasks: Promise<any>[] = [];
       if (profileForm.name.trim()) tasks.push(api.patch('/auth/me/name', { name: profileForm.name }));
-      if (profileForm.phone) tasks.push(api.patch('/client/profile/phone', { phone: profileForm.phone }));
+      if (profileForm.phone) {
+        if (!isMobilePhone(profileForm.phone)) throw new Error('010으로 시작하는 휴대폰 번호를 입력해주세요');
+        tasks.push(api.patch('/auth/me/phone', { phone: phoneDigits(profileForm.phone) }));
+      }
       if (profileForm.newPassword) {
         // 비밀번호를 바꾸면 다른 기기의 로그인은 끊기고, 이 화면은 새 토큰으로 계속 쓴다
         tasks.push(api.patch('/auth/me/password', {
@@ -159,7 +163,7 @@ function ClientPageContent() {
       alert('저장됐습니다.');
       setProfileForm(prev => ({ ...prev, currentPassword: '', newPassword: '' }));
     } catch (err: any) {
-      alert(err?.response?.data?.error?.message ?? '저장에 실패했습니다');
+      alert(err?.response?.data?.error?.message ?? err?.message ?? '저장에 실패했습니다');
     } finally { setProfileSaving(false); }
   }
 
@@ -565,11 +569,11 @@ function ClientPageContent() {
                   value={profileForm.name} onChange={e => setProfileForm(p => ({ ...p, name: e.target.value }))} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-ink-2 mb-1">연락처 (SMS 수신용)</label>
-                <input type="tel" placeholder="예: 01012345678"
+                <label className="block text-sm font-medium text-ink-2 mb-1">휴대폰 번호</label>
+                <input type="tel" inputMode="tel" autoComplete="tel" maxLength={13} placeholder="010-1234-5678"
                   className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none"
-                  value={profileForm.phone} onChange={e => setProfileForm(p => ({ ...p, phone: e.target.value }))} />
-                <p className="text-xs text-muted mt-1">운영자가 결제 링크를 발송할 때 사용됩니다</p>
+                  value={profileForm.phone} onChange={e => setProfileForm(p => ({ ...p, phone: formatPhone(e.target.value) }))} />
+                <p className="text-xs text-muted mt-1">결제·정산 안내를 이 번호로 보냅니다</p>
               </div>
               <div className="border-t pt-4">
                 <p className="text-sm font-medium text-ink-2 mb-3">비밀번호 변경 (선택)</p>

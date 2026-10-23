@@ -3,12 +3,13 @@ import bcrypt from 'bcryptjs';
 import app from '../../src/app';
 import { describeDb, resetDb, prisma } from '../helpers/db';
 import { createOperator } from '../../src/scripts/create-operator';
+import { nextPhone } from '../helpers/factory';
 
 describeDb('회원가입 역할 제한 · 운영자 생성 스크립트', () => {
   beforeEach(resetDb);
   afterAll(() => prisma.$disconnect());
 
-  const body = (role: string) => ({ email: `${role.toLowerCase()}@test.local`, password: 'pass1234', name: '테스트', role });
+  const body = (role: string) => ({ email: `${role.toLowerCase()}@test.local`, password: 'pass1234', name: '테스트', role, phone: nextPhone() });
 
   it('refuses to register an OPERATOR (or any unknown role)', async () => {
     for (const role of ['OPERATOR', 'operator', 'ADMIN']) {

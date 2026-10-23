@@ -26,7 +26,7 @@ describeDb('고객사 응답의 체험단원 정보 범위', () => {
       where: { id: participant.profile.id },
       data: { bio: '자기소개-노출금지', regionDong: '망원동', totalEarned: 123456, missionCount: 7, rating: 4.5 },
     });
-    await prisma.user.update({ where: { id: participant.user.id }, data: { phone: '010-0000-9999' } });
+    await prisma.user.update({ where: { id: participant.user.id }, data: { phone: '01000009999' } });
 
     const { application, link } = await createTrackingLink(mission.id, participant.profile.id);
     await prisma.application.update({ where: { id: application.id }, data: { message: '지원메시지-노출금지' } });
@@ -76,7 +76,9 @@ describeDb('고객사 응답의 체험단원 정보 범위', () => {
     ]);
     const all = bodies.map(b => JSON.stringify(b.body)).join('\n');
     for (const leaked of [
-      '010-0000-9999',            // 연락처
+      '01000009999',              // 휴대폰 번호 (숫자만 저장)
+      '010-0000-9999',            // 하이픈을 붙여 내보내는 경우도 막는다
+      '0000-9999',                // 마스킹한 형태(010-****-9999)로도 나가면 안 된다
       ...participantEmailParts,   // 이메일
       '자기소개-노출금지',
       '지원메시지-노출금지',

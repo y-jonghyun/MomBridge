@@ -9,16 +9,18 @@ import { PostCheckSummary, ReviewGuideModal } from '@/components/campaign/Review
 import { BottomTabBar, BottomTabBarSpacer, CategoryTabs, SiteHeader } from '@/components/ui';
 import { photoTone } from '@/components/ui/MissionCard';
 import { BellIcon, LogOutIcon } from '@/components/ui/icons';
+import { formatPhone, isMobilePhone, phoneDigits } from '@/lib/phone';
 
 /** 기준: docs/design/mombridge-design/cream-editorial-v1.md 3번 '참여자 내 활동' + Participant.html */
 
-type Tab = 'active' | 'applications' | 'submissions' | 'payouts';
+type Tab = 'active' | 'applications' | 'submissions' | 'payouts' | 'profile';
 
 const TABS = [
   { value: 'active', label: '진행 중' },
   { value: 'applications', label: '지원 현황' },
   { value: 'submissions', label: '제출 내역' },
   { value: 'payouts', label: '보상 내역' },
+  { value: 'profile', label: '내 정보' },
 ];
 
 const STATUS_LABEL: Record<string, string> = {
@@ -90,6 +92,8 @@ export default function ParticipantPage() {
 
   const [hydrated, setHydrated] = useState(false);
   const [tab, setTab] = useState<Tab>('active');
+  const [profileForm, setProfileForm] = useState({ name: '', phone: '' });
+  const [profileSaving, setProfileSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const [applications, setApplications] = useState<any[]>([]);
@@ -134,6 +138,30 @@ export default function ParticipantPage() {
     } catch { /* 각 목록은 비어 있는 상태로 둔다 */ } finally { setLoading(false); }
   }, []);
 
+  const loadProfile = useCallback(async () => {
+    try {
+      const { data } = await api.get('/auth/me');
+      setProfileForm({ name: data.data.user.name ?? '', phone: formatPhone(data.data.user.phone ?? '') });
+    } catch { /* 내 정보 탭을 열었을 때 다시 받는다 */ }
+  }, []);
+
+  async function handleSaveProfile(e: React.FormEvent) {
+    e.preventDefault();
+    setProfileSaving(true);
+    try {
+      const tasks: Promise<unknown>[] = [];
+      if (profileForm.name.trim()) tasks.push(api.patch('/auth/me/name', { name: profileForm.name.trim() }));
+      if (profileForm.phone) {
+        if (!isMobilePhone(profileForm.phone)) throw new Error('010으로 시작하는 휴대폰 번호를 입력해주세요');
+        tasks.push(api.patch('/auth/me/phone', { phone: phoneDigits(profileForm.phone) }));
+      }
+      await Promise.all(tasks);
+      alert('저장됐습니다.');
+    } catch (err: any) {
+      alert(err?.response?.data?.error?.message ?? err?.message ?? '저장에 실패했습니다');
+    } finally { setProfileSaving(false); }
+  }
+
   const loadNotifications = useCallback(async () => {
     try {
       const r = await api.get('/notifications');
@@ -148,9 +176,10 @@ export default function ParticipantPage() {
     if (user.role !== 'PARTICIPANT' && user.role !== 'OPERATOR') { router.push('/'); return; }
     void loadAll();
     void loadNotifications();
+    void loadProfile();
     // 이미 로그인해 있던 체험단원도 본인 클릭 표시를 받는다 (만료 연장 겸)
     if (user.role === 'PARTICIPANT') void syncSelfClickCookie();
-  }, [user, hydrated, loadAll, loadNotifications, router]);
+  }, [user, hydrated, loadAll, loadNotifications, loadProfile, router]);
 
   async function markAllRead() {
     try {
@@ -485,6 +514,38 @@ export default function ParticipantPage() {
                     )}
                   </div>
                 </section>
+              </div>
+            )}
+
+            {/* 내 정보 */}
+            {tab === 'profile' && (
+              <div className="px-5 pt-[18px]">
+                <form onSubmit={handleSaveProfile} className="space-y-4 rounded-card border border-line bg-paper p-[18px]">
+                  <div>
+                    <label htmlFor="me-name" className="mb-1 block text-[13px] text-muted">이름</label>
+                    <input
+                      id="me-name" value={profileForm.name}
+                      onChange={e => setProfileForm(f => ({ ...f, name: e.target.value }))}
+                      className="w-full rounded-control border border-line bg-cream p-3 text-sm outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="me-phone" className="mb-1 block text-[13px] text-muted">휴대폰 번호</label>
+                    <input
+                      id="me-phone" type="tel" inputMode="tel" autoComplete="tel" maxLength={13}
+                      placeholder="010-1234-5678" value={profileForm.phone}
+                      onChange={e => setProfileForm(f => ({ ...f, phone: formatPhone(e.target.value) }))}
+                      className="w-full rounded-control border border-line bg-cream p-3 text-sm outline-none"
+                    />
+                    <p className="mt-1 text-xs text-muted">선정·정산 안내를 이 번호로 보냅니다</p>
+                  </div>
+                  <button
+                    type="submit" disabled={profileSaving}
+                    className="flex h-12 w-full items-center justify-center rounded-control bg-ink text-sm font-bold text-paper disabled:opacity-50"
+                  >
+                    {profileSaving ? '저장 중…' : '저장하기'}
+                  </button>
+                </form>
               </div>
             )}
           </>

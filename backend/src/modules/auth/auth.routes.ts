@@ -9,8 +9,17 @@ import * as authService from './auth.service';
 import { confirmPasswordReset, requestPasswordReset } from './password-reset';
 import { parseInput } from '../../middleware/validate';
 import { loginPerEmail, loginPerIp, registerPerIp, resetConfirmPerIp, resetRequestPerIp } from './auth-limits';
+import { isMobilePhone, normalizePhone } from '../../lib/phone';
 
 const router = Router();
+
+/** 휴대폰 번호 — 하이픈은 있어도 되고, 저장은 숫자만 한다 */
+const phoneSchema = z.string()
+  .trim()
+  .min(1, '휴대폰 번호를 입력해주세요')
+  .max(20)
+  .transform(normalizePhone)
+  .refine(isMobilePhone, { message: '010으로 시작하는 휴대폰 번호를 입력해주세요' });
 
 // 회원가입으로는 참여자·고객사만 만들 수 있다. 운영자 계정은 서버에서 scripts/create-operator로만 만든다
 const registerSchema = z.object({
@@ -18,7 +27,7 @@ const registerSchema = z.object({
   password: z.string().min(6, '비밀번호는 6자 이상이어야 합니다').max(100),
   name: z.string().trim().min(1, '이름을 입력해주세요').max(100),
   role: z.enum(['PARTICIPANT', 'CLIENT'], { errorMap: () => ({ message: '참여자 또는 고객사로만 가입할 수 있습니다' }) }),
-  phone: z.preprocess(v => (v === '' ? undefined : v), z.string().trim().max(20).optional()),
+  phone: phoneSchema,
 });
 
 router.post('/register', registerPerIp, async (req: Request, res: Response, next: NextFunction) => {
@@ -66,8 +75,24 @@ router.post('/password-reset/confirm', resetConfirmPerIp, async (req: Request, r
   } catch (e) { next(e); }
 });
 
-router.get('/me', authenticate, (req: Request, res: Response) => {
-  res.json({ success: true, data: { user: req.user } });
+// 내 정보. 번호는 본인에게만 전체로 보여준다
+router.get('/me', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const row = await prisma.user.findUnique({
+      where: { id: req.user!.sub },
+      select: { name: true, phone: true, phoneVerifiedAt: true },
+    });
+    res.json({ success: true, data: { user: { ...req.user, ...row } } });
+  } catch (e) { next(e); }
+});
+
+// 휴대폰 번호 변경
+router.patch('/me/phone', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { phone } = parseInput(z.object({ phone: phoneSchema }), req.body);
+    await authService.changePhone(req.user!.sub, phone);
+    res.json({ success: true });
+  } catch (e) { next(e); }
 });
 
 // 이름 변경

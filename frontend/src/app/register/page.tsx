@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/auth';
 import { Role } from '@/store/auth';
 import { Suspense } from 'react';
 import AuthShell, { authButtonClass, authInputClass } from '@/components/auth/AuthShell';
+import { formatPhone, isMobilePhone, phoneDigits } from '@/lib/phone';
 
 function RegisterForm() {
   const router = useRouter();
@@ -23,11 +24,16 @@ function RegisterForm() {
     e.preventDefault();
     setLoading(true); setError('');
     try {
-      const { data } = await api.post('/auth/register', form);
+      if (!isMobilePhone(form.phone)) throw new Error('phone');
+      const { data } = await api.post('/auth/register', { ...form, phone: phoneDigits(form.phone) });
       setAuth(data.data.user, data.data.accessToken, data.data.refreshToken);
       router.push('/missions');
     } catch (err: unknown) {
-      setError(apiErrorMessage(err, '회원가입에 실패했습니다'));
+      if (err instanceof Error && err.message === 'phone') {
+        setError('010으로 시작하는 휴대폰 번호를 입력해주세요');
+      } else {
+        setError(apiErrorMessage(err, '회원가입에 실패했습니다'));
+      }
     } finally { setLoading(false); }
   }
 
@@ -66,19 +72,26 @@ function RegisterForm() {
               </div>
             );
           })}
-          {form.role === 'CLIENT' && (
-            <div>
-              <label className="block text-sm font-medium text-ink-2 mb-1">연락처 (SMS 수신용)</label>
-              <input
-                type="tel"
-                placeholder="예: 01012345678"
-                className={authInputClass}
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              />
-              <p className="text-xs text-muted mt-1">운영자가 결제 링크를 SMS로 발송할 때 사용됩니다</p>
-            </div>
-          )}
+          <div>
+            <label htmlFor="signup-phone" className="block text-sm font-medium text-ink-2 mb-1">휴대폰 번호</label>
+            <input
+              id="signup-phone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              required
+              maxLength={13}
+              placeholder="010-1234-5678"
+              className={authInputClass}
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })}
+            />
+            <p className="text-xs text-muted mt-1">
+              {form.role === 'CLIENT'
+                ? '결제·정산 안내를 이 번호로 보냅니다'
+                : '선정·정산 안내를 이 번호로 보냅니다'}
+            </p>
+          </div>
           {error && <p className="text-clay-dark text-sm">{error}</p>}
           <button type="submit" disabled={loading}
             className={authButtonClass}>

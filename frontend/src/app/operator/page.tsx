@@ -33,6 +33,7 @@ export default function OperatorDashboard() {
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [payouts, setPayouts] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
+  const [userDetail, setUserDetail] = useState<any | null>(null);
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
@@ -103,6 +104,14 @@ export default function OperatorDashboard() {
     await api.patch(`/operator/payouts/${id}`, { status: 'COMPLETED' });
     setPayouts(prev => prev.filter(p => p.id !== id));
     loadStats();
+  }
+
+  /** 번호 전체는 목록이 아니라 상세에서만 받는다 */
+  async function openUserDetail(id: string) {
+    try {
+      const { data } = await api.get(`/operator/users/${id}`);
+      setUserDetail(data.data);
+    } catch { alert('회원 정보를 불러오지 못했습니다'); }
   }
 
   async function toggleUserActive(id: string, current: boolean) {
@@ -722,8 +731,11 @@ export default function OperatorDashboard() {
                   <div key={u.id} className="bg-paper rounded-card border p-4">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-ink text-sm">{u.name}</p>
+                        <button type="button" onClick={() => openUserDetail(u.id)} className="text-left">
+                          <p className="font-semibold text-ink text-sm underline-offset-2 hover:underline">{u.name}</p>
+                        </button>
                         <p className="text-xs text-muted truncate">{u.email}</p>
+                        <p className="text-xs text-muted">{u.phone ?? '번호 없음'}</p>
                         <div className="flex gap-1.5 mt-1.5">
                           <span className="px-2 py-0.5 bg-cream text-ink-2 rounded-full text-xs">{ROLE_LABEL[u.role] ?? u.role}</span>
                           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${u.isActive ? 'bg-sage-tint text-sage' : 'bg-clay-tint text-clay-dark'}`}>
@@ -747,15 +759,17 @@ export default function OperatorDashboard() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm min-w-[600px]">
                     <thead className="bg-cream border-b">
-                      <tr>{['이름/이메일', '역할', '상태', '가입일', '최근 로그인', '작업'].map(h => <th key={h} className="text-left px-4 py-3 font-medium text-ink-2">{h}</th>)}</tr>
+                      <tr>{['이름/이메일', '휴대폰', '역할', '상태', '가입일', '최근 로그인', '작업'].map(h => <th key={h} className="text-left px-4 py-3 font-medium text-ink-2">{h}</th>)}</tr>
                     </thead>
                     <tbody className="divide-y">
                       {users.map(u => (
                         <tr key={u.id} className="hover:bg-cream">
                           <td className="px-4 py-3">
-                            <p className="font-medium text-ink">{u.name}</p>
+                            <button type="button" onClick={() => openUserDetail(u.id)}
+                              className="font-medium text-ink underline-offset-2 hover:underline">{u.name}</button>
                             <p className="text-xs text-muted">{u.email}</p>
                           </td>
+                          <td className="px-4 py-3 text-muted">{u.phone ?? '-'}</td>
                           <td className="px-4 py-3">
                             <span className="px-2 py-1 bg-cream text-ink-2 rounded-full text-xs">{ROLE_LABEL[u.role] ?? u.role}</span>
                           </td>
@@ -797,6 +811,38 @@ export default function OperatorDashboard() {
             <MissionImageUploader missionId={photoMissionId} />
             <button onClick={() => { setPhotoMissionId(null); void loadTab('missions'); }}
               className="mt-4 h-11 w-full rounded-control bg-ink text-sm font-bold text-paper">완료</button>
+          </div>
+        </div>
+      )}
+
+      {/* 회원 상세 — 휴대폰 번호 전체는 여기서만 보여준다 */}
+      {userDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-sm rounded-box bg-paper p-5">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="font-serif text-section-sm font-bold">{userDetail.name}</h2>
+                <p className="mt-0.5 truncate text-xs text-muted">{userDetail.email}</p>
+              </div>
+              <button onClick={() => setUserDetail(null)} aria-label="닫기" className="shrink-0 text-xl text-muted">×</button>
+            </div>
+            <dl className="space-y-2 text-sm">
+              {[
+                ['역할', ROLE_LABEL[userDetail.role] ?? userDetail.role],
+                ['휴대폰', userDetail.phone ?? '등록 없음'],
+                ['문자 인증', userDetail.phoneVerifiedAt ? new Date(userDetail.phoneVerifiedAt).toLocaleDateString('ko-KR') : '안 함'],
+                ['상태', userDetail.isActive ? '활성' : '비활성'],
+                ['가입일', new Date(userDetail.createdAt).toLocaleDateString('ko-KR')],
+                ['최근 로그인', userDetail.lastLoginAt ? new Date(userDetail.lastLoginAt).toLocaleDateString('ko-KR') : '-'],
+              ].map(([k, v]) => (
+                <div key={k as string} className="flex justify-between gap-3 border-b border-line pb-2">
+                  <dt className="text-muted">{k}</dt>
+                  <dd className="text-right font-medium text-ink">{v}</dd>
+                </div>
+              ))}
+            </dl>
+            <button onClick={() => setUserDetail(null)}
+              className="mt-5 h-12 w-full rounded-control bg-ink text-sm font-bold text-paper">닫기</button>
           </div>
         </div>
       )}

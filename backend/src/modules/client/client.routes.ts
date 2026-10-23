@@ -22,17 +22,7 @@ router.get('/profile', async (req: Request, res: Response, next: NextFunction) =
   } catch (e) { next(e); }
 });
 
-// 연락처 업데이트
-router.patch('/profile/phone', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const profile = await getOrCreateClientProfile(req.user!.sub);
-    const updated = await prisma.clientProfile.update({
-      where: { id: profile.id },
-      data: { contactPhone: req.body.phone },
-    });
-    res.json({ success: true, data: updated });
-  } catch (e) { next(e); }
-});
+// 연락처는 User.phone 하나로 모았다 → PATCH /auth/me/phone 을 쓴다
 
 // 내 미션 목록
 router.get('/missions', async (req: Request, res: Response, next: NextFunction) => {
