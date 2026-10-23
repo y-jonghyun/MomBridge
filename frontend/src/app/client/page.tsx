@@ -9,6 +9,8 @@ import KeywordRecommender, { KeywordSelection } from '@/components/campaign/Keyw
 import CampaignPanel from '@/components/campaign/CampaignPanel';
 import ProvinceSelect from '@/components/common/ProvinceSelect';
 import { CategoryTabs, SiteHeader } from '@/components/ui';
+import MissionImageUploader, { uploadPendingImages, type PendingImage } from '@/components/missions/MissionImageUploader';
+import { BUSINESS_CATEGORIES, MOM_TAGS } from '@/lib/mission-options';
 import { ClientPerformanceCard, MissionProgress, clientMissionStage } from '@/components/client/ClientOverview';
 
 type Tab = 'my-missions' | 'create' | 'results' | 'profile';
@@ -24,6 +26,10 @@ const defaultForm = {
   requirements: '',
   visitGuide: '',
   destinationUrl: '',
+  businessCategory: '',
+  momTags: [] as string[],
+  visitHours: '',
+  announceDate: '',
 };
 
 type CreateForm = typeof defaultForm & { keywords?: KeywordSelection | null };
@@ -74,6 +80,7 @@ function ClientPageContent() {
   const [missionDetail, setMissionDetail] = useState<{ applications: any[]; submissions: any[] } | null>(null);
   const [profileForm, setProfileForm] = useState({ name: '', phone: '', currentPassword: '', newPassword: '' });
   const [profileSaving, setProfileSaving] = useState(false);
+  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
 
   useEffect(() => { setHydrated(true); }, []);
 
@@ -168,14 +175,20 @@ function ClientPageContent() {
     setSubmitting(true);
     try {
       const { keywords: pickedKeywords, ...fields } = formData;
-      await api.post('/missions/pay-and-create', {
+      const { data: createdRes } = await api.post('/missions/pay-and-create', {
         ...fields,
         keywords: pickedKeywords ?? undefined,
         rewardAmount: Number(formData.rewardAmount),
         maxParticipants: Number(formData.maxParticipants),
         paymentKey, orderId, amount,
       });
+      const created = createdRes?.data;
       alert('미션이 등록됐습니다. 운영자 승인 후 오픈됩니다.');
+      // 등록 화면에서 고른 사진을 만들어진 미션에 올린다 (실패해도 미션은 남는다)
+      if (pendingImages.length > 0 && created?.id) {
+        await uploadPendingImages(created.id, pendingImages).catch(() => alert('미션은 등록됐지만 사진을 올리지 못했습니다. 미션 목록에서 다시 올려 주세요.'));
+        setPendingImages([]);
+      }
       setForm(defaultForm);
       setKeywords(null);
       router.replace('/client');
@@ -250,7 +263,7 @@ function ClientPageContent() {
     setTab('results');
   }
 
-  const f = (k: keyof typeof form, v: string) => setForm(prev => ({ ...prev, [k]: v }));
+  const f = (k: keyof typeof form, v: string | string[]) => setForm(prev => ({ ...prev, [k]: v }));
   const totalAmount = Number(form.rewardAmount || 0) * Number(form.maxParticipants || 0);
   const pendingPaymentMissions = missions.filter(m => m.paymentStatus === 'PENDING');
 
@@ -447,6 +460,49 @@ function ClientPageContent() {
                   </div>
                 ))}
               </div>
+              <div className="rounded-card border border-line bg-cream p-4">
+                <MissionImageUploader pending={pendingImages} onPendingChange={setPendingImages} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="client-biz" className="mb-1 block text-sm font-medium text-ink-2">업종</label>
+                  <select id="client-biz" className="w-full rounded-control border border-line bg-paper px-3 py-2 text-sm"
+                    value={form.businessCategory} onChange={e => f('businessCategory', e.target.value)}>
+                    <option value="">선택 안 함</option>
+                    {BUSINESS_CATEGORIES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="client-hours" className="mb-1 block text-sm font-medium text-ink-2">방문 가능 시간</label>
+                  <input id="client-hours" className="w-full rounded-control border border-line bg-paper px-3 py-2 text-sm"
+                    value={form.visitHours} onChange={e => f('visitHours', e.target.value)} placeholder="예: 평일 10:00~15:00" />
+                </div>
+              </div>
+
+              <div>
+                <span className="mb-1 block text-sm font-medium text-ink-2">엄마 시간 태그</span>
+                <div className="flex flex-wrap gap-2">
+                  {MOM_TAGS.map(([v, l]) => {
+                    const on = form.momTags.includes(v);
+                    return (
+                      <button key={v} type="button" aria-pressed={on}
+                        onClick={() => f('momTags', on ? form.momTags.filter(t => t !== v) : [...form.momTags, v])}
+                        className={`flex h-9 items-center rounded-full px-3.5 text-[13px] ${on ? 'bg-ink font-medium text-paper' : 'border border-line bg-paper text-ink-2'}`}>
+                        {l}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="client-announce" className="mb-1 block text-sm font-medium text-ink-2">선정 발표일</label>
+                <input id="client-announce" type="date" className="w-full rounded-control border border-line bg-paper px-3 py-2 text-sm"
+                  value={form.announceDate} onChange={e => f('announceDate', e.target.value)} />
+                <p className="mt-1 text-xs text-muted">비워 두면 상세 일정에서 이 단계를 보여주지 않습니다.</p>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-ink-2 mb-1">도착 URL {form.category === 'REVIEW' ? '(권장)' : '(선택)'}</label>
                 <input type="url" className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none"

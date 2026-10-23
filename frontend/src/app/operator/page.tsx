@@ -5,6 +5,8 @@ import Link from 'next/link';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { LogOutIcon } from '@/components/ui/icons';
+import MissionImageUploader, { uploadPendingImages, type PendingImage } from '@/components/missions/MissionImageUploader';
+import { BUSINESS_CATEGORIES, MOM_TAGS } from '@/lib/mission-options';
 import { SettingsEditor, SubmissionCheckPanel, TrafficSummary } from '@/components/operator/OperatorCampaignTools';
 import ProvinceSelect from '@/components/common/ProvinceSelect';
 
@@ -27,10 +29,13 @@ export default function OperatorDashboard() {
   const [users, setUsers] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
+  const [photoMissionId, setPhotoMissionId] = useState<string | null>(null);
   const [registerForm, setRegisterForm] = useState({
     clientProfileId: '', title: '', description: '', category: 'SNS',
     rewardAmount: '', maxParticipants: '5', regionSi: '', regionGu: '',
     startDate: '', endDate: '', submissionDeadline: '', requirements: '', visitGuide: '',
+    businessCategory: '', momTags: [] as string[], visitHours: '', announceDate: '',
     sendPaymentLink: false,
   });
   const [registerSubmitting, setRegisterSubmitting] = useState(false);
@@ -99,12 +104,19 @@ export default function OperatorDashboard() {
     setRegisterSubmitting(true);
     try {
       const { sendPaymentLink, ...missionData } = registerForm;
-      await api.post('/missions', {
+      const { data: createdRes } = await api.post('/missions', {
         ...missionData,
         rewardAmount: Number(missionData.rewardAmount),
         maxParticipants: Number(missionData.maxParticipants),
         sendPaymentLink,
       });
+      // 등록 화면에서 고른 사진을 만들어진 미션에 올린다 (실패해도 미션은 남는다)
+      const createdId = createdRes?.data?.id;
+      if (pendingImages.length > 0 && createdId) {
+        await uploadPendingImages(createdId, pendingImages)
+          .catch(() => alert('미션은 등록됐지만 사진을 올리지 못했습니다. 미션 관리에서 다시 올려 주세요.'));
+        setPendingImages([]);
+      }
       const msg = sendPaymentLink
         ? '미션이 등록됐습니다. 고객사에게 결제 링크를 발송했습니다.'
         : '미션이 등록됐습니다 (결제 면제).';
@@ -113,6 +125,7 @@ export default function OperatorDashboard() {
         clientProfileId: '', title: '', description: '', category: 'SNS',
         rewardAmount: '', maxParticipants: '5', regionSi: '', regionGu: '',
         startDate: '', endDate: '', submissionDeadline: '', requirements: '', visitGuide: '',
+        businessCategory: '', momTags: [] as string[], visitHours: '', announceDate: '',
         sendPaymentLink: false,
       });
     } catch (err: any) {
@@ -120,7 +133,7 @@ export default function OperatorDashboard() {
     } finally { setRegisterSubmitting(false); }
   }
 
-  const rf = (k: keyof typeof registerForm, v: string | boolean) =>
+  const rf = (k: keyof typeof registerForm, v: string | boolean | string[]) =>
     setRegisterForm(prev => ({ ...prev, [k]: v }));
 
   if (!user) return null;
@@ -142,7 +155,10 @@ export default function OperatorDashboard() {
       {/* 1024px 미만: 메뉴가 위로 올라가 가로 스크롤 탭이 된다 */}
       <div className="border-b border-line bg-paper lg:hidden">
         <div className="flex items-center justify-between px-5 pt-3">
-          <span className="font-serif text-section font-bold">관리자</span>
+          <span className="flex flex-col">
+            <span className="font-accent text-[11px] italic tracking-[0.08em] text-muted">Operator</span>
+            <span className="font-serif text-section font-bold">맘브릿지</span>
+          </span>
           <button
             type="button" aria-label="로그아웃"
             onClick={() => { clearAuth(); router.push('/login'); }}
@@ -151,7 +167,7 @@ export default function OperatorDashboard() {
             <LogOutIcon size={20} />
           </button>
         </div>
-        <div className="overflow-x-auto px-5">
+        <div className="no-scrollbar overflow-x-auto px-5">
           <div className="flex min-w-max">
           {tabs.map(t => (
             <button key={t.key} onClick={() => loadTab(t.key)}
@@ -272,6 +288,8 @@ export default function OperatorDashboard() {
                         <span>제출 {m._count?.submissions}건</span>
                         <span className="text-ink-2 font-medium">{Number(m.rewardAmount).toLocaleString()}원</span>
                       </div>
+                      <button type="button" onClick={() => setPhotoMissionId(m.id)}
+                        className="rounded-control border border-line px-2 py-1 text-xs text-ink-2">사진 관리</button>
                       <select value={m.status} onChange={e => updateMissionStatus(m.id, e.target.value)}
                         className="text-xs border rounded px-2 py-1 text-ink-2">
                         {['DRAFT', 'OPEN', 'IN_PROGRESS', 'REVIEWING', 'CLOSED'].map(s => (
@@ -523,6 +541,48 @@ export default function OperatorDashboard() {
                       placeholder={'한 줄에 하나씩. 예: 체험 가능: 평일 11:30~20:30 / 당일 예약 불가'} />
                   </div>
 
+                  <div className="rounded-card border border-line bg-cream p-4">
+                    <MissionImageUploader pending={pendingImages} onPendingChange={setPendingImages} />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="op-biz" className="mb-1 block text-sm font-medium text-ink-2">업종</label>
+                      <select id="op-biz" className="w-full rounded-control border border-line bg-paper px-3 py-2 text-sm"
+                        value={registerForm.businessCategory} onChange={e => rf('businessCategory', e.target.value)}>
+                        <option value="">선택 안 함</option>
+                        {BUSINESS_CATEGORIES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor="op-hours" className="mb-1 block text-sm font-medium text-ink-2">방문 가능 시간</label>
+                      <input id="op-hours" className="w-full rounded-control border border-line bg-paper px-3 py-2 text-sm"
+                        value={registerForm.visitHours} onChange={e => rf('visitHours', e.target.value)} placeholder="예: 평일 10:00~15:00" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="mb-1 block text-sm font-medium text-ink-2">엄마 시간 태그</span>
+                    <div className="flex flex-wrap gap-2">
+                      {MOM_TAGS.map(([v, l]) => {
+                        const on = registerForm.momTags.includes(v);
+                        return (
+                          <button key={v} type="button" aria-pressed={on}
+                            onClick={() => rf('momTags', on ? registerForm.momTags.filter(t => t !== v) : [...registerForm.momTags, v])}
+                            className={`flex h-9 items-center rounded-full px-3.5 text-[13px] ${on ? 'bg-ink font-medium text-paper' : 'border border-line bg-paper text-ink-2'}`}>
+                            {l}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="op-announce" className="mb-1 block text-sm font-medium text-ink-2">선정 발표일</label>
+                    <input id="op-announce" type="date" className="w-full rounded-control border border-line bg-paper px-3 py-2 text-sm"
+                      value={registerForm.announceDate} onChange={e => rf('announceDate', e.target.value)} />
+                  </div>
+
                   {/* 결제 옵션 */}
                   <div className="bg-cream rounded-card p-4 border">
                     <p className="text-sm font-medium text-ink-2 mb-3">결제 처리</p>
@@ -640,6 +700,21 @@ export default function OperatorDashboard() {
           )}
         </main>
       </div>
+
+      {/* 사진 관리 — 미션 수정 화면이 아직 없어, 기존 미션의 사진만 여기서 바꾼다 */}
+      {photoMissionId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4">
+          <div className="w-full max-w-lg rounded-box bg-paper p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-serif text-section-sm font-bold">사진 관리</h2>
+              <button onClick={() => setPhotoMissionId(null)} aria-label="닫기" className="h-11 w-11 text-xl text-muted">×</button>
+            </div>
+            <MissionImageUploader missionId={photoMissionId} />
+            <button onClick={() => { setPhotoMissionId(null); void loadTab('missions'); }}
+              className="mt-4 h-11 w-full rounded-control bg-ink text-sm font-bold text-paper">완료</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

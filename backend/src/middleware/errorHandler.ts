@@ -13,7 +13,26 @@ export class AppError extends Error {
   }
 }
 
+/** multer가 한도를 넘는 업로드를 끊었을 때 — 500이 아니라 400으로 답한다 */
+function multerMessage(code: string): string | null {
+  switch (code) {
+    case 'LIMIT_FILE_SIZE': return '사진 한 장은 5MB까지 올릴 수 있습니다';
+    case 'LIMIT_FILE_COUNT': return '사진은 한 번에 한 장씩 올려 주세요';
+    case 'LIMIT_UNEXPECTED_FILE': return '사진 항목 이름이 올바르지 않습니다';
+    default: return null;
+  }
+}
+
 export function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunction) {
+  const maybeMulter = err as { name?: string; code?: string };
+  if (maybeMulter?.name === 'MulterError' && maybeMulter.code) {
+    const message = multerMessage(maybeMulter.code);
+    if (message) {
+      res.status(400).json({ success: false, error: { code: 'IMAGE_TOO_LARGE', message } });
+      return;
+    }
+  }
+
   if (err instanceof AppError) {
     if (err.statusCode >= 500) captureError(err, { area: areaForPath(req.originalUrl), path: req.path, userId: req.user?.sub });
     res.status(err.statusCode).json({

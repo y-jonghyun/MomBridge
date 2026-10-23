@@ -48,6 +48,17 @@ export const missionFieldsSchema = z.object({
   rewardDescription: optionalText(5000),
   requirements: optionalText(5000),
   visitGuide: optionalText(2000),
+  /// 업종 (유형 category와는 다른 축)
+  businessCategory: z.preprocess(
+    v => (v === '' || v === null ? undefined : v),
+    z.enum(['FOOD', 'CAFE', 'KIDS', 'BEAUTY', 'LIVING', 'ETC']).optional(),
+  ),
+  /// 엄마 시간 태그 (복수 선택)
+  momTags: z.array(z.enum(['WEEKDAY_DAY', 'WEEKEND_OK', 'KID_FRIENDLY', 'AT_HOME'])).max(4).optional(),
+  /// 방문 가능 시간 한 줄
+  visitHours: optionalText(100),
+  /// 선정 발표일
+  announceDate: z.preprocess(v => (v === '' || v === null ? undefined : v), z.coerce.date().optional()),
   startDate: z.coerce.date(),
   endDate: z.coerce.date(),
   submissionDeadline: z.coerce.date(),
