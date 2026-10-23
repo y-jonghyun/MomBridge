@@ -10,6 +10,12 @@ import ProvinceSelect from '@/components/common/ProvinceSelect';
 
 type Tab = 'overview' | 'missions' | 'applications' | 'submissions' | 'payouts' | 'users' | 'register-mission' | 'traffic' | 'settings';
 
+/** 상태 막대 색 — 진행·확인 필요 clay / 완료 sage / 종료 ink / 임시저장 line */
+const MISSION_STATUS_BAR: Record<string, string> = {
+  DRAFT: 'bg-line', OPEN: 'bg-clay', IN_PROGRESS: 'bg-clay-dark',
+  REVIEWING: 'bg-[#E3C2AC]', CLOSED: 'bg-ink', COMPLETED: 'bg-sage',
+};
+
 const MISSION_STATUS_LABEL: Record<string, string> = { DRAFT: '임시저장', OPEN: '모집중', IN_PROGRESS: '진행중', REVIEWING: '검수중', CLOSED: '종료' };
 const MISSION_STATUS_COLOR: Record<string, string> = { DRAFT: 'bg-cream text-ink-2', OPEN: 'bg-sage-tint text-sage', IN_PROGRESS: 'bg-sage-tint text-sage', REVIEWING: 'bg-clay-tint text-clay-dark', CLOSED: 'bg-clay-tint text-clay-dark' };
 const ROLE_LABEL: Record<string, string> = { OPERATOR: '운영자', PARTICIPANT: '참여자', CLIENT: '고객사' };
@@ -43,6 +49,11 @@ export default function OperatorDashboard() {
 
   async function loadStats() {
     const { data } = await api.get('/operator/stats');
+    // 개요의 검수 대기 표와 정산 대기 카드에 쓸 자료 (실패해도 개요는 그려진다)
+    void Promise.all([
+      api.get('/submissions/pending').then(r => setSubmissions(r.data.data)).catch(() => {}),
+      api.get('/operator/payouts?status=PENDING').then(r => setPayouts(r.data.data)).catch(() => {}),
+    ]);
     setStats(data.data);
   }
 
@@ -169,8 +180,8 @@ export default function OperatorDashboard() {
         {/* 왼쪽 메뉴 (1024px 이상) */}
         <aside className="hidden min-h-screen w-[232px] shrink-0 flex-col border-r border-line bg-paper py-5 lg:flex">
           <div className="px-5 pb-5">
-            <span className="font-accent text-[13px] italic tracking-[0.08em] text-muted">Mom Bridge</span>
-            <p className="font-serif text-[22px] font-bold tracking-[-0.02em]">관리자</p>
+            <span className="font-accent text-[13px] italic tracking-[0.08em] text-muted">Operator</span>
+            <p className="font-serif text-[22px] font-bold tracking-[-0.02em]">맘브릿지</p>
           </div>
           <nav aria-label="관리 메뉴" className="flex-1">
             {tabs.map(t => (
@@ -225,27 +236,101 @@ export default function OperatorDashboard() {
                   );
                 })}
               </div>
-              {stats.missionsByStatus && (
-                <div className="bg-paper rounded-box p-5">
-                  <h3 className="font-semibold text-ink mb-4">미션 상태별 현황</h3>
-                  <div className="flex gap-3 flex-wrap">
-                    {(stats.missionsByStatus as any[]).map(s => (
-                      <div key={s.status} className={`px-4 py-2 rounded-card text-sm font-medium ${MISSION_STATUS_COLOR[s.status] ?? 'bg-cream'}`}>
-                        {MISSION_STATUS_LABEL[s.status] ?? s.status}: {s._count}건
-                      </div>
-                    ))}
-                  </div>
+              {/* 검수 대기 — 가장 먼저 처리해야 할 일이므로 위에 둔다 */}
+              <section className="rounded-box border border-line bg-paper">
+                <div className="flex items-center justify-between border-b border-line-soft px-5 py-4">
+                  <h3 className="font-serif text-section-sm font-bold">검수 대기</h3>
+                  <button onClick={() => loadTab('submissions')} className="text-[13px] text-muted">전체보기</button>
                 </div>
-              )}
-              <div className="grid grid-cols-3 gap-4">
-                {([['applications', '지원서 승인 처리'], ['submissions', '콘텐츠 검수'], ['payouts', '정산 처리']] as const).map(([key, label]) => (
-                  <button key={key} onClick={() => loadTab(key)}
-                    className="bg-paper rounded-box p-5 text-left hover: transition-shadow">
-                    <p className="font-semibold text-ink mb-1">{label} →</p>
-                    <p className="text-sm text-muted">대기 항목 처리하기</p>
-                  </button>
-                ))}
-              </div>
+                {submissions.length === 0 ? (
+                  <p className="px-5 py-10 text-center text-sm text-muted">검수할 콘텐츠가 없습니다</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-line-soft text-xs text-muted">
+                          <th className="px-5 py-2.5 font-medium">미션</th>
+                          <th className="px-5 py-2.5 font-medium">참여자</th>
+                          <th className="whitespace-nowrap px-5 py-2.5 font-medium">제출일</th>
+                          <th className="whitespace-nowrap px-5 py-2.5 font-medium">대가 표시</th>
+                          <th className="px-5 py-2.5" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {submissions.slice(0, 5).map(sb => {
+                          const d = sb.disclosureCheck;
+                          const ok = d === 'AUTO_PASSED' || d === 'MANUAL_CONFIRMED';
+                          return (
+                            <tr key={sb.id} className="border-b border-line-soft last:border-0">
+                              <td className="max-w-[220px] truncate px-5 py-3">{sb.mission?.title}</td>
+                              <td className="whitespace-nowrap px-5 py-3 text-ink-2">{sb.participant?.user?.name}</td>
+                              <td className="whitespace-nowrap px-5 py-3 text-muted">
+                                {sb.submittedAt ? new Date(sb.submittedAt).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }) : '-'}
+                              </td>
+                              <td className="whitespace-nowrap px-5 py-3">
+                                <span className={`inline-flex h-[26px] items-center rounded-full px-2.5 text-xs ${ok ? 'bg-sage-tint text-sage' : 'bg-clay-tint text-clay-dark'}`}>
+                                  {ok ? '확인됨' : '확인 필요'}
+                                </span>
+                              </td>
+                              <td className="whitespace-nowrap px-5 py-3 text-right">
+                                <button onClick={() => loadTab('submissions')} className="rounded-control border border-line px-3 py-1.5 text-[13px] text-ink-2">
+                                  검수하기
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </section>
+
+              {/* 미션 상태 — 가로 막대 하나에 비율로, 아래에 범례 */}
+              {stats.missionsByStatus && (() => {
+                const rows = (stats.missionsByStatus as any[]).filter(r => r._count > 0);
+                const total = rows.reduce((n, r) => n + r._count, 0) || 1;
+                return (
+                  <section className="rounded-box border border-line bg-paper p-5">
+                    <h3 className="mb-3.5 font-serif text-section-sm font-bold">미션 상태</h3>
+                    <div className="flex h-2.5 overflow-hidden rounded-full bg-line" aria-hidden="true">
+                      {rows.map(r => (
+                        <span
+                          key={r.status}
+                          style={{ width: `${(r._count / total) * 100}%` }}
+                          className={MISSION_STATUS_BAR[r.status] ?? 'bg-line'}
+                        />
+                      ))}
+                    </div>
+                    <ul className="mt-3.5 flex flex-wrap gap-x-5 gap-y-2">
+                      {rows.map(r => (
+                        <li key={r.status} className="flex items-center gap-1.5 text-[13px] text-ink-2">
+                          <span className={`h-2.5 w-2.5 rounded-full ${MISSION_STATUS_BAR[r.status] ?? 'bg-line'}`} />
+                          {MISSION_STATUS_LABEL[r.status] ?? r.status}
+                          <b className="font-medium">{r._count}건</b>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                );
+              })()}
+
+              {/* 정산 대기 */}
+              <section className="flex items-center justify-between gap-4 rounded-box border border-line bg-paper p-5">
+                <div>
+                  <p className="text-[13px] text-muted">정산 대기</p>
+                  <p className="mt-1 font-serif text-[28px] font-bold">
+                    {payouts.reduce((sum, x) => sum + Number(x.netAmount ?? 0), 0).toLocaleString()}원
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted">{payouts.length}건 · 수수료·세금 공제 후</p>
+                </div>
+                <button
+                  onClick={() => loadTab('payouts')}
+                  className="flex h-11 shrink-0 items-center rounded-control border border-ink px-4 text-sm font-medium text-ink"
+                >
+                  정산 처리로 이동
+                </button>
+              </section>
             </div>
           )}
 
