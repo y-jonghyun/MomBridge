@@ -35,7 +35,11 @@ export interface MissionCardData {
 
 const won = (n: number) => `${Number(n).toLocaleString()}원`;
 
-function Photo({ m, rounded, size }: { m: MissionCardData; rounded: string; size: string }) {
+function Photo({ m, rounded, size, compact = false }: {
+  m: MissionCardData; rounded: string; size: string;
+  /** 64px 썸네일처럼 배지를 올릴 자리가 없는 경우 (시안의 row 카드) */
+  compact?: boolean;
+}) {
   const tone = photoTone(m.id);
   return (
     <div className={`relative ${size} ${rounded} ${m.thumbnailUrl ? '' : tone.bg} flex items-center justify-center overflow-hidden`}>
@@ -43,11 +47,11 @@ function Photo({ m, rounded, size }: { m: MissionCardData; rounded: string; size
         // 외부 이미지 도메인이 정해지기 전까지 next/image 대신 img를 쓴다
         // eslint-disable-next-line @next/next/no-img-element
         ? <img src={m.thumbnailUrl} alt="" className="h-full w-full object-cover" />
-        : <span className={`text-[11px] tracking-[0.04em] ${tone.fg}`}>가게 사진</span>}
-      {m.categoryLabel && (
+        : !compact && <span className={`text-[11px] tracking-[0.04em] ${tone.fg}`}>가게 사진</span>}
+      {!compact && m.categoryLabel && (
         <span className="absolute left-2 top-2"><Badge>{m.categoryLabel}</Badge></span>
       )}
-      {typeof m.dday === 'number' && m.dday >= 0 && m.dday <= 3 && (
+      {!compact && typeof m.dday === 'number' && m.dday >= 0 && m.dday <= 3 && (
         <span className="absolute bottom-2 right-2"><Badge tone="ink">{m.dday === 0 ? 'D-Day' : `D-${m.dday}`}</Badge></span>
       )}
     </div>
@@ -75,7 +79,7 @@ export default function MissionCard({
   if (variant === 'row') {
     return (
       <Link href={to} className="flex items-center gap-3.5 border-t border-line-soft py-3 text-ink">
-        <Photo m={m} rounded="rounded-control" size="h-16 w-16 shrink-0" />
+        <Photo m={m} rounded="rounded-control" size="h-16 w-16 shrink-0" compact />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">{m.place}</p>
           <p className="mt-[3px] truncate text-xs text-muted">
