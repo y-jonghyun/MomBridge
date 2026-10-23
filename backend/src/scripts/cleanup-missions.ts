@@ -69,6 +69,10 @@ async function main() {
   if (!(await confirmApply('delete', ok, dbHost))) { console.log('취소했습니다'); return; }
   const result = await deleteMissions(ids);
   console.log(`삭제함: ${result.deleted.length}개`);
+  const { removed, failed } = result.imageFiles;
+  if (removed || failed) {
+    console.log(`저장소 사진 파일: ${removed}개 삭제${failed ? `, ${failed}개 실패 (로그 확인 후 수동 정리 필요)` : ''}`);
+  }
 }
 
 main()

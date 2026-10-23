@@ -14,8 +14,12 @@ import { newCampaignCode, normalizeMissionKeywords, saveMissionKeywords } from '
 import { recruitingCutoff } from './mission-lifecycle';
 import { logger } from '../../utils/logger';
 import { captureError, reportIssue } from '../../lib/monitoring';
+import missionImageRoutes from './mission-images.routes';
 
 const router = Router();
+
+// 미션 사진 (업로드·순서·삭제) — 고객사 본인/운영자만
+router.use('/:id/images', missionImageRoutes);
 
 // 미션 목록 조회 (공개)
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
@@ -48,7 +52,11 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const [missions, total] = await Promise.all([
       prisma.mission.findMany({
         where, skip, take: limit, orderBy,
-        include: { clientProfile: { select: { businessName: true, category: true } }, tags: { include: { tag: true } } },
+        include: {
+          clientProfile: { select: { businessName: true, category: true } },
+          tags: { include: { tag: true } },
+          images: { orderBy: { sortOrder: 'asc' }, select: { id: true, url: true, sortOrder: true } },
+        },
       }),
       prisma.mission.count({ where }),
     ]);
@@ -65,6 +73,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
       include: {
         clientProfile: { select: { businessName: true, category: true, address: true, regionSi: true, regionGu: true } },
         tags: { include: { tag: true } },
+        images: { orderBy: { sortOrder: 'asc' }, select: { id: true, url: true, sortOrder: true } },
         // 고객사가 고른 메인·서브 키워드 (검색량 같은 내부 수치는 공개하지 않음)
         keywords: { select: { keyword: true, role: true }, orderBy: [{ role: 'asc' }, { snapshotAt: 'asc' }] },
         _count: { select: { applications: true } },
