@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
-import { BusinessValue, LegalPage, Section } from '@/components/legal/LegalPage';
-import { BUSINESS_INFO, GOVERNING_COURT, TERMS_EFFECTIVE_DATE } from '@/lib/legal';
+import { LegalPage, Section } from '@/components/legal/LegalPage';
+import { BUSINESS_INFO, GOVERNING_COURT, TERMS_EFFECTIVE_DATE, businessInfoLine } from '@/lib/legal';
 
 export const metadata: Metadata = { title: '이용약관 — 맘브릿지' };
 
@@ -97,11 +97,7 @@ export default function TermsPage() {
       <Section title="부칙">
         <p>이 약관은 {TERMS_EFFECTIVE_DATE}부터 시행합니다.</p>
         <p className="text-gray-500">
-          사업자 정보: {BUSINESS_INFO.name} · 대표 {BUSINESS_INFO.owner}
-          {' · '}사업자등록번호 <BusinessValue value={BUSINESS_INFO.registrationNumber} />
-          {' · '}통신판매업 신고 <BusinessValue value={BUSINESS_INFO.mailOrderNumber} />
-          {' · '}<BusinessValue value={BUSINESS_INFO.address} />
-          {' · '}문의 {BUSINESS_INFO.inquiryEmail}
+          사업자 정보: {businessInfoLine()}
         </p>
       </Section>
     </LegalPage>

@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate, requireRole } from '../../middleware/auth';
 import { prisma } from '../../config/database';
 import { env } from '../../config/env';
+import { CLIENT_PAYMENT_ENABLED, paymentDisabledError } from '../../config/features';
 import { AppError } from '../../middleware/errorHandler';
 import { sendAlimTalk } from '../../utils/sms';
 import { parseInput } from '../../middleware/validate';
@@ -140,6 +141,11 @@ router.post('/', authenticate, requireRole('OPERATOR'), async (req: Request, res
 // 결제 후 미션 생성 — CLIENT 전용 (토스페이먼츠 결제 확인)
 router.post('/pay-and-create', authenticate, requireRole('CLIENT'), async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // 사업자등록 전에는 결제를 받지 않는다 (config/features) — 미션은 운영자 대행 등록으로만 받는다
+    if (!CLIENT_PAYMENT_ENABLED) {
+      const e = paymentDisabledError();
+      throw new AppError(e.code, 503, e.message);
+    }
     // 0. 입력 검증 — 결제 승인 전에 해야 결제만 되고 미션이 안 만들어지는 일이 없다
     const { paymentKey, orderId, amount, keywords, ...missionData } = parseInput(payAndCreateMissionSchema, req.body);
     if (amount !== expectedMissionAmount(missionData.rewardAmount, missionData.maxParticipants)) {
@@ -198,6 +204,11 @@ router.post('/pay-and-create', authenticate, requireRole('CLIENT'), async (req: 
 // 기존 미션 결제 확인 — CLIENT 전용 (결제 대기 중인 미션에 대해 결제 완료 처리)
 router.patch('/:id/pay', authenticate, requireRole('CLIENT'), async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // 사업자등록 전에는 결제를 받지 않는다 (config/features) — 미션은 운영자 대행 등록으로만 받는다
+    if (!CLIENT_PAYMENT_ENABLED) {
+      const e = paymentDisabledError();
+      throw new AppError(e.code, 503, e.message);
+    }
     const { paymentKey, orderId, amount } = parseInput(payExistingMissionSchema, req.body);
 
     // 0. 미션 소유권·금액 확인 — 결제 승인 전에 검사한다

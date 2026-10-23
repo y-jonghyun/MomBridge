@@ -29,16 +29,3 @@ export function Section({ title, children }: { title: string; children: React.Re
     </section>
   );
 }
-
-/** 사업자 정보 등 게시 전에 채워야 하는 값 */
-export function Fill({ children }: { children: React.ReactNode }) {
-  return <span className="bg-amber-100 text-amber-900 px-1 rounded">〔{children}〕</span>;
-}
-
-/**
- * 사업자 정보 값. lib/legal의 BUSINESS_INFO가 아직 비어 있으면(사업자등록 전)
- * 게시 전에 채워야 한다는 표시를 보여준다. 값이 들어오면 그대로 나온다.
- */
-export function BusinessValue({ value }: { value: string }) {
-  return value ? <>{value}</> : <Fill>게시 전 기재</Fill>;
-}

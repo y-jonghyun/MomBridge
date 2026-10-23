@@ -8,6 +8,7 @@ import { BottomTabBar, BottomTabBarSpacer, MissionCard, SectionHeader, SiteHeade
 import { ArrowRightIcon, ChevronDownIcon, PinIcon, SearchIcon } from '@/components/ui/icons';
 import { CATEGORY_LABEL, EMPTY_MESSAGE, toCardData, type MissionListItem } from '@/components/missions/MissionBrowser';
 import MissionEmptyBox from '@/components/missions/MissionEmptyBox';
+import SiteFooter from '@/components/legal/SiteFooter';
 
 /** 기준: docs/design/mombridge-design/cream-editorial-v1.md 3번 '홈' + Main.html */
 
@@ -152,14 +153,7 @@ export default function Home() {
         )}
       </div>
 
-      <footer className="mt-7 border-t border-line bg-paper py-6 text-center text-xs text-muted">
-        <p>© 2026 맘브릿지 · 지역 마케팅 미션 플랫폼</p>
-        <p className="mt-2">
-          <Link href="/terms" className="hover:underline">이용약관</Link>
-          <span className="mx-2">·</span>
-          <Link href="/privacy" className="font-semibold hover:underline">개인정보처리방침</Link>
-        </p>
-      </footer>
+      <SiteFooter className="mt-7" />
 
       <BottomTabBarSpacer />
       <BottomTabBar />
