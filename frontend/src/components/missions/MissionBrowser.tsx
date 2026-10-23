@@ -111,7 +111,7 @@ export default function MissionBrowser({
   return (
     <div>
       {/* 칩 줄 — 엄마 시간 칩(평일 낮·아이 동반·재택)은 데이터가 없어 숨긴다 */}
-      <div className="flex gap-2 overflow-x-auto px-5 pb-1">
+      <div className="no-scrollbar flex gap-2 overflow-x-auto px-5 pb-1">
         {/* 지역 칩. Chip은 button이라 select를 품을 수 없어 같은 모양의 label로 만든다 */}
         <label
           className={`flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] ${

@@ -82,7 +82,7 @@ export default function Home() {
           </form>
         </section>
 
-        <nav aria-label="미션 유형" className="flex gap-[22px] overflow-x-auto border-b border-line px-5">
+        <nav aria-label="미션 유형" className="no-scrollbar flex gap-[22px] overflow-x-auto border-b border-line px-5">
           {TYPE_TABS.map((t, i) => (
             <Link
               key={t.label}
@@ -107,7 +107,7 @@ export default function Home() {
             <div className="px-5 pb-3.5">
               <SectionHeader eyebrow="After drop-off" title="마감이 가까운 미션" moreHref="/missions" />
             </div>
-            <div className="flex gap-3 overflow-x-auto px-5 pb-1">
+            <div className="no-scrollbar flex gap-3 overflow-x-auto px-5 pb-1">
               {closing.map(m => <MissionCard key={m.id} mission={toCardData(m)} variant="rail" />)}
             </div>
           </section>

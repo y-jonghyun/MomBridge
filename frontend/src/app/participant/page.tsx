@@ -181,8 +181,15 @@ export default function ParticipantPage() {
   const subByMission = new Map(submissions.map(s => [s.missionId, s]));
   const payoutByMission = new Map(payouts.map(p => [p.submission?.missionId, p]));
 
+  // 지급 예정 금액은 운영자가 만든 Payout 행에서만 나온다.
+  // 제출물이 '승인'돼도 정산이 잡히기 전에는 행이 없어, 그 경우를 따로 안내한다 (약관 제8조:
+  // 매월 말일까지 승인된 건 → 다음 달 10일 지급)
   const pendingPay = payouts.filter(p => p.status !== 'COMPLETED');
   const nextAmount = pendingPay.reduce((sum, p) => sum + Number(p.netAmount ?? 0), 0);
+  const payoutMissionIds = new Set(payouts.map(p => p.submission?.missionId));
+  const approvedAwaitingPayout = submissions.filter(
+    s => s.status === 'APPROVED' && !payoutMissionIds.has(s.missionId),
+  ).length;
   const totalEarned = payouts.filter(p => p.status === 'COMPLETED').reduce((sum, p) => sum + Number(p.netAmount ?? 0), 0);
   const applyingCount = applications.filter(a => a.status === 'PENDING').length;
   const activeApps = applications.filter(a => a.status === 'APPROVED' && payoutByMission.get(a.missionId)?.status !== 'COMPLETED');
@@ -261,9 +268,17 @@ export default function ParticipantPage() {
         {/* 이번 달 요약 */}
         <section className="mx-5 mt-3 rounded-box bg-ink px-5 py-[22px] text-paper">
           <span className="font-accent text-sm italic text-[#D9A27F]">This month</span>
-          <p className="mt-1 text-[13px] text-[#CFC4B4]">{nextPayoutLabel()}에 받을 보상</p>
+          <p className="mt-1 text-[13px] text-[#CFC4B4]">
+            {pendingPay.length > 0 ? `${nextPayoutLabel()}에 받을 보상` : '다음 정산일 ' + nextPayoutLabel()}
+          </p>
           <p className="mt-1 font-serif text-hero font-bold">{won(nextAmount)}</p>
-          <p className="mt-1 text-xs text-[#CFC4B4]">수수료·세금 공제 후 · 승인된 미션 {pendingPay.length}건</p>
+          <p className="mt-1 text-xs text-[#CFC4B4]">
+            {pendingPay.length > 0
+              ? `수수료·세금 공제 후 · 정산 대기 ${pendingPay.length}건`
+              : approvedAwaitingPayout > 0
+                ? `승인된 ${approvedAwaitingPayout}건은 정산이 잡히면 금액이 표시돼요`
+                : '아직 정산 대기 중인 건이 없어요'}
+          </p>
           <div className="mt-[18px] grid grid-cols-3 border-t border-[#3A332B] pt-3.5">
             {[
               { label: '지원 중', value: String(applyingCount) },

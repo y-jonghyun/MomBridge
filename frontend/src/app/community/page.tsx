@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { BottomTabBar, BottomTabBarSpacer } from '@/components/ui';
+import { BottomTabBar, BottomTabBarSpacer, SiteHeader } from '@/components/ui';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 
@@ -110,38 +110,34 @@ export default function CommunityPage() {
 
   return (
     <div className="min-h-screen bg-cream">
-      {/* 헤더 */}
-      <header className="bg-paper border-b sticky top-0 z-20">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href={backHref} className="text-muted hover:text-ink-2 text-sm">←</Link>
-            <h1 className="text-lg font-bold text-ink">맘브릿지</h1>
-            <span className="text-line">|</span>
-            <span className="text-sm font-semibold text-ink-2">커뮤니티</span>
-          </div>
-          <div className="flex items-center gap-3">
-            {user && (
-              <button onClick={() => setShowWrite(true)}
-                className="px-4 py-1.5 bg-ink text-paper rounded-control text-sm font-semibold hover:bg-ink">
-                글 작성
-              </button>
-            )}
-            {!user && (
-              <Link href="/login" className="text-sm text-ink-2 font-semibold">로그인</Link>
-            )}
-          </div>
-        </div>
+      <SiteHeader showSearch={false} />
 
-        {/* 카테고리 탭 */}
-        <div className="max-w-5xl mx-auto px-4 flex gap-1 pb-0 overflow-x-auto">
+      <div className="mx-auto max-w-shell">
+        <header className="flex items-center justify-between gap-2 px-5 pb-2 pt-3.5">
+          <h1 className="font-serif text-title font-bold">커뮤니티</h1>
+          {user ? (
+            <button
+              onClick={() => setShowWrite(true)}
+              className="flex h-11 shrink-0 items-center rounded-control bg-clay px-4 text-sm font-bold text-paper"
+            >
+              글 작성
+            </button>
+          ) : (
+            <Link href="/login" className="flex h-11 items-center px-2 text-sm font-medium text-ink-2">로그인</Link>
+          )}
+        </header>
+
+        {/* 카테고리 탭 — 스크롤은 되되 스크롤바는 숨긴다 */}
+        <nav aria-label="게시판 분류" className="no-scrollbar flex gap-[22px] overflow-x-auto border-b border-line px-5">
           {CATEGORIES.map(c => (
             <button key={c.key} onClick={() => { setCategory(c.key); loadPosts(1, c.key, sort, keyword); }}
-              className={`shrink-0 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${category === c.key ? 'border-ink text-ink-2' : 'border-transparent text-muted hover:text-ink-2'}`}>
+              aria-current={category === c.key ? 'page' : undefined}
+              className={`-mb-px shrink-0 whitespace-nowrap py-3 text-sm ${category === c.key ? 'border-b-2 border-ink font-bold text-ink' : 'text-muted'}`}>
               {c.label}
             </button>
           ))}
-        </div>
-      </header>
+        </nav>
+      </div>
 
       <div className="max-w-5xl mx-auto px-4 py-5 flex gap-5">
 
@@ -149,31 +145,37 @@ export default function CommunityPage() {
         <div className="flex-1 min-w-0">
 
           {/* 탭 + 검색 + 정렬 */}
-          <div className="flex items-center gap-3 mb-4 flex-wrap">
-            <div className="flex bg-paper border rounded-control overflow-hidden">
+          {/* 검색은 한 줄 전체 폭으로, 탭과 정렬은 그 아래 줄로 */}
+          <form onSubmit={handleSearch} className="mb-2.5 flex h-[52px] items-center gap-2.5 rounded-control-lg border border-line bg-paper px-4">
+            <label htmlFor="community-q" className="sr-only">게시글 검색</label>
+            <input
+              id="community-q" value={searchInput} onChange={e => setSearchInput(e.target.value)}
+              placeholder="게시글 검색"
+              className="min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-muted"
+            />
+            <button type="submit" className="shrink-0 whitespace-nowrap text-[13px] font-medium text-clay">검색</button>
+          </form>
+
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="no-scrollbar flex gap-2 overflow-x-auto">
               {(['LIST', 'BEST', 'MY'] as const).map(t => (
                 <button key={t} onClick={() => setTab(t)}
-                  className={`px-4 py-2 text-sm font-medium transition-colors ${tab === t ? 'bg-ink text-paper' : 'text-muted hover:bg-cream'}`}>
+                  aria-pressed={tab === t}
+                  className={`flex h-9 shrink-0 items-center rounded-full px-3.5 text-[13px] ${tab === t ? 'bg-ink font-medium text-paper' : 'border border-line bg-paper text-ink-2'}`}>
                   {t === 'LIST' ? '전체' : t === 'BEST' ? 'BEST' : '내 글'}
                 </button>
               ))}
             </div>
 
-            <form onSubmit={handleSearch} className="flex flex-1 min-w-0">
-              <input
-                value={searchInput} onChange={e => setSearchInput(e.target.value)}
-                placeholder="게시글 검색..."
-                className="min-w-0 flex-1 rounded-l-control border border-line bg-paper px-3 py-2 text-sm outline-none"
-              />
-              <button type="submit" className="shrink-0 whitespace-nowrap rounded-r-control bg-ink px-4 py-2 text-sm text-paper">검색</button>
-            </form>
-
-            <select value={sort} onChange={e => { setSort(e.target.value as SortKey); loadPosts(1, category, e.target.value as SortKey, keyword); }}
-              className="border rounded-control px-3 py-2 text-sm focus:outline-none bg-paper">
-              <option value="NEWEST">최신순</option>
-              <option value="POPULAR">인기순</option>
-              <option value="VIEWS">조회순</option>
-            </select>
+            <label className="flex shrink-0 items-center text-[13px] text-ink-2">
+              <span className="sr-only">정렬</span>
+              <select value={sort} onChange={e => { setSort(e.target.value as SortKey); loadPosts(1, category, e.target.value as SortKey, keyword); }}
+                className="h-9 bg-transparent text-[13px] text-ink-2 outline-none">
+                <option value="NEWEST">최신순</option>
+                <option value="POPULAR">인기순</option>
+                <option value="VIEWS">조회순</option>
+              </select>
+            </label>
           </div>
 
           {/* BEST 탭 */}
