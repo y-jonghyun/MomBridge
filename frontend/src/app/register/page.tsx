@@ -6,6 +6,7 @@ import api, { apiErrorMessage } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { Role } from '@/store/auth';
 import { Suspense } from 'react';
+import AuthShell, { authButtonClass, authInputClass } from '@/components/auth/AuthShell';
 
 function RegisterForm() {
   const router = useRouter();
@@ -31,16 +32,19 @@ function RegisterForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-stone-50">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-sm p-8">
-        <h1 className="text-2xl font-bold text-center mb-2">맘브릿지</h1>
-        <p className="text-gray-500 text-center mb-8">회원가입</p>
+    <AuthShell
+      title="회원가입"
+      footer={<>
+          <p>이미 계정이 있으신가요? <Link href="/login" className="font-medium text-clay">로그인</Link></p>
+        </>}
+    >
+      <>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">역할</label>
+            <label className="block text-sm font-medium text-ink-2 mb-1">역할</label>
             <select
-              className="w-full border rounded-lg px-3 py-2 text-sm"
+              className="w-full border rounded-control px-3 py-2 text-sm"
               value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })}
             >
               <option value="PARTICIPANT">참여자 (지역 주민)</option>
@@ -51,11 +55,11 @@ function RegisterForm() {
             const key = label === '이름' ? 'name' : label === '이메일' ? 'email' : 'password';
             return (
               <div key={key}>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+                <label className="block text-sm font-medium text-ink-2 mb-1">{label}</label>
                 <input
                   type={key === 'password' ? 'password' : key === 'email' ? 'email' : 'text'}
                   required
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                  className={authInputClass}
                   value={form[key as keyof typeof form] as string}
                   onChange={(e) => setForm({ ...form, [key]: e.target.value })}
                 />
@@ -64,28 +68,25 @@ function RegisterForm() {
           })}
           {form.role === 'CLIENT' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">연락처 (SMS 수신용)</label>
+              <label className="block text-sm font-medium text-ink-2 mb-1">연락처 (SMS 수신용)</label>
               <input
                 type="tel"
                 placeholder="예: 01012345678"
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                className={authInputClass}
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
               />
-              <p className="text-xs text-gray-400 mt-1">운영자가 결제 링크를 SMS로 발송할 때 사용됩니다</p>
+              <p className="text-xs text-muted mt-1">운영자가 결제 링크를 SMS로 발송할 때 사용됩니다</p>
             </div>
           )}
-          {error && <p className="text-red-500 text-sm">{error}</p>}
+          {error && <p className="text-clay-dark text-sm">{error}</p>}
           <button type="submit" disabled={loading}
-            className="w-full bg-slate-700 text-white rounded-lg py-2 font-semibold hover:bg-slate-700 disabled:opacity-50">
+            className={authButtonClass}>
             {loading ? '처리 중...' : '가입하기'}
           </button>
         </form>
-        <p className="text-center text-sm text-gray-500 mt-4">
-          이미 계정이 있으신가요? <Link href="/login" className="text-slate-600 font-medium">로그인</Link>
-        </p>
-      </div>
-    </div>
+      </>
+    </AuthShell>
   );
 }
 
