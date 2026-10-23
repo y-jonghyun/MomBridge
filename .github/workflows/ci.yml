@@ -56,8 +56,6 @@ jobs:
       DATABASE_URL: postgresql://mombridge:mombridge@localhost:5432/mombridge_test
       DIRECT_URL: postgresql://mombridge:mombridge@localhost:5432/mombridge_test
       TZ: Asia/Seoul
-      # 임시: self-click 간헐 실패의 원인 경로를 보기 위해 진단 로그를 켠다
-      LOG_LEVEL: debug
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

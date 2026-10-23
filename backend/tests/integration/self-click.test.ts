@@ -57,6 +57,21 @@ describeDb('체험단원 본인 클릭 제외', () => {
     return self ? req.set('x-mb-self', self) : req;
   };
   const settle = async () => { for (let i = 0; i < 5; i++) await recorder.idle(); };
+  /**
+   * 기록은 응답 뒤 setImmediate로 일어난다. idle()은 '그 순간 등록된' 작업만 기다리므로
+   * 느린 러너에서는 아직 시작도 안 한 기록을 놓칠 수 있다 — 행이 보일 때까지 기다린다.
+   * 끝내 안 보이면 숫자가 아니라 이유를 알 수 있게 메시지를 남기고 실패한다.
+   */
+  const waitForClicks = async (n: number) => {
+    const deadline = Date.now() + 5_000;
+    let count = await prisma.clickEvent.count();
+    while (count < n && Date.now() < deadline) {
+      await settle();
+      count = await prisma.clickEvent.count();
+    }
+    if (count < n) throw new Error(`클릭 ${n}건을 5초 동안 기다렸지만 ${count}건만 기록됐다 (LOG_LEVEL=debug로 원인 로그 확인)`);
+    return count;
+  };
 
   it('gives participants a token for their own profile', async () => {
     const { owner } = await setup();
@@ -76,7 +91,7 @@ describeDb('체험단원 본인 클릭 제외', () => {
     await click(link.code, selfClickToken(other.profile.id)!, '203.0.113.22'); await settle();
     await click(link.code, `${owner.profile.id}.9999999999.forged`, '203.0.113.23'); await settle();
     await click(link.code, undefined, '203.0.113.24'); await settle();
-    expect(await prisma.clickEvent.count()).toBe(3);
+    expect(await waitForClicks(3)).toBe(3);
   });
 
   it('counts the owner again when the operator turns the option off', async () => {
@@ -84,6 +99,6 @@ describeDb('체험단원 본인 클릭 제외', () => {
     await setSetting('click.excludeSelf', false, SYSTEM_ID);
     await click(link.code, selfClickToken(owner.profile.id)!);
     await settle();
-    expect(await prisma.clickEvent.count()).toBe(1);
+    expect(await waitForClicks(1)).toBe(1);
   });
 });
