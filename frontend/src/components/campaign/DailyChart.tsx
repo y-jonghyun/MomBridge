@@ -27,10 +27,10 @@ export default function DailyChart({ data }: { data: Point[] }) {
 
   return (
     <div>
-      <div className="flex items-center gap-4 text-xs text-gray-600 mb-2">
+      <div className="flex items-center gap-4 text-xs text-ink-2 mb-2">
         <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm" style={{ background: CLICK_COLOR }} />총 클릭</span>
         <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-0.5" style={{ background: UNIQUE_COLOR }} />고유 방문자</span>
-        <span className="ml-auto text-gray-700 tabular-nums min-h-[1rem]">
+        <span className="ml-auto text-ink-2 tabular-nums min-h-[1rem]">
           {h ? `${h.day} · 클릭 ${h.clicks} · 고유 ${h.uniqueVisitors}` : ''}
         </span>
       </div>

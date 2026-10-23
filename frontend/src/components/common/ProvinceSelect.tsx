@@ -6,7 +6,7 @@ export default function ProvinceSelect({ value, onChange, required, emptyLabel =
 }) {
   return (
     <select required={required} value={value} onChange={e => onChange(e.target.value)}
-      className={className ?? 'w-full border rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-slate-500 focus:outline-none'}>
+      className={className ?? 'w-full rounded-control border border-line bg-paper px-3 py-2 text-sm outline-none'}>
       <option value="">{emptyLabel}</option>
       <optgroup label="특별·광역시">
         {PROVINCES.filter(p => p.metro).map(p => <option key={p.name} value={p.name}>{p.short}</option>)}

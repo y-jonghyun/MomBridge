@@ -15,10 +15,12 @@ const MY_LABEL_BY_ROLE = { PARTICIPANT: '내 활동', CLIENT: '내 가게', OPER
  * 1024px 이상에서는 하단 탭바가 숨겨지므로 여기에 상단 메뉴를 함께 보여 준다.
  */
 export default function SiteHeader({
-  onSearch, showSearch = true,
+  onSearch, showSearch = true, showMyLink = true,
 }: {
   onSearch?: () => void;
   showSearch?: boolean;
+  /** 이미 내 화면에 있을 때처럼 오른쪽 바로가기가 필요 없으면 false */
+  showMyLink?: boolean;
 }) {
   const user = useAuthStore(s => s.user);
   const pathname = usePathname() ?? '/';
@@ -69,14 +71,14 @@ export default function SiteHeader({
             <SearchIcon />
           </button>
         )}
-        {signedIn ? (
+        {signedIn ? (showMyLink && (
           <Link
             href={myHref} aria-label={myLabel}
             className="flex h-11 w-11 items-center justify-center text-ink"
           >
             <BellIcon />
           </Link>
-        ) : (
+        )) : (
           ready && (
             <Link
               href="/login"

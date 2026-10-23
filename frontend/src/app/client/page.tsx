@@ -4,14 +4,17 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
+import { LogOutIcon } from '@/components/ui/icons';
 import KeywordRecommender, { KeywordSelection } from '@/components/campaign/KeywordRecommender';
 import CampaignPanel from '@/components/campaign/CampaignPanel';
 import ProvinceSelect from '@/components/common/ProvinceSelect';
+import { CategoryTabs, SiteHeader } from '@/components/ui';
+import { ClientPerformanceCard, MissionProgress, clientMissionStage } from '@/components/client/ClientOverview';
 
 type Tab = 'my-missions' | 'create' | 'results' | 'profile';
 
 const STATUS_LABEL: Record<string, string> = { DRAFT: '임시저장', OPEN: '모집중', IN_PROGRESS: '진행중', REVIEWING: '검수중', CLOSED: '종료' };
-const STATUS_COLOR: Record<string, string> = { DRAFT: 'bg-gray-100 text-gray-600', OPEN: 'bg-green-100 text-green-700', IN_PROGRESS: 'bg-blue-100 text-blue-700', REVIEWING: 'bg-yellow-100 text-yellow-700', CLOSED: 'bg-red-100 text-red-600' };
+const STATUS_COLOR: Record<string, string> = { DRAFT: 'border border-line text-muted', OPEN: 'bg-clay-tint text-clay-dark', IN_PROGRESS: 'bg-clay-tint text-clay-dark', REVIEWING: 'bg-clay-tint text-clay-dark', CLOSED: 'bg-ink text-paper' };
 
 const defaultForm = {
   title: '', description: '', category: 'SNS',
@@ -64,7 +67,7 @@ function ClientPageContent() {
   const [missions, setMissions] = useState<any[]>([]);
   const [form, setForm] = useState(defaultForm);
   const [keywords, setKeywords] = useState<KeywordSelection | null>(null);
-  const [clientInfo, setClientInfo] = useState<{ category: string; regionGu: string; regionDong: string | null } | null>(null);
+  const [clientInfo, setClientInfo] = useState<{ businessName?: string; category: string; regionGu: string; regionDong: string | null } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [selectedMission, setSelectedMission] = useState<any>(null);
@@ -254,39 +257,46 @@ function ClientPageContent() {
   if (!hydrated || !user) return null;
 
   return (
-    <div className="min-h-screen bg-stone-50">
-      <header className="bg-white border-b px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <h1 className="text-base sm:text-xl font-bold text-slate-700 whitespace-nowrap shrink-0">맘브릿지</h1>
-          <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium whitespace-nowrap shrink-0">고객사</span>
-          {user.role === 'OPERATOR' && (
-            <Link href="/operator" className="text-xs text-gray-400 hover:text-slate-600 border border-gray-200 px-2 py-1 rounded-full whitespace-nowrap shrink-0">← 운영자</Link>
-          )}
+    <div className="min-h-screen bg-cream">
+      <SiteHeader showSearch={false} showMyLink={false} />
+
+      <header className="mx-auto flex w-full max-w-client items-center justify-between gap-2 px-5 pb-2 pt-3.5">
+        <div className="min-w-0">
+          <span className="font-accent text-[13px] italic tracking-[0.06em] text-muted">For shop owners</span>
+          <h1 className="truncate font-serif text-title font-bold">{clientInfo?.businessName || user.name}</h1>
         </div>
-        <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-          <span className="text-xs sm:text-sm text-gray-500 hidden sm:block">{user.name}님</span>
-          <button onClick={() => { clearAuth(); router.push('/login'); }} className="text-xs sm:text-sm text-gray-400 hover:text-red-500 whitespace-nowrap">로그아웃</button>
+        <div className="flex shrink-0 items-center gap-1">
+          {user.role === 'OPERATOR' && (
+            <Link href="/operator" className="rounded-full border border-line px-2 py-1 text-xs text-muted">운영자</Link>
+          )}
+          <button
+            type="button" aria-label="로그아웃"
+            onClick={() => { clearAuth(); router.push('/login'); }}
+            className="flex h-11 w-11 items-center justify-center text-muted"
+          >
+            <LogOutIcon size={20} />
+          </button>
         </div>
       </header>
 
-      <div className="max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
+      <div className="mx-auto max-w-client px-5 pb-28 pt-2">
 
         {/* 결제 대기 중인 미션 알림 배너 */}
         {pendingPaymentMissions.length > 0 && tab === 'my-missions' && (
-          <div className="mb-4 bg-amber-50 border border-amber-200 rounded-2xl p-4">
-            <p className="text-sm font-semibold text-amber-800 mb-2">결제 대기 중인 미션이 {pendingPaymentMissions.length}건 있습니다</p>
+          <div className="mb-4 bg-clay-tint border border-clay-tint rounded-box p-4">
+            <p className="text-sm font-semibold text-clay-dark mb-2">결제 대기 중인 미션이 {pendingPaymentMissions.length}건 있습니다</p>
             <div className="space-y-2">
               {pendingPaymentMissions.map(m => (
-                <div key={m.id} className="flex items-center justify-between bg-white rounded-xl px-4 py-3 border border-amber-100">
+                <div key={m.id} className="flex items-center justify-between bg-paper rounded-card px-4 py-3 border border-clay-tint">
                   <div>
-                    <p className="text-sm font-medium text-gray-900">{m.title}</p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-sm font-medium text-ink">{m.title}</p>
+                    <p className="text-xs text-muted">
                       총 결제금액: {(Number(m.rewardAmount) * m.maxParticipants).toLocaleString()}원
                     </p>
                   </div>
                   <button
                     onClick={() => handlePayExistingMission(m)}
-                    className="px-4 py-2 bg-amber-500 text-white text-sm font-semibold rounded-xl hover:bg-amber-600 transition-colors">
+                    className="px-4 py-2 bg-clay text-paper text-sm font-semibold rounded-card transition-colors">
                     결제하기
                   </button>
                 </div>
@@ -295,43 +305,85 @@ function ClientPageContent() {
           </div>
         )}
 
-        <div className="flex gap-1 bg-white rounded-xl p-1 shadow-sm mb-6">
-          {([['my-missions', '내 미션 목록'], ['create', '미션 등록'], ['results', '결과 리포트'], ['profile', '내 정보']] as const).map(([key, label]) => (
-            <button key={key} onClick={() => setTab(key)}
-              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${tab === key ? 'bg-slate-700 text-white' : 'text-gray-600 hover:bg-stone-50'}`}>
-              {label}
-            </button>
-          ))}
+        <div className="-mx-5 mb-2">
+          <CategoryTabs
+            tabs={[
+              { value: 'my-missions', label: '내 미션' },
+              { value: 'create', label: '미션 등록' },
+              { value: 'results', label: '결과 리포트' },
+              { value: 'profile', label: '내 정보' },
+            ]}
+            value={tab}
+            onChange={v => setTab(v as Tab)}
+            ariaLabel="고객사 메뉴"
+          />
         </div>
+
+        {/* 성과 카드 — 내 미션들의 리포트를 합쳐 보여 준다 */}
+        {tab === 'my-missions' && (
+          <ClientPerformanceCard missions={missions} onOpenReport={m => loadMissionDetail(m)} />
+        )}
+
+        {tab === 'my-missions' && (
+          <div className="flex items-baseline justify-between pb-3 pt-[30px]">
+            <div>
+              <span className="font-accent text-sm italic text-clay">My missions</span>
+              <h2 className="mt-0.5 font-serif text-section font-bold">내 미션</h2>
+            </div>
+            <span className="text-[13px] text-muted">
+              진행 {missions.filter(m => m.status === 'OPEN' || m.status === 'IN_PROGRESS' || m.status === 'REVIEWING').length}
+              {' · '}완료 {missions.filter(m => m.status === 'CLOSED').length}
+            </span>
+          </div>
+        )}
 
         {/* 내 미션 목록 */}
         {tab === 'my-missions' && (
           <div className="space-y-3">
-            {loading && <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-slate-500 border-t-transparent rounded-full animate-spin" /></div>}
+            {loading && <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-ink border-t-transparent rounded-full animate-spin" /></div>}
             {!loading && missions.filter(m => m.paymentStatus !== 'PENDING').map(m => (
-              <div key={m.id} className="bg-white rounded-2xl p-5 shadow-sm">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-gray-900">{m.title}</h3>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLOR[m.status] ?? 'bg-gray-100'}`}>{STATUS_LABEL[m.status] ?? m.status}</span>
-                    </div>
-                    <p className="text-sm text-gray-500 line-clamp-1">{m.description}</p>
-                    <div className="flex gap-4 mt-2 text-xs text-gray-400">
-                      <span>보상 {Number(m.rewardAmount).toLocaleString()}원</span>
-                      <span>지원자 {m._count?.applications ?? 0}명</span>
-                      <span>제출 {m._count?.submissions ?? 0}건</span>
-                      <span>마감 {new Date(m.endDate).toLocaleDateString('ko-KR')}</span>
-                    </div>
+              <section key={m.id} className="rounded-card border border-line bg-paper p-[18px]">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[15px] font-medium">{m.title}</p>
+                    <p className="mt-[3px] text-xs text-muted">
+                      모집 {new Date(m.startDate).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })}
+                      {' – '}{new Date(m.endDate).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })}
+                      {' · '}{m.maxParticipants}명
+                    </p>
                   </div>
-                  <button onClick={() => loadMissionDetail(m)} className="ml-4 px-3 py-1.5 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">결과보기</button>
+                  <span className={`flex h-[26px] shrink-0 items-center rounded-full px-2.5 text-xs ${STATUS_COLOR[m.status] ?? 'border border-line text-muted'}`}>
+                    {STATUS_LABEL[m.status] ?? m.status}
+                  </span>
                 </div>
-              </div>
+
+                <MissionProgress current={clientMissionStage(m)} />
+
+                <div className="mt-4 grid grid-cols-3 border-t border-line-soft pt-3.5 text-center">
+                  {[
+                    { label: '신청', value: m._count?.applications ?? 0 },
+                    { label: '후기', value: m._count?.submissions ?? 0 },
+                    { label: '보상', value: `${Number(m.rewardAmount).toLocaleString()}원` },
+                  ].map(c => (
+                    <div key={c.label}>
+                      <p className="text-lg font-bold">{c.value}</p>
+                      <p className="mt-0.5 text-[11px] text-muted">{c.label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => loadMissionDetail(m)}
+                  className="mt-4 flex h-11 w-full items-center justify-center rounded-control border border-line text-sm text-ink-2"
+                >
+                  성과 리포트 보기
+                </button>
+              </section>
             ))}
             {!loading && missions.filter(m => m.paymentStatus !== 'PENDING').length === 0 && pendingPaymentMissions.length === 0 && (
-              <div className="text-center py-20 bg-white rounded-2xl text-gray-400">
+              <div className="text-center py-20 bg-paper rounded-box text-muted">
                 <p className="mb-4">등록한 미션이 없습니다</p>
-                <button onClick={() => setTab('create')} className="px-6 py-2 bg-slate-700 text-white rounded-xl text-sm font-semibold">첫 미션 등록하기</button>
+                <button onClick={() => setTab('create')} className="px-6 py-2 bg-ink text-paper rounded-card text-sm font-semibold">첫 미션 등록하기</button>
               </div>
             )}
           </div>
@@ -339,67 +391,67 @@ function ClientPageContent() {
 
         {/* 미션 등록 */}
         {tab === 'create' && (
-          <div className="bg-white rounded-2xl shadow-sm p-6">
+          <div className="bg-paper rounded-box p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-gray-900">미션 등록</h2>
-              <span className="text-xs text-gray-400 bg-stone-100 px-3 py-1 rounded-full">결제 후 등록</span>
+              <h2 className="text-lg font-bold text-ink">미션 등록</h2>
+              <span className="text-xs text-muted bg-cream px-3 py-1 rounded-full">결제 후 등록</span>
             </div>
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">미션 제목 *</label>
-                <input required className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
+                <label className="block text-sm font-medium text-ink-2 mb-1">미션 제목 *</label>
+                <input required className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none"
                   value={form.title} onChange={e => f('title', e.target.value)} placeholder="예: 우리 카페 방문 후 인스타 업로드" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">미션 설명 *</label>
-                <textarea required rows={4} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none resize-none"
+                <label className="block text-sm font-medium text-ink-2 mb-1">미션 설명 *</label>
+                <textarea required rows={4} className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none resize-none"
                   value={form.description} onChange={e => f('description', e.target.value)} placeholder="미션 내용을 자세히 설명해주세요" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">미션 유형 *</label>
-                  <select required className="w-full border rounded-lg px-3 py-2 text-sm" value={form.category} onChange={e => f('category', e.target.value)}>
+                  <label className="block text-sm font-medium text-ink-2 mb-1">미션 유형 *</label>
+                  <select required className="w-full border rounded-control px-3 py-2 text-sm" value={form.category} onChange={e => f('category', e.target.value)}>
                     {[['SNS', 'SNS 게시'], ['VISIT', '방문 인증'], ['REVIEW', '리뷰 작성'], ['VIDEO', '영상 제작']].map(([v, l]) => (
                       <option key={v} value={v}>{l}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">1인 보상금액 (원) *</label>
-                  <input required type="number" min="1000" className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
+                  <label className="block text-sm font-medium text-ink-2 mb-1">1인 보상금액 (원) *</label>
+                  <input required type="number" min="1000" className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none"
                     value={form.rewardAmount} onChange={e => f('rewardAmount', e.target.value)} placeholder="예: 30000" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">모집 인원 *</label>
-                  <input required type="number" min="1" className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
+                  <label className="block text-sm font-medium text-ink-2 mb-1">모집 인원 *</label>
+                  <input required type="number" min="1" className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none"
                     value={form.maxParticipants} onChange={e => f('maxParticipants', e.target.value)} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">지역 (시·도) *</label>
+                  <label className="block text-sm font-medium text-ink-2 mb-1">지역 (시·도) *</label>
                   <ProvinceSelect required value={form.regionSi} onChange={v => f('regionSi', v)} />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">지역 (시·군·구) *</label>
-                <input required className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
+                <label className="block text-sm font-medium text-ink-2 mb-1">지역 (시·군·구) *</label>
+                <input required className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none"
                   value={form.regionGu} onChange={e => f('regionGu', e.target.value)} placeholder="예: 청주시 상당구, 마포구" />
               </div>
               <div className="grid grid-cols-3 gap-4">
                 {([['startDate', '시작일 *'], ['endDate', '종료일 *'], ['submissionDeadline', '제출 마감일 *']] as const).map(([k, l]) => (
                   <div key={k}>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">{l}</label>
-                    <input required type="date" className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
+                    <label className="block text-sm font-medium text-ink-2 mb-1">{l}</label>
+                    <input required type="date" className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none"
                       value={form[k]} onChange={e => f(k, e.target.value)} />
                   </div>
                 ))}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">도착 URL {form.category === 'REVIEW' ? '(권장)' : '(선택)'}</label>
-                <input type="url" className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
+                <label className="block text-sm font-medium text-ink-2 mb-1">도착 URL {form.category === 'REVIEW' ? '(권장)' : '(선택)'}</label>
+                <input type="url" className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none"
                   value={form.destinationUrl} onChange={e => f('destinationUrl', e.target.value)} placeholder="예약 페이지·스마트스토어·홈페이지 주소 (https://...)" />
-                <p className="text-xs text-gray-400 mt-1">체험단원마다 이 주소로 연결되는 추적 링크가 발급되어 리뷰 유입을 집계합니다. 등록 후에도 변경할 수 있습니다.</p>
+                <p className="text-xs text-muted mt-1">체험단원마다 이 주소로 연결되는 추적 링크가 발급되어 리뷰 유입을 집계합니다. 등록 후에도 변경할 수 있습니다.</p>
               </div>
               <KeywordRecommender
                 defaultCategory={clientInfo?.category ?? ''}
@@ -408,36 +460,36 @@ function ClientPageContent() {
                 onChange={setKeywords}
               />
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">수행 조건 (선택)</label>
-                <textarea rows={2} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none resize-none"
+                <label className="block text-sm font-medium text-ink-2 mb-1">수행 조건 (선택)</label>
+                <textarea rows={2} className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none resize-none"
                   value={form.requirements} onChange={e => f('requirements', e.target.value)} placeholder="예: 인스타그램 팔로워 500명 이상, 게시물 24시간 이상 유지" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">방문·예약 안내 (선택)</label>
-                <textarea rows={3} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none resize-none"
+                <label className="block text-sm font-medium text-ink-2 mb-1">방문·예약 안내 (선택)</label>
+                <textarea rows={3} className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none resize-none"
                   value={form.visitGuide} onChange={e => f('visitGuide', e.target.value)}
                   placeholder={'한 줄에 하나씩 적어 주세요. 예:\n체험 가능: 평일 11:30~20:30\n당일 예약 불가, 전화로 예약 후 방문'} />
-                <p className="text-xs text-gray-400 mt-1">비워 두면 미션 상세에 이 안내가 표시되지 않습니다.</p>
+                <p className="text-xs text-muted mt-1">비워 두면 미션 상세에 이 안내가 표시되지 않습니다.</p>
               </div>
               {form.rewardAmount && form.maxParticipants && (
-                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                  <div className="flex justify-between text-sm text-gray-600 mb-1">
+                <div className="bg-cream rounded-card p-4 border border-line">
+                  <div className="flex justify-between text-sm text-ink-2 mb-1">
                     <span>1인 보상금액</span>
                     <span>{Number(form.rewardAmount).toLocaleString()}원</span>
                   </div>
-                  <div className="flex justify-between text-sm text-gray-600 mb-2">
+                  <div className="flex justify-between text-sm text-ink-2 mb-2">
                     <span>모집 인원</span>
                     <span>{form.maxParticipants}명</span>
                   </div>
-                  <div className="flex justify-between font-bold text-slate-800 text-base border-t pt-2">
+                  <div className="flex justify-between font-bold text-ink text-base border-t pt-2">
                     <span>총 결제 금액</span>
                     <span>{totalAmount.toLocaleString()}원</span>
                   </div>
-                  <p className="text-xs text-gray-400 mt-2">토스페이먼츠를 통해 안전하게 결제됩니다</p>
+                  <p className="text-xs text-muted mt-2">토스페이먼츠를 통해 안전하게 결제됩니다</p>
                 </div>
               )}
               <button type="submit" disabled={submitting}
-                className="w-full bg-slate-700 text-white rounded-xl py-3 font-semibold hover:bg-slate-800 disabled:opacity-50 transition-colors">
+                className="w-full bg-ink text-paper rounded-card py-3 font-semibold disabled:opacity-50 transition-colors">
                 {submitting
                   ? '처리 중...'
                   : `${totalAmount > 0 ? `${totalAmount.toLocaleString()}원 ` : ''}결제하고 등록하기`}
@@ -448,34 +500,34 @@ function ClientPageContent() {
 
         {/* 내 정보 */}
         {tab === 'profile' && (
-          <div className="bg-white rounded-2xl shadow-sm p-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-6">내 정보 수정</h2>
+          <div className="bg-paper rounded-box p-6">
+            <h2 className="text-lg font-bold text-ink mb-6">내 정보 수정</h2>
             <form onSubmit={handleSaveProfile} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">이름</label>
-                <input className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
+                <label className="block text-sm font-medium text-ink-2 mb-1">이름</label>
+                <input className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none"
                   value={profileForm.name} onChange={e => setProfileForm(p => ({ ...p, name: e.target.value }))} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">연락처 (SMS 수신용)</label>
+                <label className="block text-sm font-medium text-ink-2 mb-1">연락처 (SMS 수신용)</label>
                 <input type="tel" placeholder="예: 01012345678"
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
+                  className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none"
                   value={profileForm.phone} onChange={e => setProfileForm(p => ({ ...p, phone: e.target.value }))} />
-                <p className="text-xs text-gray-400 mt-1">운영자가 결제 링크를 발송할 때 사용됩니다</p>
+                <p className="text-xs text-muted mt-1">운영자가 결제 링크를 발송할 때 사용됩니다</p>
               </div>
               <div className="border-t pt-4">
-                <p className="text-sm font-medium text-gray-700 mb-3">비밀번호 변경 (선택)</p>
+                <p className="text-sm font-medium text-ink-2 mb-3">비밀번호 변경 (선택)</p>
                 <div className="space-y-3">
                   <input type="password" placeholder="현재 비밀번호"
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
+                    className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none"
                     value={profileForm.currentPassword} onChange={e => setProfileForm(p => ({ ...p, currentPassword: e.target.value }))} />
                   <input type="password" placeholder="새 비밀번호 (6자 이상)"
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 focus:outline-none"
+                    className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none"
                     value={profileForm.newPassword} onChange={e => setProfileForm(p => ({ ...p, newPassword: e.target.value }))} />
                 </div>
               </div>
               <button type="submit" disabled={profileSaving}
-                className="w-full bg-slate-700 text-white rounded-xl py-3 font-semibold hover:bg-slate-800 disabled:opacity-50 transition-colors">
+                className="w-full bg-ink text-paper rounded-card py-3 font-semibold disabled:opacity-50 transition-colors">
                 {profileSaving ? '저장 중...' : '저장하기'}
               </button>
             </form>
@@ -486,43 +538,43 @@ function ClientPageContent() {
         {tab === 'results' && (
           <div>
             {!selectedMission ? (
-              <div className="text-center py-20 text-gray-400 bg-white rounded-2xl">미션 목록에서 결과보기를 클릭하세요</div>
+              <div className="text-center py-20 text-muted bg-paper rounded-box">미션 목록에서 결과보기를 클릭하세요</div>
             ) : (
               <div className="space-y-4">
-                <div className="bg-white rounded-2xl p-5 shadow-sm">
-                  <h3 className="font-bold text-gray-900 text-lg mb-1">{selectedMission.title}</h3>
-                  <div className="flex gap-4 text-sm text-gray-500">
+                <div className="bg-paper rounded-box p-5">
+                  <h3 className="font-bold text-ink text-lg mb-1">{selectedMission.title}</h3>
+                  <div className="flex gap-4 text-sm text-muted">
                     <span>보상 {Number(selectedMission.rewardAmount).toLocaleString()}원</span>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLOR[selectedMission.status] ?? 'bg-gray-100'}`}>{STATUS_LABEL[selectedMission.status]}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLOR[selectedMission.status] ?? 'bg-cream'}`}>{STATUS_LABEL[selectedMission.status]}</span>
                   </div>
                 </div>
                 {missionDetail && (
                   <>
                     <div className="grid grid-cols-3 gap-4">
                       {[
-                        { label: '총 지원자', value: missionDetail.applications.length, color: 'text-blue-600' },
-                        { label: '승인된 지원', value: missionDetail.applications.filter(a => a.status === 'APPROVED').length, color: 'text-green-600' },
-                        { label: '콘텐츠 제출', value: missionDetail.submissions.length, color: 'text-slate-600' },
+                        { label: '총 지원자', value: missionDetail.applications.length, color: 'text-ink' },
+                        { label: '승인된 지원', value: missionDetail.applications.filter(a => a.status === 'APPROVED').length, color: 'text-sage' },
+                        { label: '콘텐츠 제출', value: missionDetail.submissions.length, color: 'text-ink-2' },
                       ].map(s => (
-                        <div key={s.label} className="bg-white rounded-2xl p-4 shadow-sm text-center">
-                          <p className="text-sm text-gray-500 mb-1">{s.label}</p>
+                        <div key={s.label} className="bg-paper rounded-box p-4 text-center">
+                          <p className="text-sm text-muted mb-1">{s.label}</p>
                           <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
                         </div>
                       ))}
                     </div>
                     <CampaignPanel mission={selectedMission} defaultCategory={clientInfo?.category ?? ''} />
                     {missionDetail.submissions.length > 0 && (
-                      <div className="bg-white rounded-2xl p-5 shadow-sm">
-                        <h4 className="font-semibold text-gray-900 mb-4">제출된 콘텐츠</h4>
+                      <div className="bg-paper rounded-box p-5">
+                        <h4 className="font-semibold text-ink mb-4">제출된 콘텐츠</h4>
                         <div className="space-y-3">
                           {missionDetail.submissions.map((s: any) => (
-                            <div key={s.id} className="border rounded-xl p-3">
+                            <div key={s.id} className="border rounded-card p-3">
                               <div className="flex items-center justify-between mb-2">
-                                <p className="text-sm font-medium text-gray-700">{s.participant?.user?.name}</p>
-                                <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLOR[s.status] ?? 'bg-gray-100 text-gray-600'}`}>{STATUS_LABEL[s.status] ?? s.status}</span>
+                                <p className="text-sm font-medium text-ink-2">{s.participant?.user?.name}</p>
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLOR[s.status] ?? 'bg-cream text-ink-2'}`}>{STATUS_LABEL[s.status] ?? s.status}</span>
                               </div>
-                              {s.description && <p className="text-sm text-gray-600">{s.description}</p>}
-                              {s.snsPostUrl && <a href={s.snsPostUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-500 underline">SNS 링크 →</a>}
+                              {s.description && <p className="text-sm text-ink-2">{s.description}</p>}
+                              {s.snsPostUrl && <a href={s.snsPostUrl} target="_blank" rel="noreferrer" className="text-xs text-clay underline">SNS 링크 →</a>}
                             </div>
                           ))}
                         </div>
@@ -535,6 +587,18 @@ function ClientPageContent() {
           </div>
         )}
       </div>
+
+      {/* 하단 고정 — 어느 탭에서든 새 미션을 등록할 수 있게 */}
+      {tab !== 'create' && (
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-paper px-5 py-3">
+          <button
+            onClick={() => setTab('create')}
+            className="mx-auto flex h-[52px] w-full max-w-client items-center justify-center rounded-control-lg bg-clay text-base font-bold text-paper"
+          >
+            새 미션 등록
+          </button>
+        </div>
+      )}
     </div>
   );
 }
