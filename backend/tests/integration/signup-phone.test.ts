@@ -11,9 +11,10 @@ describeDb('가입 휴대폰 번호', () => {
   afterAll(() => prisma.$disconnect());
 
   let seq = 0;
+  const agreements = { age14: true, terms: true, privacy: true };
   const register = (phone: unknown, role = 'PARTICIPANT') =>
     request(app).post('/api/v1/auth/register')
-      .send({ email: `p${seq++}-${Date.now()}@test.local`, password: 'pass1234', name: '맘', role, phone });
+      .send({ email: `p${seq++}-${Date.now()}@test.local`, password: 'pass1234', name: '맘', role, phone, agreements });
 
   it('010으로 시작하는 11자리만 받고, 하이픈은 떼어 숫자만 저장한다', async () => {
     const ok = await register('010-1234-5678');
@@ -44,7 +45,7 @@ describeDb('가입 휴대폰 번호', () => {
     // 같은 번호로 계속 두드려 다른 사람의 가입 여부를 캐내지 못하게, 실패해도 횟수를 센다
     const ip = '192.0.2.123';
     const probe = () => request(app).post('/api/v1/auth/register').set('X-Forwarded-For', ip)
-      .send({ email: `dup${seq++}@test.local`, password: 'pass1234', name: '맘', role: 'PARTICIPANT', phone: '01077776666' });
+      .send({ email: `dup${seq++}@test.local`, password: 'pass1234', name: '맘', role: 'PARTICIPANT', phone: '01077776666', agreements });
 
     expect((await probe()).status).toBe(201);
     for (let i = 0; i < 19; i++) expect((await probe()).status).toBe(409);
