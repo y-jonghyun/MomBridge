@@ -95,8 +95,8 @@ export default function MissionCard({
         {m.tags && m.tags.length > 0 && (
           <div className="mt-3 flex gap-1.5">{m.tags.map(t => <Tag key={t}>{t}</Tag>)}</div>
         )}
-        <p className="mb-0.5 mt-2 text-[15px] font-medium tracking-[-0.01em]">{m.place}</p>
-        {m.offer && <p className="text-[13px] text-muted">{m.offer}</p>}
+        <p className="mb-0.5 mt-2 line-clamp-2 text-[15px] font-medium tracking-[-0.01em]">{m.place}</p>
+        {m.offer && <p className="line-clamp-1 text-[13px] text-muted">{m.offer}</p>}
         <p className="mt-2 text-[15px] font-bold text-clay">
           {won(m.rewardAmount)}
           {m.netAmount != null && (
@@ -113,8 +113,8 @@ export default function MissionCard({
       {m.tags && m.tags.length > 0 && (
         <p className="mt-2.5 text-[11px] text-sage">{m.tags.join(' · ')}</p>
       )}
-      <p className="mt-[3px] text-sm font-medium leading-[1.4]">{m.place}</p>
-      {m.offer && <p className="mt-0.5 line-clamp-2 text-xs text-muted">{m.offer}</p>}
+      <p className="mt-[3px] line-clamp-2 text-sm font-medium leading-[1.4]">{m.place}</p>
+      {m.offer && <p className="mt-0.5 line-clamp-1 text-xs text-muted">{m.offer}</p>}
       <p className="mt-1.5 text-sm font-bold text-clay">{won(m.rewardAmount)}</p>
       {applied !== null && max !== null && (
         <p className="mt-1.5 border-t border-line pt-1.5 text-[11px] text-muted">
