@@ -13,6 +13,8 @@ import MissionImageUploader, { uploadPendingImages, type PendingImage } from '@/
 import { BUSINESS_CATEGORIES, MOM_TAGS } from '@/lib/mission-options';
 import { formatPhone, isMobilePhone, phoneDigits } from '@/lib/phone';
 import { ClientPerformanceCard, MissionProgress, clientMissionStage } from '@/components/client/ClientOverview';
+import { CLIENT_PAYMENT_ENABLED } from '@/lib/features';
+import { BUSINESS_INFO } from '@/lib/legal';
 
 type Tab = 'my-missions' | 'create' | 'results' | 'profile';
 
@@ -299,7 +301,7 @@ function ClientPageContent() {
       <div className="mx-auto max-w-client px-5 pb-28 pt-2">
 
         {/* 결제 대기 중인 미션 알림 배너 */}
-        {pendingPaymentMissions.length > 0 && tab === 'my-missions' && (
+        {pendingPaymentMissions.length > 0 && tab === 'my-missions' && CLIENT_PAYMENT_ENABLED && (
           <div className="mb-4 bg-clay-tint border border-clay-tint rounded-box p-4">
             <p className="text-sm font-semibold text-clay-dark mb-2">결제 대기 중인 미션이 {pendingPaymentMissions.length}건 있습니다</p>
             <div className="space-y-2">
@@ -326,6 +328,7 @@ function ClientPageContent() {
           <CategoryTabs
             tabs={[
               { value: 'my-missions', label: '내 미션' },
+              // 결제를 받지 않는 동안에도 탭은 남겨 두고 '준비 중' 안내를 보여준다 (lib/features)
               { value: 'create', label: '미션 등록' },
               { value: 'results', label: '결과 리포트' },
               { value: 'profile', label: '내 정보' },
@@ -406,8 +409,23 @@ function ClientPageContent() {
           </div>
         )}
 
-        {/* 미션 등록 */}
-        {tab === 'create' && (
+        {/* 미션 등록 — 결제를 받지 않는 동안에는 안내만 보여준다 */}
+        {tab === 'create' && !CLIENT_PAYMENT_ENABLED && (
+          <div className="rounded-box border border-line bg-paper p-6 text-center">
+            <span className="font-accent text-sm italic text-clay">Preparing</span>
+            <h2 className="mb-2 mt-1 font-serif text-section font-bold">미션 직접 등록은 준비 중이에요</h2>
+            <p className="break-keep text-[13px] leading-[1.7] text-muted">
+              결제 준비가 끝날 때까지는 운영자가 대신 등록해 드려요.
+              아래로 문의해 주시면 미션을 올려 드립니다.
+            </p>
+            <a href={`mailto:${BUSINESS_INFO.inquiryEmail}`}
+              className="mt-4 inline-flex h-11 items-center rounded-control bg-ink px-5 text-sm font-bold text-paper">
+              미션 등록 문의하기
+            </a>
+          </div>
+        )}
+
+        {tab === 'create' && CLIENT_PAYMENT_ENABLED && (
           <div className="bg-paper rounded-box p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-bold text-ink">미션 등록</h2>

@@ -44,7 +44,10 @@ describeDb('로그인·가입 시도 제한', () => {
   it('limits registrations per IP', async () => {
     const ip = '192.0.2.77';
     const reg = (i: number) => request(app).post('/api/v1/auth/register').set('X-Forwarded-For', ip)
-      .send({ email: `r${i}@test.local`, password: 'pass1234', name: '가입', role: 'PARTICIPANT', phone: nextPhone() });
+      .send({
+        email: `r${i}@test.local`, password: 'pass1234', name: '가입', role: 'PARTICIPANT',
+        phone: nextPhone(), agreements: { age14: true, terms: true, privacy: true },
+      });
     for (let i = 0; i < 20; i++) expect((await reg(i)).status).toBe(201);
     expect((await reg(20)).status).toBe(429);
   });

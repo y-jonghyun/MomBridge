@@ -9,7 +9,10 @@ import { createOperator } from '../../src/scripts/create-operator';
 
 const api = request(app);
 const register = (email: string, role = 'PARTICIPANT') =>
-  api.post('/api/v1/auth/register').send({ email, password: 'pass1234', name: '맘', role, phone: nextPhone() });
+  api.post('/api/v1/auth/register').send({
+    email, password: 'pass1234', name: '맘', role,
+    phone: nextPhone(), agreements: { age14: true, terms: true, privacy: true },
+  });
 const refresh = (refreshToken: string) => api.post('/api/v1/auth/refresh').send({ refreshToken });
 
 describeDb('세션 · 이메일 정규화', () => {

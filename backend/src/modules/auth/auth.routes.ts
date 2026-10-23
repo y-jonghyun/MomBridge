@@ -10,6 +10,7 @@ import { confirmPasswordReset, requestPasswordReset } from './password-reset';
 import { parseInput } from '../../middleware/validate';
 import { loginPerEmail, loginPerIp, registerPerIp, resetConfirmPerIp, resetRequestPerIp } from './auth-limits';
 import { isMobilePhone, normalizePhone } from '../../lib/phone';
+import { agreementsSchema } from './consent';
 
 const router = Router();
 
@@ -28,6 +29,7 @@ const registerSchema = z.object({
   name: z.string().trim().min(1, '이름을 입력해주세요').max(100),
   role: z.enum(['PARTICIPANT', 'CLIENT'], { errorMap: () => ({ message: '참여자 또는 고객사로만 가입할 수 있습니다' }) }),
   phone: phoneSchema,
+  agreements: agreementsSchema,
 });
 
 router.post('/register', registerPerIp, async (req: Request, res: Response, next: NextFunction) => {
