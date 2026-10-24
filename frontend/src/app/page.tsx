@@ -77,6 +77,13 @@ export default function Home() {
             아이 등원 후,<br />우리 동네에서<br />가볍게 버는 시간
           </h1>
           <p className="text-sm leading-[1.65] text-muted">동네 가게의 미션을 하고, 후기로 보상을 받아요.</p>
+          <Link
+            href="/about"
+            className="mt-2 inline-flex min-h-[44px] items-center gap-1 text-[13px] font-medium text-clay"
+          >
+            맘브릿지 알아보기
+            <ArrowRightIcon size={13} strokeWidth={1.8} />
+          </Link>
 
           <form
             onSubmit={e => { e.preventDefault(); router.push(`/missions${keyword ? `?keyword=${encodeURIComponent(keyword)}` : ''}`); }}
@@ -166,7 +173,7 @@ export default function Home() {
             </h2>
             <p className="mb-4 text-[13px] leading-[1.65] text-muted">후기 글을 보고 가게를 찾은 방문 수를 리포트로 보여드려요.</p>
             <Link
-              href={signedIn ? '/client' : '/register?role=CLIENT'}
+              href={signedIn ? '/client' : '/for-shops'}
               className="inline-flex h-11 items-center gap-1.5 rounded-control border border-ink px-[18px] text-sm font-medium text-ink"
             >
               {signedIn ? '내 가게 미션 보기' : '미션 등록 문의'}

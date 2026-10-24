@@ -7,6 +7,7 @@ import { PinIcon } from '@/components/ui/icons';
 import MissionEmptyBox from './MissionEmptyBox';
 import { BUSINESS_CATEGORIES, MOM_TAGS } from '@/lib/mission-options';
 import { useBookmarks } from '@/lib/bookmarks';
+import { netReward } from '@/lib/fees';
 import { useAuthStore } from '@/store/auth';
 
 /**
@@ -62,8 +63,8 @@ export const defaultMissionFilter: MissionFilter = {
   category: '', regionSi: '', sort: 'NEWEST', keyword: '', businessCategory: '', momTags: [],
 };
 
-/** 수수료 10%를 뺀 실수령액 (서버 계산값이 생기면 그 값으로 바꾼다) */
-const netOf = (reward: number) => Math.floor(Number(reward) * 0.9);
+/** 수수료를 뺀 실수령액 (서버 계산값이 생기면 그 값으로 바꾼다) */
+const netOf = (reward: number) => netReward(Number(reward));
 
 export function toCardData(m: MissionListItem): MissionCardData {
   const area = m.regionDong || m.regionGu;
