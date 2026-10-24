@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Cormorant_Garamond, Gowun_Batang, Noto_Sans_KR } from 'next/font/google';
 import './globals.css';
 import ServerWakeNotice from '@/components/common/ServerWakeNotice';
+import { SITE_URL } from '@/lib/site';
 
 // 디자인 기준: docs/design/mombridge-design/cream-editorial-v1.md
 const sans = Noto_Sans_KR({
@@ -26,6 +27,8 @@ const accent = Cormorant_Garamond({
 });
 
 export const metadata: Metadata = {
+  // 소개 페이지의 공유 카드가 절대 주소를 갖게 한다
+  metadataBase: new URL(SITE_URL),
   title: '맘브릿지 — 지역 마케팅 미션 플랫폼',
   description: '소상공인과 지역 주민을 연결하는 하이퍼로컬 미션 매칭 플랫폼',
 };

@@ -11,6 +11,7 @@ import { BUSINESS_LABEL, MOM_TAG_LABEL } from '@/components/missions/MissionBrow
 import { useBookmarks } from '@/lib/bookmarks';
 import { toLines } from '@/lib/lines';
 import { PAYOUT_DELAY_HINT, payoutLabel } from '@/lib/payout';
+import { PLATFORM_FEE_PERCENT, netReward } from '@/lib/fees';
 
 /** 기준: docs/design/mombridge-design/cream-editorial-v1.md 3번 '미션 상세' + Detail.html */
 
@@ -114,7 +115,7 @@ export default function MissionDetailPage() {
   const dday = Math.ceil((new Date(mission.endDate).getTime() - Date.now()) / 86400000);
   const backHref = user?.role === 'PARTICIPANT' ? '/participant' : user?.role === 'OPERATOR' ? '/operator' : '/missions';
   const area = [mission.regionSi, mission.regionGu, mission.regionDong].filter(Boolean).join(' ');
-  const net = Math.floor(Number(mission.rewardAmount) * 0.9);
+  const net = netReward(Number(mission.rewardAmount));
   const points = MISSION_POINTS[mission.category] ?? MISSION_POINTS.SNS;
   const keywords: { keyword: string; role: 'MAIN' | 'SUB' }[] = mission.keywords ?? [];
   const images: { id: string; url: string }[] = mission.images ?? [];
@@ -204,7 +205,7 @@ export default function MissionDetailPage() {
             <div>
               <p className="text-xs text-muted">보상</p>
               <p className="mt-0.5 text-[22px] font-bold text-clay">{won(mission.rewardAmount)}</p>
-              <p className="mt-0.5 text-xs text-muted">플랫폼 수수료 10% 공제 후 {won(net)} 지급</p>
+              <p className="mt-0.5 text-xs text-muted">플랫폼 수수료 {PLATFORM_FEE_PERCENT}% 공제 후 {won(net)} 지급</p>
             </div>
             <div className="text-right">
               <p className="text-xs text-muted">신청</p>

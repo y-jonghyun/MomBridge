@@ -10,10 +10,11 @@ export default function SiteFooter({ className = '' }: { className?: string }) {
   return (
     <footer className={`border-t border-line bg-paper py-6 text-center text-xs text-muted ${className}`}>
       <p>© 2026 맘브릿지 · 지역 마케팅 미션 플랫폼</p>
-      <p className="mt-2">
-        <Link href="/terms" className="hover:underline">이용약관</Link>
-        <span className="mx-2">·</span>
-        <Link href="/privacy" className="font-semibold hover:underline">개인정보처리방침</Link>
+      {/* 터치 영역 44px (디자인 기준 1번) */}
+      <p className="mt-1 flex items-center justify-center">
+        <Link href="/terms" className="inline-flex min-h-[44px] items-center px-2 hover:underline">이용약관</Link>
+        <span aria-hidden>·</span>
+        <Link href="/privacy" className="inline-flex min-h-[44px] items-center px-2 font-semibold hover:underline">개인정보처리방침</Link>
       </p>
       <p className="mx-auto mt-2 max-w-shell px-5 leading-relaxed">{businessInfoLine()}</p>
     </footer>
