@@ -18,6 +18,7 @@ import { isStoreComplete, missingStoreParts } from '../client/store';
 import { logger } from '../../utils/logger';
 import { captureError, reportIssue } from '../../lib/monitoring';
 import missionImageRoutes from './mission-images.routes';
+import missionEditRoutes from './mission-edit.routes';
 
 const router = Router();
 
@@ -33,6 +34,9 @@ function parseEnum<T extends string>(raw: unknown, allowed: readonly T[]): T | u
 
 // 미션 사진 (업로드·순서·삭제) — 고객사 본인/운영자만
 router.use('/:id/images', missionImageRoutes);
+
+// 미션 수정 — 운영자는 모두, 고객사는 본인 미션만
+router.use('/:id/edit', missionEditRoutes);
 
 // 미션 목록 조회 (공개)
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {

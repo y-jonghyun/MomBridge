@@ -18,6 +18,7 @@ import { missionDateError } from '@/lib/mission-dates';
 import { BUSINESS_INFO } from '@/lib/legal';
 import { PASSWORD_HINT, passwordError } from '@/lib/password';
 import ClientStoreForm from '@/components/profile/ClientStoreForm';
+import MissionEditModal from '@/components/missions/MissionEditModal';
 
 type Tab = 'my-missions' | 'create' | 'results' | 'profile';
 
@@ -89,6 +90,7 @@ function ClientPageContent() {
   const [profileSaving, setProfileSaving] = useState(false);
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [storeComplete, setStoreComplete] = useState(true);
+  const [editMissionId, setEditMissionId] = useState<string | null>(null);
 
   useEffect(() => { setHydrated(true); }, []);
 
@@ -415,12 +417,20 @@ function ClientPageContent() {
                   ))}
                 </div>
 
-                <button
-                  onClick={() => loadMissionDetail(m)}
-                  className="mt-4 flex h-11 w-full items-center justify-center rounded-control border border-line text-sm text-ink-2"
-                >
-                  성과 리포트 보기
-                </button>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    onClick={() => loadMissionDetail(m)}
+                    className="flex h-11 min-w-0 flex-1 items-center justify-center whitespace-nowrap rounded-control border border-line text-sm text-ink-2"
+                  >
+                    성과 리포트 보기
+                  </button>
+                  <button
+                    onClick={() => setEditMissionId(m.id)}
+                    className="flex h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-control border border-line px-4 text-sm text-ink-2"
+                  >
+                    수정
+                  </button>
+                </div>
               </section>
             ))}
             {!loading && missions.filter(m => m.paymentStatus !== 'PENDING').length === 0 && pendingPaymentMissions.length === 0 && (
@@ -740,6 +750,15 @@ function ClientPageContent() {
             새 미션 등록
           </button>
         </div>
+      )}
+
+      {/* 미션 수정 — 등록 폼을 그대로 다시 쓴다 */}
+      {editMissionId && (
+        <MissionEditModal
+          missionId={editMissionId}
+          onClose={() => setEditMissionId(null)}
+          onSaved={() => void loadMissions()}
+        />
       )}
     </div>
   );

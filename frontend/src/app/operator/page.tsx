@@ -11,6 +11,7 @@ import { SubmissionCheckPanel, TrafficSummary } from '@/components/operator/Oper
 import SettingsEditor from '@/components/operator/SettingsEditor';
 import PayoutAccount from '@/components/operator/PayoutAccount';
 import SubmissionReviewCard from '@/components/operator/SubmissionReviewCard';
+import MissionEditModal from '@/components/missions/MissionEditModal';
 import RegisterMissionForm from '@/components/operator/RegisterMissionForm';
 import {
   CardList, CardRow, DangerButton, EmptyRow, PrimaryButton, QuietButton,
@@ -45,7 +46,6 @@ export default function OperatorDashboard() {
   const [loading, setLoading] = useState(false);
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [photoMissionId, setPhotoMissionId] = useState<string | null>(null);
-  // 미션 수정 화면·API는 다음 PR에서 붙인다. 지금은 자리만 둔다
   const [editMissionId, setEditMissionId] = useState<string | null>(null);
   const [registerForm, setRegisterForm] = useState({
     clientProfileId: '', title: '', description: '', category: 'SNS',
@@ -697,19 +697,13 @@ export default function OperatorDashboard() {
         </div>
       )}
 
-      {/* 미션 수정 — 수정 화면·API는 다음 PR에서 붙인다 (지금은 자리만) */}
+      {/* 미션 수정 */}
       {editMissionId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4" role="dialog" aria-modal="true">
-          <div className="w-full max-w-sm rounded-box bg-paper p-5 text-center">
-            <span className="font-accent text-sm italic text-clay">Coming</span>
-            <h2 className="mb-2 mt-1 font-serif text-section-sm font-bold">미션 수정은 준비 중이에요</h2>
-            <p className="break-keep text-[13px] leading-[1.7] text-muted">
-              지금은 상태 변경과 사진 관리만 할 수 있어요. 내용을 고쳐야 하면 미션을 임시저장으로 내리고 다시 등록해 주세요.
-            </p>
-            <button onClick={() => setEditMissionId(null)}
-              className="mt-4 h-11 w-full rounded-control bg-ink text-sm font-bold text-paper">닫기</button>
-          </div>
-        </div>
+        <MissionEditModal
+          missionId={editMissionId}
+          onClose={() => setEditMissionId(null)}
+          onSaved={() => void loadTab('missions')}
+        />
       )}
 
       {/* 회원 상세 — 휴대폰 번호 전체는 여기서만 보여준다 */}

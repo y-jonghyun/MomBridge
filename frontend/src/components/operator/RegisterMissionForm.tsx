@@ -66,8 +66,12 @@ function Section({ step, title, hint, children }: {
   );
 }
 
+/** 수정 화면에서 칸마다 내려오는 규칙 (backend/src/modules/missions/mission-edit.ts) */
+export interface FieldRule { locked: boolean; onlyBetter: boolean; reason?: string }
+
 export default function RegisterMissionForm({
   form, set, clients, pendingImages, onPendingChange, submitting, onSubmit,
+  mode = 'create', rules, missionId, submitLabel,
 }: {
   form: RegisterForm;
   set: (key: keyof RegisterForm, value: string | string[] | boolean) => void;
@@ -76,53 +80,85 @@ export default function RegisterMissionForm({
   onPendingChange: (next: PendingImage[]) => void;
   submitting: boolean;
   onSubmit: (e: React.FormEvent) => void;
+  /** edit이면 고객사 선택과 결제 선택지를 숨기고, 사진은 바로 올린다 */
+  mode?: 'create' | 'edit';
+  /** 칸별 잠금 규칙 (수정 화면에서만) */
+  rules?: Record<string, FieldRule>;
+  /** 수정 중인 미션 — 사진을 바로 올릴 때 쓴다 */
+  missionId?: string;
+  submitLabel?: string;
 }) {
   const chosen = clients.find(c => c.id === form.clientProfileId);
+  const editing = mode === 'edit';
+
+  /** 이 칸이 잠겼는지와 이유 */
+  const rule = (field: keyof RegisterForm): FieldRule =>
+    rules?.[field as string] ?? { locked: false, onlyBetter: false };
+  const locked = (field: keyof RegisterForm) => rule(field).locked;
+
+  /** 잠긴 칸·주의가 필요한 칸 아래에 붙이는 한 줄 */
+  const Note = ({ field }: { field: keyof RegisterForm }) => {
+    const r = rule(field);
+    if (!r.reason) return null;
+    return (
+      <p className={`mt-1 break-keep text-xs leading-[1.5] ${r.locked ? 'text-clay-dark' : 'text-muted'}`}>
+        {r.locked ? '🔒 ' : ''}{r.reason}
+      </p>
+    );
+  };
   const total = Number(form.rewardAmount || 0) * Number(form.maxParticipants || 0);
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <Section step={1} title="기본 정보">
-        <div>
-          <label htmlFor="op-client" className={label}>고객사 *</label>
-          <select id="op-client" required className={input}
-            value={form.clientProfileId}
-            onChange={e => {
-              const id = e.target.value;
-              set('clientProfileId', id);
-              // 고른 고객사의 주소·지역·업종을 비어 있는 칸에만 채운다 (운영자가 고친 값은 건드리지 않는다)
-              const picked = clients.find(c => c.id === id);
-              if (!picked) return;
-              if (!form.regionSi && picked.regionSi) set('regionSi', picked.regionSi);
-              if (!form.regionGu && picked.regionGu) set('regionGu', picked.regionGu);
-              if (!form.regionDong && picked.regionDong) set('regionDong', picked.regionDong);
-              if (!form.visitAddress && picked.address) set('visitAddress', picked.address);
-              if (!form.businessCategory && picked.businessCategory) set('businessCategory', picked.businessCategory);
-            }}>
-            <option value="">고객사를 선택하세요</option>
-            {clients.map(c => (
-              <option key={c.id} value={c.id}>
-                {c.businessName} ({c.user?.email}){c.contactPhone ? ` · ${c.contactPhone}` : ' · 연락처 없음'}
-              </option>
-            ))}
-          </select>
-          {clients.length === 0 && (
-            <p className="mt-1 text-xs text-clay-dark">등록된 고객사가 없습니다. 먼저 고객사 계정을 만들어야 합니다.</p>
-          )}
-          {chosen && (
-            <p className="mt-1 text-xs text-muted">
-              {chosen.address
-                ? '고객사에 등록된 주소·지역·업종을 아래에 채웠어요. 필요하면 고쳐 주세요.'
-                : '이 고객사는 아직 가게 정보를 채우지 않았어요. 장소를 직접 적어 주세요.'}
-            </p>
-          )}
-        </div>
+        {editing ? (
+          <p className="text-sm text-ink-2">
+            고객사 <strong className="text-ink">{chosen?.businessName ?? form.clientProfileId}</strong>
+            <span className="ml-1 text-xs text-muted">(수정 화면에서는 바꿀 수 없어요)</span>
+          </p>
+        ) : (
+          <div>
+            <label htmlFor="op-client" className={label}>고객사 *</label>
+            <select id="op-client" required className={input}
+              value={form.clientProfileId}
+              onChange={e => {
+                const id = e.target.value;
+                set('clientProfileId', id);
+                // 고른 고객사의 주소·지역·업종을 비어 있는 칸에만 채운다 (운영자가 고친 값은 건드리지 않는다)
+                const picked = clients.find(c => c.id === id);
+                if (!picked) return;
+                if (!form.regionSi && picked.regionSi) set('regionSi', picked.regionSi);
+                if (!form.regionGu && picked.regionGu) set('regionGu', picked.regionGu);
+                if (!form.regionDong && picked.regionDong) set('regionDong', picked.regionDong);
+                if (!form.visitAddress && picked.address) set('visitAddress', picked.address);
+                if (!form.businessCategory && picked.businessCategory) set('businessCategory', picked.businessCategory);
+              }}>
+              <option value="">고객사를 선택하세요</option>
+              {clients.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.businessName} ({c.user?.email}){c.contactPhone ? ` · ${c.contactPhone}` : ' · 연락처 없음'}
+                </option>
+              ))}
+            </select>
+            {clients.length === 0 && (
+              <p className="mt-1 text-xs text-clay-dark">등록된 고객사가 없습니다. 먼저 고객사 계정을 만들어야 합니다.</p>
+            )}
+            {chosen && (
+              <p className="mt-1 text-xs text-muted">
+                {chosen.address
+                  ? '고객사에 등록된 주소·지역·업종을 아래에 채웠어요. 필요하면 고쳐 주세요.'
+                  : '이 고객사는 아직 가게 정보를 채우지 않았어요. 장소를 직접 적어 주세요.'}
+              </p>
+            )}
+          </div>
+        )}
 
         <div>
           <label htmlFor="op-title" className={label}>미션 제목 *</label>
-          <input id="op-title" required className={input}
+          <input id="op-title" required className={input} disabled={locked('title')}
             value={form.title} onChange={e => set('title', e.target.value)}
             placeholder="예: 우리 카페 방문 후 인스타 업로드" />
+          <Note field="title" />
         </div>
 
         <div>
@@ -134,12 +170,13 @@ export default function RegisterMissionForm({
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="op-category" className={label}>미션 유형 *</label>
-            <select id="op-category" required className={input}
+            <select id="op-category" required className={input} disabled={locked('category')}
               value={form.category} onChange={e => set('category', e.target.value)}>
               {[['SNS', 'SNS 게시'], ['VISIT', '방문 인증'], ['REVIEW', '리뷰 작성'], ['VIDEO', '영상 제작']].map(([v, l]) => (
                 <option key={v} value={v}>{l}</option>
               ))}
             </select>
+            <Note field="category" />
           </div>
           <div>
             <label htmlFor="op-biz" className={label}>업종</label>
@@ -157,12 +194,14 @@ export default function RegisterMissionForm({
           <div>
             <label htmlFor="op-si" className={label}>시·도 *</label>
             <ProvinceSelect required value={form.regionSi}
-              onChange={v => { set('regionSi', v); set('regionGu', ''); }} />
+              onChange={v => { if (locked('regionSi')) return; set('regionSi', v); set('regionGu', ''); }} />
+            <Note field="regionSi" />
           </div>
           <div>
             <label htmlFor="op-gu" className={label}>시·군·구 *</label>
             <DistrictSelect id="op-gu" required province={form.regionSi}
-              value={form.regionGu} onChange={v => set('regionGu', v)} />
+              value={form.regionGu} onChange={v => { if (!locked('regionGu')) set('regionGu', v); }} />
+            <Note field="regionGu" />
           </div>
         </div>
         <div>
@@ -189,9 +228,10 @@ export default function RegisterMissionForm({
           ] as const).map(([key, text, after, required]) => (
             <div key={key}>
               <label htmlFor={`op-${key}`} className={label}>{text}</label>
-              <input id={`op-${key}`} type="date" required={required} className={input}
-                min={after ? form[after as 'startDate'] || undefined : undefined}
+              <input id={`op-${key}`} type="date" required={required} className={input} disabled={locked(key)}
+                min={rule(key).onlyBetter ? (form[key] || undefined) : (after ? form[after as 'startDate'] || undefined : undefined)}
                 value={form[key]} onChange={e => set(key, e.target.value)} />
+              <Note field={key} />
             </div>
           ))}
         </div>
@@ -202,13 +242,15 @@ export default function RegisterMissionForm({
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="op-reward" className={label}>1인 보상 금액 (원) *</label>
-            <input id="op-reward" required type="number" min="1000" className={input}
+            <input id="op-reward" required type="number" min="1000" className={input} disabled={locked('rewardAmount')}
               value={form.rewardAmount} onChange={e => set('rewardAmount', e.target.value)} placeholder="예: 30000" />
+            <Note field="rewardAmount" />
           </div>
           <div>
             <label htmlFor="op-max" className={label}>모집 인원 *</label>
-            <input id="op-max" required type="number" min="1" className={input}
+            <input id="op-max" required type="number" min="1" className={input} disabled={locked('maxParticipants')}
               value={form.maxParticipants} onChange={e => set('maxParticipants', e.target.value)} />
+            <Note field="maxParticipants" />
           </div>
         </div>
         {total > 0 && (
@@ -256,12 +298,14 @@ export default function RegisterMissionForm({
         </div>
       </Section>
 
-      <Section step={6} title="사진" hint="첫 장이 대표 사진이 됩니다. 미션을 저장하면 함께 올라갑니다.">
-        <MissionImageUploader pending={pendingImages} onPendingChange={onPendingChange} />
+      <Section step={6} title="사진" hint={editing ? '첫 장이 대표 사진이 됩니다. 사진은 고르는 즉시 저장됩니다.' : '첫 장이 대표 사진이 됩니다. 미션을 저장하면 함께 올라갑니다.'}>
+        {editing && missionId
+          ? <MissionImageUploader missionId={missionId} />
+          : <MissionImageUploader pending={pendingImages} onPendingChange={onPendingChange} />}
       </Section>
 
-      {/* 결제 처리 — 결제를 받지 않는 동안에는 선택지를 숨기고 면제만 쓴다 */}
-      {CLIENT_PAYMENT_ENABLED ? (
+      {/* 결제 처리 — 등록할 때만. 수정에서는 결제를 건드리지 않는다 */}
+      {editing ? null : CLIENT_PAYMENT_ENABLED ? (
         <section className="rounded-card border border-line bg-cream p-4 sm:p-5">
           <p className="mb-3 text-sm font-medium text-ink-2">결제 처리</p>
           <div className="space-y-2">
@@ -300,7 +344,10 @@ export default function RegisterMissionForm({
 
       <button type="submit" disabled={submitting}
         className="h-12 w-full rounded-card bg-ink text-sm font-bold text-paper disabled:opacity-50">
-        {submitting ? '등록 중…' : CLIENT_PAYMENT_ENABLED && form.sendPaymentLink ? '미션 등록 + 결제 링크 발송' : '미션 등록 (결제 면제)'}
+        {submitting
+          ? '저장 중…'
+          : submitLabel
+            ?? (CLIENT_PAYMENT_ENABLED && form.sendPaymentLink ? '미션 등록 + 결제 링크 발송' : '미션 등록 (결제 면제)')}
       </button>
     </form>
   );
