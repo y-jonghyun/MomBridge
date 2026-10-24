@@ -101,7 +101,7 @@ describeDb('재제출', () => {
 
     for (let i = 0; i < 2; i++) {
       await request(app).patch(`/api/v1/submissions/${id}/review`).set('Authorization', `Bearer ${op.token}`)
-        .send({ status: 'REVISION', reviewNote: '수정해 주세요' }).expect(200);
+        .send({ status: 'REVISION', rejectionReason: '수정해 주세요' }).expect(200);
       const r = await request(app).patch(`/api/v1/submissions/${id}/resubmit`).set('Authorization', `Bearer ${p.token}`)
         .send({ snsPostUrl: `https://blog.naver.com/a/${i + 2}` });
       expect(r.status).toBe(200);
@@ -110,7 +110,7 @@ describeDb('재제출', () => {
     }
 
     await request(app).patch(`/api/v1/submissions/${id}/review`).set('Authorization', `Bearer ${op.token}`)
-      .send({ status: 'REVISION' }).expect(200);
+      .send({ status: 'REVISION', rejectionReason: '다시 올려 주세요' }).expect(200);
     const over = await request(app).patch(`/api/v1/submissions/${id}/resubmit`).set('Authorization', `Bearer ${p.token}`).send({});
     expect(over.status).toBe(409);
     expect(over.body.error.code).toBe('REVISION_LIMIT');
@@ -121,7 +121,7 @@ describeDb('재제출', () => {
     const created = await request(app).post('/api/v1/submissions').set('Authorization', `Bearer ${p.token}`)
       .send({ missionId: mission.id });
     await request(app).patch(`/api/v1/submissions/${created.body.data.id}/review`).set('Authorization', `Bearer ${op.token}`)
-      .send({ status: 'REVISION' });
+      .send({ status: 'REVISION', rejectionReason: '다시 올려 주세요' });
     const other = await createParticipant('다른 사람');
     const r = await request(app).patch(`/api/v1/submissions/${created.body.data.id}/resubmit`).set('Authorization', `Bearer ${other.token}`).send({});
     expect(r.status).toBe(404);

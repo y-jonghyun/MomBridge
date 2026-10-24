@@ -31,6 +31,16 @@ const reviewSchema = z.object({
   status: z.enum(['APPROVED', 'REJECTED', 'REVISION']),
   reviewNote: z.string().max(5000).optional(),
   rejectionReason: z.string().max(5000).optional(),
+}).superRefine((v, ctx) => {
+  // 반려·수정 요청은 체험단원이 무엇을 고쳐야 하는지 알아야 해서 사유를 반드시 받는다
+  if (v.status === 'APPROVED') return;
+  if (!v.rejectionReason?.trim()) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['rejectionReason'],
+      message: v.status === 'REJECTED' ? '반려 사유를 적어 주세요' : '무엇을 고쳐야 하는지 적어 주세요',
+    });
+  }
 });
 
 const disclosureConfirmSchema = z.object({
@@ -313,7 +323,24 @@ router.get('/pending', authenticate, requireRole('OPERATOR'), async (req: Reques
       },
       orderBy: { submittedAt: 'asc' },
     });
-    res.json({ success: true, data: submissions });
+
+    // 추적 링크 방문 수 — 검수할 때 "후기를 보고 실제로 들어왔는지"를 같이 본다
+    const links = await prisma.trackingLink.findMany({
+      where: { applicationId: { in: submissions.map(s => s.applicationId) } },
+      select: { applicationId: true, daily: { select: { totalClicks: true, uniqueVisitors: true } } },
+    });
+    const traffic = new Map(links.map(l => [l.applicationId, l.daily.reduce(
+      (acc, d) => ({ clicks: acc.clicks + d.totalClicks, uniqueVisitors: acc.uniqueVisitors + d.uniqueVisitors }),
+      { clicks: 0, uniqueVisitors: 0 },
+    )]));
+
+    res.json({
+      success: true,
+      data: submissions.map(s => ({
+        ...s,
+        traffic: traffic.get(s.applicationId) ?? { clicks: 0, uniqueVisitors: 0 },
+      })),
+    });
   } catch (e) { next(e); }
 });
 

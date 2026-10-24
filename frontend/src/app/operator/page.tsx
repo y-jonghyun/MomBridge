@@ -7,7 +7,10 @@ import { useAuthStore } from '@/store/auth';
 import { LogOutIcon } from '@/components/ui/icons';
 import MissionImageUploader, { uploadPendingImages, type PendingImage } from '@/components/missions/MissionImageUploader';
 import { missionDateError } from '@/lib/mission-dates';
-import { SettingsEditor, SubmissionCheckPanel, TrafficSummary } from '@/components/operator/OperatorCampaignTools';
+import { SubmissionCheckPanel, TrafficSummary } from '@/components/operator/OperatorCampaignTools';
+import SettingsEditor from '@/components/operator/SettingsEditor';
+import PayoutAccount from '@/components/operator/PayoutAccount';
+import SubmissionReviewCard from '@/components/operator/SubmissionReviewCard';
 import RegisterMissionForm from '@/components/operator/RegisterMissionForm';
 import {
   CardList, CardRow, DangerButton, EmptyRow, PrimaryButton, QuietButton,
@@ -95,11 +98,15 @@ export default function OperatorDashboard() {
     loadStats();
   }
 
-  async function reviewSubmission(id: string, status: 'APPROVED' | 'REJECTED' | 'REVISION') {
-    const reason = status === 'REJECTED' ? prompt('반려 사유') : undefined;
-    const note = status === 'REVISION' ? prompt('수정 요청 내용 (예: 제목에 [광고]를 넣어 주세요)') : undefined;
+  async function reviewSubmission(id: string, status: 'APPROVED' | 'REJECTED' | 'REVISION', reason?: string) {
+    // 사유는 카드에서 받아 온다 (prompt는 화면을 멈춰서 쓰지 않는다)
     try {
-      await api.patch(`/submissions/${id}/review`, { status, rejectionReason: reason ?? undefined, reviewNote: note ?? undefined });
+      await api.patch(`/submissions/${id}/review`, {
+        status,
+        rejectionReason: reason || undefined,
+        // 수정 요청은 체험단원이 '무엇을 고칠지'로 읽으므로 검수 메모에도 같이 남긴다
+        reviewNote: status === 'REVISION' ? reason || undefined : undefined,
+      });
       setSubmissions(prev => prev.filter(s => s.id !== id));
       loadStats();
     } catch (err: any) {
@@ -107,10 +114,24 @@ export default function OperatorDashboard() {
     }
   }
 
+  /** 계좌번호 전체 보기 — 서버가 AuditLog에 기록한다 */
+  async function revealAccount(id: string) {
+    try {
+      const { data } = await api.get(`/operator/payouts/${id}/account`);
+      setPayouts(prev => prev.map(p => (p.id === id ? { ...p, ...data.data, revealed: true } : p)));
+    } catch (err: any) {
+      alert(err?.response?.data?.error?.message ?? '계좌를 불러오지 못했습니다');
+    }
+  }
+
   async function processPayout(id: string) {
-    await api.patch(`/operator/payouts/${id}`, { status: 'COMPLETED' });
-    setPayouts(prev => prev.filter(p => p.id !== id));
-    loadStats();
+    try {
+      await api.patch(`/operator/payouts/${id}`, { status: 'COMPLETED' });
+      setPayouts(prev => prev.filter(p => p.id !== id));
+      loadStats();
+    } catch (err: any) {
+      alert(err?.response?.data?.error?.message ?? '지급 완료로 바꾸지 못했습니다');
+    }
   }
 
   /** 번호 전체는 목록이 아니라 상세에서만 받는다 */
@@ -478,47 +499,17 @@ export default function OperatorDashboard() {
           {/* 콘텐츠 검수 */}
           {tab === 'submissions' && !loading && (
             <div>
-              <h2 className="text-xl font-bold text-ink mb-4">콘텐츠 검수 대기 ({submissions.length}건)</h2>
+              <h2 className="mb-4 text-xl font-bold text-ink">콘텐츠 검수 대기 ({submissions.length}건)</h2>
               <div className="space-y-3">
                 {submissions.map(s => (
-                  <div key={s.id} className="bg-paper rounded-box p-5">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <p className="font-semibold text-ink">{s.mission?.title}</p>
-                        <p className="text-sm text-muted">{s.participant?.user?.name} ({s.participant?.user?.email})</p>
-                      </div>
-                      <span className="text-xs text-muted">{new Date(s.submittedAt).toLocaleDateString('ko-KR')}</span>
-                    </div>
-                    {s.description && <p className="text-sm text-ink-2 bg-cream rounded-control p-3 mb-3">{s.description}</p>}
-                    {s.snsPostUrl && <a href={s.snsPostUrl} target="_blank" rel="noreferrer" className="text-xs text-clay underline block mb-3">SNS 링크 보기 →</a>}
-                    <SubmissionCheckPanel submission={s} onConfirmed={u => setSubmissions(prev => prev.map(x => x.id === u.id ? { ...x, ...u } : x))} />
-                    {s.mediaUrls?.length > 0 && (
-                      <div className="flex gap-2 mb-3 flex-wrap">
-                        {s.mediaUrls.map((url: string, i: number) => <a key={i} href={url} target="_blank" rel="noreferrer" className="text-xs bg-cream text-ink-2 px-2 py-1 rounded">첨부 {i + 1}</a>)}
-                      </div>
-                    )}
-                    <div className="flex flex-wrap items-center gap-2">
-                      {(() => {
-                        const blocked = s.mission?.category === 'REVIEW'
-                          && !['AUTO_PASSED', 'MANUAL_CONFIRMED'].includes(s.disclosureCheck);
-                        return (
-                          <PrimaryButton
-                            onClick={() => reviewSubmission(s.id, 'APPROVED')}
-                            disabled={blocked}
-                            title={blocked ? '대가 표시 확인 후 승인할 수 있습니다' : undefined}
-                          >
-                            승인 (정산 생성)
-                          </PrimaryButton>
-                        );
-                      })()}
-                      <QuietButton onClick={() => reviewSubmission(s.id, 'REVISION')}>수정 요청</QuietButton>
-                      <DangerButton confirmLabel="반려할까요?" onConfirm={() => reviewSubmission(s.id, 'REJECTED')}>
-                        반려
-                      </DangerButton>
-                    </div>
-                  </div>
+                  <SubmissionReviewCard
+                    key={s.id}
+                    submission={s}
+                    onChange={u => setSubmissions(prev => prev.map(x => (x.id === u.id ? { ...x, ...u } : x)))}
+                    onReview={reviewSubmission}
+                  />
                 ))}
-                {submissions.length === 0 && <div className="text-center py-12 text-muted bg-paper rounded-box">대기 중인 제출물이 없습니다</div>}
+                {submissions.length === 0 && <EmptyRow>대기 중인 제출물이 없습니다</EmptyRow>}
               </div>
             </div>
           )}
@@ -539,12 +530,21 @@ export default function OperatorDashboard() {
                       <p className="text-xs text-muted">{p.participant?.user?.email}</p>
                       <p className="mt-1 line-clamp-1 text-xs text-muted">{p.submission?.mission?.title}</p>
                     </div>
+                    <div className="mb-3 rounded-control border border-line bg-cream px-3 py-2">
+                      <PayoutAccount payout={p} onReveal={revealAccount} />
+                    </div>
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex flex-wrap items-center gap-x-2 text-sm">
                         <Won value={p.amount} className="text-muted line-through" />
                         <Won value={p.netAmount} className="font-bold text-sage" />
                       </div>
-                      <PrimaryButton onClick={() => processPayout(p.id)}>지급 완료 처리</PrimaryButton>
+                      <PrimaryButton
+                        onClick={() => processPayout(p.id)}
+                        disabled={!p.hasAccount}
+                        title={p.hasAccount ? undefined : '계좌가 등록되어야 지급 완료로 바꿀 수 있습니다'}
+                      >
+                        지급 완료 처리
+                      </PrimaryButton>
                     </div>
                   </CardRow>
                 ))}
@@ -552,8 +552,8 @@ export default function OperatorDashboard() {
               </CardList>
 
               <TableBox>
-                <table className="w-full min-w-[820px] text-sm">
-                  <TableHead columns={['참여자', '미션', '지급액', '수수료', '실지급', '작업']} />
+                <table className="w-full min-w-[1000px] text-sm">
+                  <TableHead columns={['참여자', '미션', '입금 계좌', '지급액', '수수료', '실지급', '작업']} />
                   <tbody className="divide-y divide-line">
                     {payouts.map(p => (
                       <tr key={p.id} className="hover:bg-cream">
@@ -561,14 +561,21 @@ export default function OperatorDashboard() {
                           <p className="font-medium text-ink">{p.participant?.user?.name}</p>
                           <p className="text-xs text-muted">{p.participant?.user?.email}</p>
                         </td>
-                        <td className="max-w-xs truncate px-4 py-3 text-ink-2" title={p.submission?.mission?.title}>
+                        <td className="max-w-[200px] truncate px-4 py-3 text-ink-2" title={p.submission?.mission?.title}>
                           {p.submission?.mission?.title}
                         </td>
+                        <td className="px-4 py-3"><PayoutAccount payout={p} onReveal={revealAccount} /></td>
                         <td className="px-4 py-3"><Won value={p.amount} className="font-medium" /></td>
                         <td className="px-4 py-3 text-clay-dark"><Won value={p.platformFee} /></td>
                         <td className="px-4 py-3"><Won value={p.netAmount} className="font-bold text-sage" /></td>
                         <td className="px-4 py-3">
-                          <PrimaryButton onClick={() => processPayout(p.id)}>지급 완료 처리</PrimaryButton>
+                          <PrimaryButton
+                            onClick={() => processPayout(p.id)}
+                            disabled={!p.hasAccount}
+                            title={p.hasAccount ? '지급 완료로 바꿉니다' : '계좌가 등록되어야 지급 완료로 바꿀 수 있습니다'}
+                          >
+                            지급 완료
+                          </PrimaryButton>
                         </td>
                       </tr>
                     ))}
