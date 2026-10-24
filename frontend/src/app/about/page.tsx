@@ -101,7 +101,7 @@ export default function AboutPage() {
 
       {/* 맘브릿지는 이런 곳이에요 */}
       <section className={`${LANDING_WIDTH} pt-11`}>
-        <LandingHeading eyebrow="Why Mom Bridge">맘브릿지는 이런 곳이에요</LandingHeading>
+        <LandingHeading eyebrow="Why MomBridge">맘브릿지는 이런 곳이에요</LandingHeading>
         <div className="mt-[18px] space-y-3">
           {WHY.map(({ icon, tone, title, body }) => (
             <FeatureCard key={title} icon={icon} tone={tone} title={title}>{body}</FeatureCard>
