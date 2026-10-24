@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { env } from './config/env';
+import './lib/validation-messages'; // 검증 오류 문구를 한국어로 (불러오는 것만으로 설정된다)
 import { corsOrigin } from './config/cors';
 import { prisma } from './config/database';
 import { errorHandler } from './middleware/errorHandler';

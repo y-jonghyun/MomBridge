@@ -8,7 +8,8 @@ export const CONSENT_VERSION = {
   MARKETING: '2026-10-23',
 } as const;
 
-const mustAgree = (message: string) => z.literal(true, { errorMap: () => ({ message }) });
+// zod 4에서는 errorMap 대신 error를 쓴다 (문구는 그대로)
+const mustAgree = (message: string) => z.literal(true, { error: message });
 
 /** 회원가입 동의 항목: 필수 3개(만 14세 이상, 이용약관, 개인정보 수집·이용) + 선택 1개(마케팅 정보 수신) */
 export const agreementsSchema = z.object({
@@ -16,7 +17,8 @@ export const agreementsSchema = z.object({
   terms: mustAgree('이용약관에 동의해 주세요'),
   privacy: mustAgree('개인정보 수집·이용에 동의해 주세요'),
   marketing: z.boolean().optional().default(false),
-}, { required_error: '약관 동의가 필요합니다', invalid_type_error: '약관 동의가 필요합니다' });
+// zod 4에서는 required_error·invalid_type_error가 error 하나로 합쳐졌다
+}, { error: '약관 동의가 필요합니다' });
 
 export type Agreements = z.infer<typeof agreementsSchema>;
 

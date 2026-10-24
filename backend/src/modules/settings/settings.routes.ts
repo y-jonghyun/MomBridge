@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
+import { userMessage } from '../../lib/validation-messages';
 import { authenticate, requireRole } from '../../middleware/auth';
 import { prisma } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
@@ -32,8 +33,10 @@ router.put('/:key', async (req: Request, res: Response, next: NextFunction) => {
       value = await setSetting(key, req.body?.value, req.user!.sub);
     } catch (err) {
       if (err instanceof ZodError) {
+        // 운영 설정은 운영자만 보는 화면이라 어느 칸인지 경로를 함께 보여 준다
         const issue = err.issues[0];
-        throw new AppError('VALIDATION_ERROR', 400, `${issue.path.join('.') || 'value'}: ${issue.message}`);
+        const where = issue.path.join('.');
+        throw new AppError('VALIDATION_ERROR', 400, where ? `${where}: ${userMessage(issue)}` : userMessage(issue));
       }
       throw err;
     }

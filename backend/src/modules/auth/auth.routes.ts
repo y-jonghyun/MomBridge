@@ -27,7 +27,7 @@ const registerSchema = z.object({
   email: z.string().trim().email().max(320),
   password: z.string().min(6, '비밀번호는 6자 이상이어야 합니다').max(100),
   name: z.string().trim().min(1, '이름을 입력해주세요').max(100),
-  role: z.enum(['PARTICIPANT', 'CLIENT'], { errorMap: () => ({ message: '참여자 또는 고객사로만 가입할 수 있습니다' }) }),
+  role: z.enum(['PARTICIPANT', 'CLIENT'], { error: '참여자 또는 고객사로만 가입할 수 있습니다' }),
   phone: phoneSchema,
   agreements: agreementsSchema,
 });
