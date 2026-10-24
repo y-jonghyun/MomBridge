@@ -4,6 +4,7 @@ import { authenticate, requireRole } from '../../middleware/auth';
 import { prisma } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
 import { parseInput } from '../../middleware/validate';
+import { netReward, platformFee } from '../../config/fees';
 import { Prisma } from '@prisma/client';
 import { parseNaverBlogUrl } from '../review-check/naver-blog-url';
 import { checkReviewPost } from '../review-check/review-check.service';
@@ -230,14 +231,15 @@ router.patch('/:id/review', authenticate, requireRole('OPERATOR'), async (req: R
     // 승인 시 정산 레코드 생성 + 알림
     const mission = await prisma.mission.findUnique({ where: { id: submission.missionId } });
     if (input.status === 'APPROVED' && mission) {
-      const fee = Number(mission.rewardAmount) * 0.1;
+      // 원 단위 아래는 버린다 — 화면이 보여 준 실수령액과 같은 식(config/fees.ts)을 쓴다
+      const reward = Number(mission.rewardAmount);
       await prisma.payout.create({
         data: {
           submissionId: submission.id,
           participantId: submission.participantId,
           amount: mission.rewardAmount,
-          platformFee: fee,
-          netAmount: Number(mission.rewardAmount) - fee,
+          platformFee: platformFee(reward),
+          netAmount: netReward(reward),
         },
       });
     }
