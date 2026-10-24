@@ -2,6 +2,8 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate, requireRole } from '../../middleware/auth';
 import { prisma } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
+import { parseInput } from '../../middleware/validate';
+import { formatBusinessNumber, isStoreComplete, missingStoreParts, storeSchema } from './store';
 
 const router = Router();
 router.use(authenticate, requireRole('CLIENT', 'OPERATOR'));
@@ -14,11 +16,44 @@ async function getOrCreateClientProfile(userId: string, name = '') {
   });
 }
 
-// 내 프로필 조회
+// 내 프로필 조회 — 가게 정보가 다 찼는지도 함께 알려준다
 router.get('/profile', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const profile = await getOrCreateClientProfile(req.user!.sub);
-    res.json({ success: true, data: profile });
+    res.json({
+      success: true,
+      data: {
+        ...profile,
+        businessNumber: formatBusinessNumber(profile.businessNumber),
+        complete: isStoreComplete(profile),
+        missing: missingStoreParts(profile),
+      },
+    });
+  } catch (e) { next(e); }
+});
+
+// 가게 정보 저장
+router.put('/profile', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const input = parseInput(storeSchema, req.body);
+    const profile = await getOrCreateClientProfile(req.user!.sub);
+    const updated = await prisma.clientProfile.update({
+      where: { id: profile.id },
+      data: {
+        businessName: input.businessName,
+        businessCategory: input.businessCategory,
+        address: input.address,
+        regionSi: input.regionSi,
+        regionGu: input.regionGu,
+        regionDong: input.regionDong ?? null,
+        businessNumber: input.businessNumber ?? null,
+        ...(input.description !== undefined && { description: input.description ?? null }),
+      },
+    });
+    res.json({
+      success: true,
+      data: { ...updated, businessNumber: formatBusinessNumber(updated.businessNumber), complete: isStoreComplete(updated) },
+    });
   } catch (e) { next(e); }
 });
 

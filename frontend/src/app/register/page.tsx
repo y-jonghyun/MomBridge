@@ -8,6 +8,7 @@ import { Role } from '@/store/auth';
 import { Suspense } from 'react';
 import AuthShell, { authButtonClass, authInputClass } from '@/components/auth/AuthShell';
 import { formatPhone, isMobilePhone, phoneDigits } from '@/lib/phone';
+import { PASSWORD_HINT, passwordError } from '@/lib/password';
 
 const AGREEMENTS = [
   { key: 'age14', label: '만 14세 이상입니다', required: true },
@@ -35,11 +36,14 @@ function RegisterForm() {
     e.preventDefault();
     if (!requiredAgreed) { setError('필수 항목에 동의해 주세요'); return; }
     if (!isMobilePhone(form.phone)) { setError('010으로 시작하는 휴대폰 번호를 입력해주세요'); return; }
+    const badPassword = passwordError(form.password);
+    if (badPassword) { setError(badPassword); return; }
     setLoading(true); setError('');
     try {
       const { data } = await api.post('/auth/register', { ...form, phone: phoneDigits(form.phone), agreements });
       setAuth(data.data.user, data.data.accessToken, data.data.refreshToken);
-      router.push('/missions');
+      // 가입 직후에는 프로필을 채우러 보낸다 (참여자는 지원 전, 고객사는 미션 등록 전에 꼭 필요하다)
+      router.push(form.role === 'CLIENT' ? '/client?tab=profile&welcome=1' : '/participant?tab=profile&welcome=1');
     } catch (err: unknown) {
       setError(apiErrorMessage(err, '회원가입에 실패했습니다'));
     } finally { setLoading(false); }
@@ -73,10 +77,12 @@ function RegisterForm() {
                 <input
                   type={key === 'password' ? 'password' : key === 'email' ? 'email' : 'text'}
                   required
+                  autoComplete={key === 'password' ? 'new-password' : undefined}
                   className={authInputClass}
                   value={form[key as keyof typeof form] as string}
                   onChange={(e) => setForm({ ...form, [key]: e.target.value })}
                 />
+                {key === 'password' && <p className="mt-1 text-xs text-muted">{PASSWORD_HINT}</p>}
               </div>
             );
           })}

@@ -9,6 +9,7 @@ import { parseNaverBlogUrl } from '../review-check/naver-blog-url';
 import { checkReviewPost } from '../review-check/review-check.service';
 import { ensureTrackingLink } from '../tracking/links';
 import { recruitingCutoff } from '../missions/mission-lifecycle';
+import { isProfileComplete, missingProfileParts } from '../participant/profile';
 
 const router = Router();
 
@@ -100,6 +101,13 @@ router.post('/apply', authenticate, requireRole('PARTICIPANT'), async (req: Requ
   try {
     const input = parseInput(applySchema, req.body);
     const profile = await requireParticipantProfile(req.user!.sub);
+
+    // 활동 지역과 SNS 계정이 있어야 지원할 수 있다 (화면도 버튼을 바꿔 안내한다)
+    const snsAccounts = await prisma.snsAccount.findMany({ where: { profileId: profile.id }, select: { id: true } });
+    if (!isProfileComplete(profile, snsAccounts)) {
+      const missing = missingProfileParts(profile, snsAccounts).join('과 ');
+      throw new AppError('PROFILE_INCOMPLETE', 422, `${missing}을 먼저 입력해 주세요`);
+    }
 
     const mission = await prisma.mission.findFirst({
       where: { id: input.missionId, status: 'OPEN', isVisible: true, endDate: { gte: recruitingCutoff() } },

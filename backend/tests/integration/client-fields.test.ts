@@ -27,6 +27,14 @@ describeDb('고객사 응답의 체험단원 정보 범위', () => {
       data: { bio: '자기소개-노출금지', regionDong: '망원동', totalEarned: 123456, missionCount: 7, rating: 4.5 },
     });
     await prisma.user.update({ where: { id: participant.user.id }, data: { phone: '01000009999' } });
+    // SNS 주소는 선정된 뒤 제출물로만 고객사에 보인다 — 지원 단계에서는 운영자만 본다
+    await prisma.snsAccount.deleteMany({ where: { profileId: participant.profile.id } });
+    await prisma.snsAccount.create({
+      data: {
+        profileId: participant.profile.id, platform: 'INSTAGRAM',
+        handle: 'sns-노출금지', url: 'https://instagram.com/sns-노출금지',
+      },
+    });
 
     const { application, link } = await createTrackingLink(mission.id, participant.profile.id);
     await prisma.application.update({ where: { id: application.id }, data: { message: '지원메시지-노출금지' } });
@@ -84,6 +92,8 @@ describeDb('고객사 응답의 체험단원 정보 범위', () => {
       '지원메시지-노출금지',
       '검수메모-노출금지',
       '망원동',                   // 동 단위 거주 지역
+      'sns-노출금지',             // SNS 계정 주소·아이디
+      'instagram.com',            // SNS 채널 주소
       '123456',                   // 누적 보상 금액
       'files.example',            // 업로드 파일 주소
     ]) {

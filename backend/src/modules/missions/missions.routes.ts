@@ -14,6 +14,7 @@ import {
 import { newCampaignCode, normalizeMissionKeywords, saveMissionKeywords } from './mission-extras';
 import { recruitingCutoff } from './mission-lifecycle';
 import { payoutDueDate } from '../../lib/payout';
+import { isStoreComplete, missingStoreParts } from '../client/store';
 import { logger } from '../../utils/logger';
 import { captureError, reportIssue } from '../../lib/monitoring';
 import missionImageRoutes from './mission-images.routes';
@@ -172,6 +173,10 @@ router.post('/pay-and-create', authenticate, requireRole('CLIENT'), async (req: 
     }
     const clientProfile = await prisma.clientProfile.findUnique({ where: { userId: req.user!.sub } });
     if (!clientProfile) throw new AppError('PROFILE_REQUIRED', 403, '고객사 프로필이 필요합니다');
+    // 가게 정보가 다 차 있어야 미션을 올릴 수 있다 (화면도 등록 버튼을 막고 안내한다)
+    if (!isStoreComplete(clientProfile)) {
+      throw new AppError('STORE_INCOMPLETE', 422, `${missingStoreParts(clientProfile).join(' · ')}을 먼저 입력해 주세요`);
+    }
     if (keywords) await normalizeMissionKeywords(keywords);
 
     // 1. 토스페이먼츠 결제 확인

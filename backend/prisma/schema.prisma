@@ -70,6 +70,14 @@ enum PayoutStatus {
   CANCELED
 }
 
+/// 자녀 연령대 (복수 선택). NONE은 '아이 없음'
+enum ChildAgeGroup {
+  INFANT
+  TODDLER
+  ELEMENTARY
+  NONE
+}
+
 enum SnsType {
   INSTAGRAM
   YOUTUBE
@@ -132,6 +140,8 @@ model ParticipantProfile {
   regionSi     String   @db.VarChar(50)
   regionGu     String   @db.VarChar(50)
   regionDong   String?  @db.VarChar(50)
+  /// 자녀 연령대 (선택 항목, 복수 선택)
+  childAgeGroups ChildAgeGroup[]
   totalEarned  Decimal  @default(0) @db.Decimal(12, 2)
   missionCount Int      @default(0)
   rating       Decimal? @db.Decimal(3, 2)
@@ -172,6 +182,8 @@ model ClientProfile {
   userId         String   @unique @db.Uuid
   businessName   String   @db.VarChar(200)
   businessNumber String?  @db.VarChar(20)
+  /// 업종 (미션의 businessCategory와 같은 축). 예전 자유 입력 category는 그대로 둔다
+  businessCategory BusinessCategory?
   category       String   @db.VarChar(100)
   description    String?  @db.Text
   address        String   @db.VarChar(500)

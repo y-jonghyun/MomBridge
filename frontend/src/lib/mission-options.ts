@@ -11,3 +11,17 @@ export const MOM_TAGS: [string, string][] = [
   ['WEEKDAY_DAY', '평일 낮'], ['WEEKEND_OK', '주말 가능'],
   ['KID_FRIENDLY', '아이 동반 가능'], ['AT_HOME', '재택(배송형)'],
 ];
+
+/** 자녀 연령대 (복수 선택, 선택 항목) */
+export const CHILD_AGE_GROUPS: [string, string][] = [
+  ['INFANT', '영아 (0~2세)'], ['TODDLER', '유아 (3~6세)'],
+  ['ELEMENTARY', '초등'], ['NONE', '아이 없음'],
+];
+
+/** 등록할 수 있는 SNS 채널 */
+export const SNS_PLATFORMS: [string, string, string][] = [
+  ['NAVER_BLOG', '네이버 블로그', 'https://blog.naver.com/아이디'],
+  ['INSTAGRAM', '인스타그램', 'https://instagram.com/아이디'],
+  ['YOUTUBE', '유튜브', 'https://youtube.com/@아이디'],
+];
+export const SNS_LABEL: Record<string, string> = Object.fromEntries(SNS_PLATFORMS.map(([v, l]) => [v, l]));

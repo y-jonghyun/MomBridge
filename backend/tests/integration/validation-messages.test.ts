@@ -39,7 +39,9 @@ describeDb('검증 오류 문구', () => {
     });
 
     it('스키마에 적어 둔 문구는 그대로 나온다', async () => {
-      expect(await message(await signup({ password: '123' }))).toBe('비밀번호는 6자 이상이어야 합니다');
+      expect(await message(await signup({ password: '123' }))).toBe('비밀번호는 8자 이상이어야 합니다');
+      expect(await message(await signup({ password: '12345678' }))).toBe('비밀번호에 영문을 넣어 주세요');
+      expect(await message(await signup({ password: 'abcdefgh' }))).toBe('비밀번호에 숫자를 넣어 주세요');
       expect(await message(await signup({ name: '' }))).toBe('이름을 입력해주세요');
       expect(await message(await signup({ phone: '0212345678' }))).toBe('010으로 시작하는 휴대폰 번호를 입력해주세요');
       expect(await message(await signup({ role: 'OPERATOR' }))).toBe('참여자 또는 고객사로만 가입할 수 있습니다');

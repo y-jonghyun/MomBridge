@@ -264,7 +264,9 @@ router.get('/clients', async (_req: Request, res: Response, next: NextFunction) 
     const clients = await prisma.clientProfile.findMany({
       orderBy: { businessName: 'asc' },
       select: {
-        id: true, businessName: true, category: true,
+        id: true, businessName: true, category: true, businessCategory: true,
+        // 대행 등록 화면이 고객사를 고르면 주소·지역을 자동으로 채운다
+        address: true, regionSi: true, regionGu: true, regionDong: true,
         user: { select: { id: true, name: true, email: true, phone: true } },
       },
     });
