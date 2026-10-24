@@ -249,7 +249,7 @@ router.patch('/:id/review', authenticate, requireRole('OPERATOR'), async (req: R
     if (participantUser && mission) {
       const statusMap: Record<string, { title: string; body: string }> = {
         APPROVED: {
-          title: '콘텐츠가 승인됐습니다! 💰',
+          title: '콘텐츠가 승인됐습니다',
           body: `[${mission.title}] 제출한 콘텐츠가 승인됐습니다. 정산이 곧 처리됩니다.`,
         },
         REJECTED: {

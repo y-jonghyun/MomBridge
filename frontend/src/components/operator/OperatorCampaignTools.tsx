@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
+import { InfoIcon } from '@/components/ui/icons';
 
 const REASON_LABEL: Record<string, string> = {
   FETCH_FAILED: '게시글을 불러오지 못함',
@@ -107,7 +108,10 @@ export function TrafficSummary() {
       {error && <p className="text-sm text-clay-dark">{error}</p>}
       {data && (
         <>
-          <p className="text-sm text-ink bg-cream border border-line rounded-card px-4 py-2">ⓘ {data.notice}</p>
+          <p className="flex items-start gap-1.5 text-sm text-ink bg-cream border border-line rounded-card px-4 py-2">
+            <InfoIcon size={15} className="mt-[3px] shrink-0 text-muted" />
+            <span>{data.notice}</span>
+          </p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[['캠페인', data.total.campaigns], ['리뷰', data.total.reviews], ['총 클릭', data.total.clicks], ['리뷰당 평균 유입', data.total.avgClicksPerReview ?? '-']].map(([l, v]) => (
               <div key={l} className="bg-paper rounded-box p-4"><p className="text-xs text-muted">{l}</p><p className="text-2xl font-bold tabular-nums">{typeof v === 'number' ? v.toLocaleString() : v}</p></div>

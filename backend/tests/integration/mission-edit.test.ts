@@ -299,6 +299,58 @@ describeDb('미션 수정', () => {
       expect(notes[0].body).toContain('방문·예약 안내');
     });
 
+    it('운영자가 불리하게 바꾸면 확인 표시를 함께 남긴다', async () => {
+      const m = await mission();
+      const applicant = await createParticipant();
+      await prisma.application.create({ data: { missionId: m.id, participantId: applicant.profile.id, status: 'PENDING' } });
+
+      const res = await put(operator.token, m.id, body({ rewardAmount: 20000, endDate: '2026-11-05' })
+      );
+      expect(res.status).toBe(200);
+      expect(res.body.data.unfavorable).toEqual(['endDate', 'rewardAmount']);
+
+      const log = await prisma.auditLog.findFirstOrThrow({ where: { action: 'MISSION_UPDATE', targetId: m.id } });
+      expect(log.after).toMatchObject({
+        rewardAmount: 20000,
+        _unfavorable: {
+          fields: ['endDate', 'rewardAmount'],
+          labels: ['신청 마감일', '보상 금액'],
+          affected: 1,
+          acknowledged: false,
+        },
+      });
+    });
+
+    it('화면에서 확인을 받고 보내면 확인했다고 남는다', async () => {
+      const m = await mission();
+      const applicant = await createParticipant();
+      await prisma.application.create({ data: { missionId: m.id, participantId: applicant.profile.id, status: 'PENDING' } });
+
+      const res = await put(operator.token, m.id, body({ maxParticipants: 3, acknowledgeUnfavorable: true }));
+      expect(res.status).toBe(200);
+
+      const log = await prisma.auditLog.findFirstOrThrow({ where: { action: 'MISSION_UPDATE', targetId: m.id } });
+      expect(log.after).toMatchObject({ maxParticipants: 3, _unfavorable: { acknowledged: true } });
+      // 확인 여부는 기록에만 남고 저장할 칸으로 새지 않는다
+      const saved = await prisma.mission.findUniqueOrThrow({ where: { id: m.id } });
+      expect(saved.maxParticipants).toBe(3);
+    });
+
+    it('좋아지는 쪽으로 바꾸거나 신청이 없으면 확인 표시가 없다', async () => {
+      const applied = await mission();
+      const applicant = await createParticipant();
+      await prisma.application.create({ data: { missionId: applied.id, participantId: applicant.profile.id, status: 'PENDING' } });
+      await put(operator.token, applied.id, body({ rewardAmount: 50000, endDate: '2026-11-15' }));
+      const better = await prisma.auditLog.findFirstOrThrow({ where: { targetId: applied.id } });
+      expect(Object.keys(better.after as object)).not.toContain('_unfavorable');
+
+      // 신청이 없으면 줄여도 불리한 사람이 없다
+      const empty = await mission({ title: '신청 없는 미션' });
+      await put(operator.token, empty.id, body({ title: '신청 없는 미션', rewardAmount: 10000 }));
+      const none = await prisma.auditLog.findFirstOrThrow({ where: { targetId: empty.id } });
+      expect(Object.keys(none.after as object)).not.toContain('_unfavorable');
+    });
+
     it('안내와 상관없는 칸만 바뀌면 알리지 않는다', async () => {
       const m = await mission();
       const picked = await createParticipant();

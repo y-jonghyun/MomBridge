@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import DailyChart from './DailyChart';
+import { InfoIcon } from '@/components/ui/icons';
 
 export interface CampaignReportData {
   notice: string;
@@ -35,8 +36,9 @@ export default function CampaignReport({ report }: { report: CampaignReportData 
 
   return (
     <div className="space-y-4">
-      <div className="bg-cream border border-line text-ink text-sm rounded-card px-4 py-3">
-        ⓘ {report.notice}
+      <div className="flex items-start gap-1.5 bg-cream border border-line text-ink text-sm rounded-card px-4 py-3">
+        <InfoIcon size={15} className="mt-[3px] shrink-0 text-muted" />
+        <span>{report.notice}</span>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

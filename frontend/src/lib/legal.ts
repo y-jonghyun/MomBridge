@@ -1,7 +1,7 @@
 /**
  * 약관·방침 시행일.
  *
- * ⚠️ 공개(머지)하는 날짜로 바꿀 때 **세 곳을 같은 값으로** 맞춰야 한다.
+ * 주의: 공개(머지)하는 날짜로 바꿀 때 **세 곳을 같은 값으로** 맞춰야 한다.
  *   1) 이 파일의 TERMS_EFFECTIVE_DATE · PRIVACY_EFFECTIVE_DATE  (화면에 보이는 시행일)
  *   2) backend/src/modules/auth/consent.ts 의 CONSENT_VERSION    (동의 기록에 남는 버전)
  * 백엔드가 기록한 버전과 화면에 보여준 시행일이 다르면, 회원이 무엇에 동의했는지 추적할 수 없다.

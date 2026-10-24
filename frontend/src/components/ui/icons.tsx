@@ -52,6 +52,9 @@ export const ArrowRightIcon = (p: IconProps) => (
 export const InfoIcon = (p: IconProps) => (
   <Svg {...p}><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5v5.5M12 16v.5" /></Svg>
 );
+export const LockIcon = (p: IconProps) => (
+  <Svg {...p}><rect x="4.5" y="10.5" width="15" height="9.5" rx="2" /><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" /></Svg>
+);
 export const LogOutIcon = (p: IconProps) => (
   <Svg {...p}><path d="M15 16l4-4-4-4" /><path d="M19 12H9" /><path d="M9 5H5v14h4" /></Svg>
 );

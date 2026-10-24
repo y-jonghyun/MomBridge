@@ -113,6 +113,18 @@ export function isBetter(field: EditableField, before: unknown, after: unknown):
   return b >= a;
 }
 
+/**
+ * 체험단원에게 불리한 변경인지 — 보상·인원을 줄이거나 일정을 앞당기는 것.
+ * 고객사는 규칙에서 이미 막히고, 운영자만 여기까지 올 수 있다.
+ * (운영자는 막지 않는다. 대신 저장 전에 한 번 묻고 확인했다는 표시를 기록에 남긴다)
+ */
+export function isUnfavorable(field: EditableField, before: unknown, after: unknown): boolean {
+  return ONLY_BETTER.includes(field) && !isBetter(field, before, after);
+}
+
+/** 기록에 붙는 확인 표시. 칸 이름과 겹치지 않게 밑줄로 시작한다 */
+export const UNFAVORABLE_KEY = '_unfavorable';
+
 /** 체험단원에게 알려야 하는 변경인지 — 일정·방문 안내·주소 */
 export const NOTIFY_FIELDS: EditableField[] = [
   'startDate', 'endDate', 'announceDate', 'submissionDeadline',
