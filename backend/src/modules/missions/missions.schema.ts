@@ -103,6 +103,14 @@ export const payAndCreateMissionSchema = missionFieldsSchema.extend({
   amount: z.coerce.number().int().positive(),
 }).superRefine(checkDateOrder);
 
+/**
+ * 미션 수정 — 등록과 같은 칸·같은 규칙을 쓴다.
+ * 키워드는 수정 화면에서 다루지 않으므로 뺀다.
+ */
+export const updateMissionSchema = missionFieldsSchema
+  .omit({ keywords: true, thumbnailUrl: true })
+  .superRefine(checkDateOrder);
+
 export const payExistingMissionSchema = z.object({
   paymentKey: z.string().min(1).max(200),
   orderId: z.string().min(1).max(200),
