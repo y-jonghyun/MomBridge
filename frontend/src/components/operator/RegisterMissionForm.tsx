@@ -4,6 +4,7 @@ import DistrictSelect from '@/components/common/DistrictSelect';
 import MissionImageUploader, { type PendingImage } from '@/components/missions/MissionImageUploader';
 import { BUSINESS_CATEGORIES, MOM_TAGS } from '@/lib/mission-options';
 import { CLIENT_PAYMENT_ENABLED } from '@/lib/features';
+import { LockIcon } from '@/components/ui/icons';
 
 /**
  * 운영자가 고객사 대신 미션을 등록하는 폼.
@@ -101,8 +102,9 @@ export default function RegisterMissionForm({
     const r = rule(field);
     if (!r.reason) return null;
     return (
-      <p className={`mt-1 break-keep text-xs leading-[1.5] ${r.locked ? 'text-clay-dark' : 'text-muted'}`}>
-        {r.locked ? '🔒 ' : ''}{r.reason}
+      <p className={`mt-1 flex items-start gap-1 break-keep text-xs leading-[1.5] ${r.locked ? 'text-clay-dark' : 'text-muted'}`}>
+        {r.locked && <LockIcon size={13} className="mt-[2px] shrink-0" />}
+        <span>{r.reason}</span>
       </p>
     );
   };

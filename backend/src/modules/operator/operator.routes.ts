@@ -118,7 +118,7 @@ router.patch('/applications/:id', async (req: Request, res: Response, next: Next
       data: {
         userId: app.participant.userId,
         type: 'APPLICATION_RESULT',
-        title: isApproved ? '지원이 승인됐습니다! 🎉' : '지원 결과 안내',
+        title: isApproved ? '지원이 승인됐습니다' : '지원 결과 안내',
         body: isApproved
           ? `[${app.mission.title}] 미션 지원이 승인됐습니다. 지금 바로 콘텐츠를 제출해보세요!`
           : `[${app.mission.title}] 미션 지원이 반려됐습니다. 사유: ${rejectionReason ?? '없음'}`,

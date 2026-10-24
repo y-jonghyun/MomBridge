@@ -6,6 +6,7 @@ import RegisterMissionForm, {
 } from '@/components/operator/RegisterMissionForm';
 import { normalizeProvince } from '@/lib/regions';
 import { missionDateError } from '@/lib/mission-dates';
+import { useAuthStore } from '@/store/auth';
 
 /**
  * 미션 수정 — 등록 폼을 그대로 다시 쓰고, 칸마다 서버가 내려준 잠금 규칙을 입힌다.
@@ -14,12 +15,36 @@ import { missionDateError } from '@/lib/mission-dates';
 
 const asDate = (v: unknown) => (v ? String(v).slice(0, 10) : '');
 
+/** 체험단원에게 불리한 변경(줄이기·앞당기기). 운영자만 여기까지 올 수 있다 */
+const UNFAVORABLE_LABEL: Partial<Record<keyof RegisterForm, string>> = {
+  rewardAmount: '보상 금액', maxParticipants: '모집 인원',
+  endDate: '신청 마감일', announceDate: '선정 발표일', submissionDeadline: '후기 마감일',
+};
+
+function unfavorableChanges(before: RegisterForm, after: RegisterForm): string[] {
+  const out: string[] = [];
+  if (Number(after.rewardAmount || 0) < Number(before.rewardAmount || 0)) out.push(`${UNFAVORABLE_LABEL.rewardAmount} 줄이기`);
+  if (Number(after.maxParticipants || 0) < Number(before.maxParticipants || 0)) out.push(`${UNFAVORABLE_LABEL.maxParticipants} 줄이기`);
+  for (const field of ['endDate', 'announceDate', 'submissionDeadline'] as const) {
+    const was = before[field], now = after[field];
+    if (!was) continue;                       // 비어 있던 일정을 채우는 건 불리하지 않다
+    if (!now) out.push(`${UNFAVORABLE_LABEL[field]} 지우기`);
+    else if (now < was) out.push(`${UNFAVORABLE_LABEL[field]} 앞당기기`);   // YYYY-MM-DD는 글자 비교로 충분
+  }
+  return out;
+}
+
 export default function MissionEditModal({ missionId, onClose, onSaved }: {
   missionId: string;
   onClose: () => void;
   onSaved?: () => void;
 }) {
+  const role = useAuthStore(st => st.user?.role);
   const [form, setForm] = useState<RegisterForm | null>(null);
+  /** 불러온 그대로의 값 — 무엇이 불리하게 바뀌었는지 견준다 */
+  const [initial, setInitial] = useState<RegisterForm | null>(null);
+  /** 저장 전에 묻는 중인 불리한 변경 목록 */
+  const [asking, setAsking] = useState<string[] | null>(null);
   const [rules, setRules] = useState<Record<string, FieldRule>>({});
   const [client, setClient] = useState<ClientOption | null>(null);
   const [applicationCount, setApplicationCount] = useState(0);
@@ -35,7 +60,8 @@ export default function MissionEditModal({ missionId, onClose, onSaved }: {
       setRules(data.data.rules);
       setApplicationCount(data.data.applicationCount);
       setClient({ id: m.clientProfileId, businessName: m.businessName });
-      setForm({
+      setAsking(null);
+      const loaded: RegisterForm = {
         clientProfileId: m.clientProfileId,
         title: m.title ?? '',
         description: m.description ?? '',
@@ -56,7 +82,9 @@ export default function MissionEditModal({ missionId, onClose, onSaved }: {
         momTags: m.momTags ?? [],
         visitHours: m.visitHours ?? '',
         sendPaymentLink: false,
-      });
+      };
+      setForm(loaded);
+      setInitial(loaded);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: { message?: string } } } };
       setError(e?.response?.data?.error?.message ?? '미션을 불러오지 못했어요');
@@ -68,7 +96,7 @@ export default function MissionEditModal({ missionId, onClose, onSaved }: {
   const set = (key: keyof RegisterForm, value: string | string[] | boolean) =>
     setForm(prev => (prev ? { ...prev, [key]: value } : prev));
 
-  async function save(e: React.FormEvent) {
+  function save(e: React.FormEvent) {
     e.preventDefault();
     if (!form) return;
     setError('');
@@ -77,12 +105,28 @@ export default function MissionEditModal({ missionId, onClose, onSaved }: {
     const dateError = missionDateError(form);
     if (dateError) { setError(dateError); return; }
 
+    // 신청이 들어온 미션에서 불리하게 바꾸는 건 운영자만 할 수 있다. 저장 전에 한 번 묻는다
+    const bad = role === 'OPERATOR' && applicationCount > 0 && initial
+      ? unfavorableChanges(initial, form)
+      : [];
+    if (bad.length > 0) { setAsking(bad); return; }
+
+    void doSave(false);
+  }
+
+  async function doSave(acknowledged: boolean) {
+    if (!form) return;
+    setAsking(null);
+    setError('');
+    setDone('');
     setSaving(true);
     try {
       const { data } = await api.put(`/missions/${missionId}/edit`, {
         ...form,
         rewardAmount: Number(form.rewardAmount),
         maxParticipants: Number(form.maxParticipants),
+        // 불리한 변경을 확인하고 보냈다는 표시 (기록에 남는다)
+        ...(acknowledged ? { acknowledgeUnfavorable: true } : {}),
       });
       const changed: string[] = data.data.changed ?? [];
       const notified: number = data.data.notified ?? 0;
@@ -133,6 +177,27 @@ export default function MissionEditModal({ missionId, onClose, onSaved }: {
               onSubmit={save}
               submitLabel="수정 내용 저장"
             />
+            {asking && (
+              <div className="mt-3 rounded-card border border-clay-dark bg-clay-tint/40 p-4">
+                <p className="break-keep text-sm font-semibold text-clay-dark">
+                  지원·선정된 {applicationCount}명에게 불리한 변경이에요. 계속할까요?
+                </p>
+                <ul className="mt-2 space-y-0.5 text-[13px] leading-[1.6] text-ink-2">
+                  {asking.map(item => <li key={item}>· {item}</li>)}
+                </ul>
+                <p className="mt-2 text-xs text-muted">계속하면 누가 확인하고 바꿨는지 기록에 남습니다.</p>
+                <div className="mt-3 flex gap-2">
+                  <button type="button" onClick={() => void doSave(true)} disabled={saving}
+                    className="h-11 flex-1 rounded-control bg-clay-dark text-sm font-semibold text-paper disabled:opacity-50">
+                    예, 계속할게요
+                  </button>
+                  <button type="button" onClick={() => setAsking(null)}
+                    className="h-11 flex-1 rounded-control border border-line bg-paper text-sm text-ink-2">
+                    아니요
+                  </button>
+                </div>
+              </div>
+            )}
             <button type="button" onClick={onClose}
               className="mt-3 h-11 w-full rounded-control border border-line bg-paper text-sm text-ink-2">
               닫기

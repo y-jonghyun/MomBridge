@@ -6,8 +6,8 @@ import { parseInput } from '../../middleware/validate';
 import { updateMissionSchema } from './missions.schema';
 import { isStoreComplete, missingStoreParts } from '../client/store';
 import {
-  EDITABLE_FIELDS, EditableField, NOTIFY_FIELDS,
-  editRules, fieldLabel, isBetter, ruleFor, sameValue,
+  EDITABLE_FIELDS, EditableField, NOTIFY_FIELDS, UNFAVORABLE_KEY,
+  editRules, fieldLabel, isBetter, isUnfavorable, ruleFor, sameValue,
 } from './mission-edit';
 
 /**
@@ -119,6 +119,22 @@ router.put('/', async (req: Request, res: Response, next: NextFunction) => {
       data: Object.fromEntries(changed.map(f => [f, (input as Record<string, unknown>)[f] ?? null])),
     });
 
+    // 체험단원에게 불리한 변경(줄이기·앞당기기)은 운영자만 할 수 있다.
+    // 막지는 않고, 화면에서 확인을 받았는지까지 기록에 남긴다.
+    const unfavorable = state.applicationCount > 0
+      ? changed.filter(f => isUnfavorable(f, before[f], after[f]))
+      : [];
+    const afterWithMark: Record<string, unknown> = { ...after };
+    if (unfavorable.length > 0) {
+      afterWithMark[UNFAVORABLE_KEY] = {
+        fields: unfavorable,
+        labels: unfavorable.map(fieldLabel),
+        affected: state.applicationCount,
+        // 화면에서 '계속할까요?'에 예를 누르고 보냈는지
+        acknowledged: req.body?.acknowledgeUnfavorable === true,
+      };
+    }
+
     // 누가 언제 무엇을 바꿨는지 남긴다
     await prisma.auditLog.create({
       data: {
@@ -128,7 +144,7 @@ router.put('/', async (req: Request, res: Response, next: NextFunction) => {
         targetId: mission.id,
         // Prisma의 Json 칸이라 평범한 객체로 넣는다
         before: before as object,
-        after: after as object,
+        after: afterWithMark as object,
         ipAddress: req.ip ?? null,
         userAgent: req.get('user-agent')?.slice(0, 500) ?? null,
       },
@@ -160,7 +176,7 @@ router.put('/', async (req: Request, res: Response, next: NextFunction) => {
 
     res.json({
       success: true,
-      data: { changed, notified, mission: { id: updated.id, title: updated.title } },
+      data: { changed, notified, unfavorable, mission: { id: updated.id, title: updated.title } },
     });
   } catch (e) { next(e); }
 });
