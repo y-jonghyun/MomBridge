@@ -9,7 +9,7 @@ import { deleteExpiredResetTokens } from '../../src/modules/auth/password-reset'
 const api = request(app);
 const requestReset = (email: string, ip = '203.0.113.1') =>
   api.post('/api/v1/auth/password-reset/request').set('X-Forwarded-For', ip).send({ email });
-const confirm = (token: string, newPassword = 'brand-new-pass', ip = '203.0.113.1') =>
+const confirm = (token: string, newPassword = 'brandnew1', ip = '203.0.113.1') =>
   api.post('/api/v1/auth/password-reset/confirm').set('X-Forwarded-For', ip).send({ token, newPassword });
 const login = (email: string, password: string) => api.post('/api/v1/auth/login').send({ email, password });
 
@@ -69,9 +69,9 @@ describeDb('비밀번호 재설정', () => {
     expect(stored.tokenHash).not.toBe(token);
     expect(stored.tokenHash).toMatch(/^[0-9a-f]{64}$/);
 
-    expect((await confirm(token, 'brand-new-pass', ip())).status).toBe(200);
+    expect((await confirm(token, 'brandnew1', ip())).status).toBe(200);
     expect((await login('mom@example.com', 'old-pass-1')).status).toBe(401);
-    expect((await login('mom@example.com', 'brand-new-pass')).status).toBe(200);
+    expect((await login('mom@example.com', 'brandnew1')).status).toBe(200);
     // 기존 세션의 리프레시 토큰은 무효
     expect((await api.post('/api/v1/auth/refresh').send({ refreshToken: before.body.data.refreshToken })).status).toBe(401);
     // 같은 링크는 다시 못 씀
@@ -102,10 +102,10 @@ describeDb('비밀번호 재설정', () => {
     await requestReset('mom@example.com', ip());
     const [first, second] = (await waitForMails(sent, 2)).map(tokenFrom);
     expect(await prisma.passwordResetToken.count()).toBe(1);
-    expect((await confirm(first, 'brand-new-pass', ip())).status).toBe(400);
+    expect((await confirm(first, 'brandnew1', ip())).status).toBe(400);
 
     clock.set(() => new Date(t0.getTime() + 31 * 60_000));
-    expect((await confirm(second, 'brand-new-pass', ip())).status).toBe(400);
+    expect((await confirm(second, 'brandnew1', ip())).status).toBe(400);
     expect((await login('mom@example.com', 'old-pass-1')).status).toBe(200);
 
     clock.set(() => new Date(t0.getTime() + 2 * 86400_000));

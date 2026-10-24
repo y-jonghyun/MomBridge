@@ -1,6 +1,6 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
 import { syncSelfClickCookie } from '@/lib/self-click';
@@ -14,6 +14,7 @@ import { MissionCard } from '@/components/ui';
 import { toCardData, type MissionListItem } from '@/components/missions/MissionBrowser';
 import { useBookmarks } from '@/lib/bookmarks';
 import { PAYOUT_DELAY_HINT, fetchNextPayoutDate, payoutLabel } from '@/lib/payout';
+import ParticipantProfileForm from '@/components/profile/ParticipantProfileForm';
 
 /** 기준: docs/design/mombridge-design/cream-editorial-v1.md 3번 '참여자 내 활동' + Participant.html */
 
@@ -83,17 +84,21 @@ function StageBar({ current }: { current: number }) {
   );
 }
 
-export default function ParticipantPage() {
+function ParticipantBody({ initialTab }: { initialTab: string }) {
   const router = useRouter();
   const user = useAuthStore(s => s.user);
   const clearAuth = useAuthStore(s => s.clearAuth);
 
   const [hydrated, setHydrated] = useState(false);
-  const [tab, setTab] = useState<Tab>('active');
+  // 가입 직후 ?tab=profile 로 들어온다
+  const [tab, setTab] = useState<Tab>(
+    () => (TABS.some(t => t.value === initialTab) ? (initialTab as Tab) : 'active'),
+  );
   const [profileForm, setProfileForm] = useState({ name: '', phone: '' });
   const [profileSaving, setProfileSaving] = useState(false);
   const [bookmarks, setBookmarks] = useState<MissionListItem[]>([]);
   const [payoutDay, setPayoutDay] = useState<string | null>(null);
+  const [profileComplete, setProfileComplete] = useState(true);
   const savedIds = useBookmarks(s => s.ids);
   const loadBookmarkIds = useBookmarks(s => s.load);
   const toggleBookmark = useBookmarks(s => s.toggle);
@@ -567,8 +572,21 @@ export default function ParticipantPage() {
 
             {/* 내 정보 */}
             {tab === 'profile' && (
-              <div className="px-5 pt-[18px]">
+              <div className="space-y-4 px-5 pt-[18px]">
+                {!profileComplete && (
+                  <section className="rounded-card border border-clay-tint bg-clay-tint/40 p-4">
+                    <span className="font-accent text-sm italic text-clay">Almost there</span>
+                    <h2 className="mb-1 mt-0.5 font-serif text-section-sm font-bold">프로필을 완성해 주세요</h2>
+                    <p className="break-keep text-[13px] leading-[1.7] text-ink-2">
+                      활동 지역과 SNS 계정을 등록하면 미션에 지원할 수 있어요.
+                    </p>
+                  </section>
+                )}
+
+                <ParticipantProfileForm onComplete={setProfileComplete} />
+
                 <form onSubmit={handleSaveProfile} className="space-y-4 rounded-card border border-line bg-paper p-[18px]">
+                  <h3 className="font-serif text-section-sm font-bold text-ink">계정</h3>
                   <div>
                     <label htmlFor="me-name" className="mb-1 block text-[13px] text-muted">이름</label>
                     <input
@@ -591,7 +609,7 @@ export default function ParticipantPage() {
                     type="submit" disabled={profileSaving}
                     className="flex h-12 w-full items-center justify-center rounded-control bg-ink text-sm font-bold text-paper disabled:opacity-50"
                   >
-                    {profileSaving ? '저장 중…' : '저장하기'}
+                    {profileSaving ? '저장 중…' : '계정 정보 저장'}
                   </button>
                 </form>
               </div>
@@ -666,5 +684,19 @@ function EmptyBox({ children }: { children: React.ReactNode }) {
     <p className="rounded-photo border border-dashed border-[#D8CBB8] bg-paper p-4 text-[13px] leading-[1.6] text-ink-2">
       {children}
     </p>
+  );
+}
+
+/** 가입 직후 ?tab=profile 로 들어오므로 주소의 조건을 읽는다 */
+function ParticipantTabFromQuery() {
+  const params = useSearchParams();
+  return <ParticipantBody initialTab={params.get('tab') ?? 'active'} />;
+}
+
+export default function ParticipantPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-cream" />}>
+      <ParticipantTabFromQuery />
+    </Suspense>
   );
 }

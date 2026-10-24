@@ -10,6 +10,7 @@ import { confirmPasswordReset, requestPasswordReset } from './password-reset';
 import { parseInput } from '../../middleware/validate';
 import { loginPerEmail, loginPerIp, registerPerIp, resetConfirmPerIp, resetRequestPerIp } from './auth-limits';
 import { isMobilePhone, normalizePhone } from '../../lib/phone';
+import { passwordSchema } from '../../lib/password';
 import { agreementsSchema } from './consent';
 
 const router = Router();
@@ -25,7 +26,7 @@ const phoneSchema = z.string()
 // 회원가입으로는 참여자·고객사만 만들 수 있다. 운영자 계정은 서버에서 scripts/create-operator로만 만든다
 const registerSchema = z.object({
   email: z.string().trim().email().max(320),
-  password: z.string().min(6, '비밀번호는 6자 이상이어야 합니다').max(100),
+  password: passwordSchema,
   name: z.string().trim().min(1, '이름을 입력해주세요').max(100),
   role: z.enum(['PARTICIPANT', 'CLIENT'], { error: '참여자 또는 고객사로만 가입할 수 있습니다' }),
   phone: phoneSchema,
@@ -58,7 +59,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
 const resetRequestSchema = z.object({ email: z.string().trim().email().max(320) });
 const resetConfirmSchema = z.object({
   token: z.string().min(20).max(200),
-  newPassword: z.string().min(6, '비밀번호는 6자 이상이어야 합니다').max(100),
+  newPassword: passwordSchema,
 });
 
 // 계정이 없어도 같은 응답 (가입 여부를 알려 주지 않음)
@@ -110,9 +111,10 @@ router.patch('/me/name', authenticate, async (req: Request, res: Response, next:
 // 비밀번호 변경
 router.patch('/me/password', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { currentPassword, newPassword } = req.body;
-    if (!currentPassword || !newPassword) throw new AppError('INVALID_INPUT', 400, '현재 비밀번호와 새 비밀번호를 입력해주세요');
-    if (newPassword.length < 6) throw new AppError('INVALID_INPUT', 400, '비밀번호는 6자 이상이어야 합니다');
+    const { currentPassword } = req.body;
+    if (!currentPassword) throw new AppError('INVALID_INPUT', 400, '현재 비밀번호를 입력해주세요');
+    // 새 비밀번호는 가입·재설정과 같은 규칙을 쓴다
+    const { newPassword } = parseInput(z.object({ newPassword: passwordSchema }), req.body);
 
     const user = await prisma.user.findUnique({ where: { id: req.user!.sub } });
     if (!user) throw new AppError('NOT_FOUND', 404, '사용자를 찾을 수 없습니다');

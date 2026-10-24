@@ -37,6 +37,11 @@ export interface ClientOption {
   id: string;
   businessName: string;
   contactPhone?: string | null;
+  businessCategory?: string | null;
+  address?: string | null;
+  regionSi?: string | null;
+  regionGu?: string | null;
+  regionDong?: string | null;
   user?: { email?: string | null } | null;
 }
 
@@ -81,7 +86,19 @@ export default function RegisterMissionForm({
         <div>
           <label htmlFor="op-client" className={label}>고객사 *</label>
           <select id="op-client" required className={input}
-            value={form.clientProfileId} onChange={e => set('clientProfileId', e.target.value)}>
+            value={form.clientProfileId}
+            onChange={e => {
+              const id = e.target.value;
+              set('clientProfileId', id);
+              // 고른 고객사의 주소·지역·업종을 비어 있는 칸에만 채운다 (운영자가 고친 값은 건드리지 않는다)
+              const picked = clients.find(c => c.id === id);
+              if (!picked) return;
+              if (!form.regionSi && picked.regionSi) set('regionSi', picked.regionSi);
+              if (!form.regionGu && picked.regionGu) set('regionGu', picked.regionGu);
+              if (!form.regionDong && picked.regionDong) set('regionDong', picked.regionDong);
+              if (!form.visitAddress && picked.address) set('visitAddress', picked.address);
+              if (!form.businessCategory && picked.businessCategory) set('businessCategory', picked.businessCategory);
+            }}>
             <option value="">고객사를 선택하세요</option>
             {clients.map(c => (
               <option key={c.id} value={c.id}>
@@ -91,6 +108,13 @@ export default function RegisterMissionForm({
           </select>
           {clients.length === 0 && (
             <p className="mt-1 text-xs text-clay-dark">등록된 고객사가 없습니다. 먼저 고객사 계정을 만들어야 합니다.</p>
+          )}
+          {chosen && (
+            <p className="mt-1 text-xs text-muted">
+              {chosen.address
+                ? '고객사에 등록된 주소·지역·업종을 아래에 채웠어요. 필요하면 고쳐 주세요.'
+                : '이 고객사는 아직 가게 정보를 채우지 않았어요. 장소를 직접 적어 주세요.'}
+            </p>
           )}
         </div>
 

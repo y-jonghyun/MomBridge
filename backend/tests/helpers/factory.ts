@@ -30,11 +30,24 @@ export async function createClient(name = '광고주') {
   return { user, token, profile };
 }
 
-export async function createParticipant(name = '체험단원') {
+/**
+ * 체험단원 한 명. 기본으로 '프로필이 완성된' 상태를 만든다 —
+ * 활동 지역과 SNS 계정이 있어야 미션에 지원할 수 있기 때문이다.
+ * 완성 전 상태가 필요하면 withSns: false로 만든다.
+ */
+export async function createParticipant(name = '체험단원', { withSns = true } = {}) {
   const { user, token } = await createUser('PARTICIPANT', name);
   const profile = await prisma.participantProfile.create({
     data: { userId: user.id, regionSi: '서울', regionGu: '마포구' },
   });
+  if (withSns) {
+    await prisma.snsAccount.create({
+      data: {
+        profileId: profile.id, platform: 'NAVER_BLOG',
+        handle: `blog-${next()}`, url: `https://blog.naver.com/blog-${next()}`,
+      },
+    });
+  }
   return { user, token, profile };
 }
 

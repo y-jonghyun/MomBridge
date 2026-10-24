@@ -6,6 +6,7 @@ import { getMissionKeywords } from '../missions/mission-extras';
 import { ensureTrackingLink, publicTrackingUrl } from '../tracking/links';
 import { buildParticipantStats } from '../reports/report.service';
 import { SELF_CLICK_MAX_AGE_SEC, selfClickToken } from '../tracking/self-click';
+import profileRoutes from './profile.routes';
 import { nextPayoutDate } from '../../lib/payout';
 
 const router = Router();
@@ -116,6 +117,9 @@ router.get('/payouts', async (req: Request, res: Response, next: NextFunction) =
     res.json({ success: true, data: payouts });
   } catch (e) { next(e); }
 });
+
+// 프로필(활동 지역·자녀 연령대·SNS 계정)
+router.use('/profile', profileRoutes);
 
 // ── 찜 ──
 // 어느 경로든 로그인한 본인의 프로필로만 읽고 쓴다 (남의 찜은 보거나 바꿀 수 없다).

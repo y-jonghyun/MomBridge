@@ -63,6 +63,8 @@ export default function MissionDetailPage() {
   const loadBookmarks = useBookmarks(s => s.load);
   const toggleBookmark = useBookmarks(s => s.toggle);
   const canSave = user?.role === 'PARTICIPANT';
+  // null = 아직 모름 (불러오는 중이거나 참여자가 아님)
+  const [profileComplete, setProfileComplete] = useState<boolean | null>(null);
 
   useEffect(() => {
     api.get(`/missions/${id}`).then(r => setMission(r.data.data)).finally(() => setLoading(false));
@@ -70,8 +72,17 @@ export default function MissionDetailPage() {
 
   useEffect(() => { if (canSave) void loadBookmarks(); }, [canSave, loadBookmarks]);
 
+  useEffect(() => {
+    if (!canSave) return;
+    api.get('/participant/profile')
+      .then(r => setProfileComplete(!!r.data.data.complete))
+      .catch(() => setProfileComplete(null));
+  }, [canSave]);
+
   async function handleApply() {
     if (!user) { router.push('/login'); return; }
+    // 프로필이 덜 찼으면 지원 대신 프로필 화면으로 보낸다 (서버도 422로 막는다)
+    if (profileComplete === false) { router.push('/participant?tab=profile'); return; }
     setApplying(true);
     try {
       await api.post('/submissions/apply', { missionId: id, message: applyMsg });
@@ -137,8 +148,13 @@ export default function MissionDetailPage() {
     : applied ? '신청 완료'
     : !isOpen ? '모집 종료'
     : isFull ? '모집 마감'
+    // 활동 지역·SNS 계정이 없으면 지원 대신 프로필을 채우러 보낸다
+    : profileComplete === false ? '프로필 완성하고 지원하기'
     : applying ? '신청 중...' : '미션 신청하기';
-  const ctaDisabled = !!user && (user.role !== 'PARTICIPANT' || applied || !isOpen || isFull || applying);
+  const ctaDisabled = !!user && (
+    user.role !== 'PARTICIPANT' || applied || !isOpen || isFull
+    || (applying && profileComplete !== false)
+  );
 
   return (
     <div className="min-h-screen bg-cream pb-[88px]">

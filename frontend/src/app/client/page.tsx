@@ -16,6 +16,8 @@ import { ClientPerformanceCard, MissionProgress, clientMissionStage } from '@/co
 import { CLIENT_PAYMENT_ENABLED } from '@/lib/features';
 import { missionDateError } from '@/lib/mission-dates';
 import { BUSINESS_INFO } from '@/lib/legal';
+import { PASSWORD_HINT, passwordError } from '@/lib/password';
+import ClientStoreForm from '@/components/profile/ClientStoreForm';
 
 type Tab = 'my-missions' | 'create' | 'results' | 'profile';
 
@@ -25,7 +27,8 @@ const STATUS_COLOR: Record<string, string> = { DRAFT: 'border border-line text-m
 const defaultForm = {
   title: '', description: '', category: 'SNS',
   rewardAmount: '', maxParticipants: '5',
-  regionSi: '', regionGu: '',
+  regionSi: '', regionGu: '', regionDong: '',
+  visitAddress: '',
   startDate: '', endDate: '', submissionDeadline: '',
   requirements: '',
   visitGuide: '',
@@ -85,6 +88,7 @@ function ClientPageContent() {
   const [profileForm, setProfileForm] = useState({ name: '', phone: '', currentPassword: '', newPassword: '' });
   const [profileSaving, setProfileSaving] = useState(false);
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
+  const [storeComplete, setStoreComplete] = useState(true);
 
   useEffect(() => { setHydrated(true); }, []);
 
@@ -139,7 +143,18 @@ function ClientPageContent() {
         name: userR.data.data.user.name ?? '',
         phone: formatPhone(userR.data.data.user.phone ?? ''),
       }));
-      setClientInfo(profileR.data.data);
+      const store = profileR.data.data;
+      setClientInfo(store);
+      setStoreComplete(!!store.complete);
+      // 미션 등록 폼의 주소·지역을 가게 정보로 미리 채운다 (아직 안 건드린 칸만)
+      setForm(prev => ({
+        ...prev,
+        regionSi: prev.regionSi || store.regionSi || '',
+        regionGu: prev.regionGu || store.regionGu || '',
+        regionDong: prev.regionDong || store.regionDong || '',
+        visitAddress: prev.visitAddress || store.address || '',
+        businessCategory: prev.businessCategory || store.businessCategory || '',
+      }));
     } catch { /* 무시 */ }
   }
 
@@ -154,6 +169,8 @@ function ClientPageContent() {
         tasks.push(api.patch('/auth/me/phone', { phone: phoneDigits(profileForm.phone) }));
       }
       if (profileForm.newPassword) {
+        const bad = passwordError(profileForm.newPassword);
+        if (bad) throw new Error(bad);
         // 비밀번호를 바꾸면 다른 기기의 로그인은 끊기고, 이 화면은 새 토큰으로 계속 쓴다
         tasks.push(api.patch('/auth/me/password', {
           currentPassword: profileForm.currentPassword,
@@ -431,7 +448,21 @@ function ClientPageContent() {
           </div>
         )}
 
-        {tab === 'create' && CLIENT_PAYMENT_ENABLED && (
+        {tab === 'create' && CLIENT_PAYMENT_ENABLED && !storeComplete && (
+          <div className="rounded-box border border-line bg-paper p-6 text-center">
+            <span className="font-accent text-sm italic text-clay">First things first</span>
+            <h2 className="mb-2 mt-1 font-serif text-section font-bold">가게 정보를 먼저 채워 주세요</h2>
+            <p className="break-keep text-[13px] leading-[1.7] text-muted">
+              상호·업종·주소·지역을 등록해야 미션을 올릴 수 있어요. 등록하면 주소와 지역이 자동으로 들어갑니다.
+            </p>
+            <button type="button" onClick={() => setTab('profile')}
+              className="mt-4 inline-flex h-11 items-center rounded-control bg-ink px-5 text-sm font-bold text-paper">
+              가게 정보 입력하기
+            </button>
+          </div>
+        )}
+
+        {tab === 'create' && CLIENT_PAYMENT_ENABLED && storeComplete && (
           <div className="bg-paper rounded-box p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-bold text-ink">미션 등록</h2>
@@ -589,39 +620,59 @@ function ClientPageContent() {
           </div>
         )}
 
-        {/* 내 정보 */}
+        {/* 내 정보 — 가게 정보 + 계정 */}
         {tab === 'profile' && (
-          <div className="bg-paper rounded-box p-6">
-            <h2 className="text-lg font-bold text-ink mb-6">내 정보 수정</h2>
-            <form onSubmit={handleSaveProfile} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-ink-2 mb-1">이름</label>
-                <input className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none"
-                  value={profileForm.name} onChange={e => setProfileForm(p => ({ ...p, name: e.target.value }))} />
+          <div className="space-y-4">
+            {!storeComplete && (
+              <section className="rounded-box border border-clay-tint bg-clay-tint/40 p-5">
+                <span className="font-accent text-sm italic text-clay">Almost there</span>
+                <h2 className="mb-1 mt-0.5 font-serif text-section font-bold">가게 정보를 채워 주세요</h2>
+                <p className="break-keep text-[13px] leading-[1.7] text-ink-2">
+                  상호·업종·주소·지역을 등록하면 미션을 올릴 수 있어요. 미션을 등록할 때 주소와 지역이 자동으로 들어갑니다.
+                </p>
+              </section>
+            )}
+
+            <div>
+              <h2 className="mb-3 font-serif text-section font-bold text-ink">가게 정보</h2>
+              <ClientStoreForm onComplete={setStoreComplete} />
+            </div>
+
+            <div>
+              <h2 className="mb-3 font-serif text-section font-bold text-ink">계정</h2>
+              <div className="rounded-box border border-line bg-paper p-6">
+                <form onSubmit={handleSaveProfile} className="space-y-4">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-ink-2">이름</label>
+                    <input className="w-full rounded-control border border-line bg-paper px-3 py-2 text-sm outline-none focus:border-ink"
+                      value={profileForm.name} onChange={e => setProfileForm(p => ({ ...p, name: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-ink-2">휴대폰 번호</label>
+                    <input type="tel" inputMode="tel" autoComplete="tel" maxLength={13} placeholder="010-1234-5678"
+                      className="w-full rounded-control border border-line bg-paper px-3 py-2 text-sm outline-none focus:border-ink"
+                      value={profileForm.phone} onChange={e => setProfileForm(p => ({ ...p, phone: formatPhone(e.target.value) }))} />
+                    <p className="mt-1 text-xs text-muted">결제·정산 안내를 이 번호로 보냅니다</p>
+                  </div>
+                  <div className="border-t border-line pt-4">
+                    <p className="mb-1 text-sm font-medium text-ink-2">비밀번호 변경 (선택)</p>
+                    <p className="mb-3 text-xs text-muted">{PASSWORD_HINT}</p>
+                    <div className="space-y-3">
+                      <input type="password" placeholder="현재 비밀번호" autoComplete="current-password"
+                        className="w-full rounded-control border border-line bg-paper px-3 py-2 text-sm outline-none focus:border-ink"
+                        value={profileForm.currentPassword} onChange={e => setProfileForm(p => ({ ...p, currentPassword: e.target.value }))} />
+                      <input type="password" placeholder="새 비밀번호" autoComplete="new-password"
+                        className="w-full rounded-control border border-line bg-paper px-3 py-2 text-sm outline-none focus:border-ink"
+                        value={profileForm.newPassword} onChange={e => setProfileForm(p => ({ ...p, newPassword: e.target.value }))} />
+                    </div>
+                  </div>
+                  <button type="submit" disabled={profileSaving}
+                    className="h-12 w-full rounded-card bg-ink text-sm font-bold text-paper disabled:opacity-50">
+                    {profileSaving ? '저장 중…' : '계정 정보 저장'}
+                  </button>
+                </form>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-ink-2 mb-1">휴대폰 번호</label>
-                <input type="tel" inputMode="tel" autoComplete="tel" maxLength={13} placeholder="010-1234-5678"
-                  className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none"
-                  value={profileForm.phone} onChange={e => setProfileForm(p => ({ ...p, phone: formatPhone(e.target.value) }))} />
-                <p className="text-xs text-muted mt-1">결제·정산 안내를 이 번호로 보냅니다</p>
-              </div>
-              <div className="border-t pt-4">
-                <p className="text-sm font-medium text-ink-2 mb-3">비밀번호 변경 (선택)</p>
-                <div className="space-y-3">
-                  <input type="password" placeholder="현재 비밀번호"
-                    className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none"
-                    value={profileForm.currentPassword} onChange={e => setProfileForm(p => ({ ...p, currentPassword: e.target.value }))} />
-                  <input type="password" placeholder="새 비밀번호 (6자 이상)"
-                    className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none"
-                    value={profileForm.newPassword} onChange={e => setProfileForm(p => ({ ...p, newPassword: e.target.value }))} />
-                </div>
-              </div>
-              <button type="submit" disabled={profileSaving}
-                className="w-full bg-ink text-paper rounded-card py-3 font-semibold disabled:opacity-50 transition-colors">
-                {profileSaving ? '저장 중...' : '저장하기'}
-              </button>
-            </form>
+            </div>
           </div>
         )}
 

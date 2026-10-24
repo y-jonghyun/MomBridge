@@ -3,6 +3,7 @@ import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
+import { PASSWORD_HINT, passwordError } from '@/lib/password';
 import AuthShell, { authButtonClass, authInputClass } from '@/components/auth/AuthShell';
 
 function ResetForm() {
@@ -15,7 +16,8 @@ function ResetForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (password.length < 6) { setError('비밀번호는 6자 이상이어야 합니다'); return; }
+    const bad = passwordError(password);
+    if (bad) { setError(bad); return; }
     if (password !== confirm) { setError('비밀번호가 서로 다릅니다'); return; }
     setLoading(true); setError('');
     try {
@@ -42,7 +44,8 @@ function ResetForm() {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label htmlFor="pw" className="block text-sm font-medium text-ink-2 mb-1">새 비밀번호</label>
-        <input id="pw" type="password" required autoComplete="new-password" minLength={6}
+        <p className="mb-1 text-xs text-muted">{PASSWORD_HINT}</p>
+        <input id="pw" type="password" required autoComplete="new-password" minLength={8}
           className={authInputClass}
           value={password} onChange={(e) => setPassword(e.target.value)} />
       </div>
