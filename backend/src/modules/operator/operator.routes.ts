@@ -7,6 +7,7 @@ import { missionStatusSchema } from '../missions/missions.schema';
 import { ensureTrackingLink } from '../tracking/links';
 import { reportIssue } from '../../lib/monitoring';
 import { formatPhone, maskPhone } from '../../lib/phone';
+import { maskAccount } from '../../lib/account';
 import { AppError } from '../../middleware/errorHandler';
 
 const applicationReviewSchema = z.object({
@@ -142,13 +143,63 @@ router.get('/payouts', async (req: Request, res: Response, next: NextFunction) =
         submission: { include: { mission: { select: { title: true } } } },
       },
     });
-    res.json({ success: true, data: payouts });
+    // 계좌번호는 끝 네 자리만 내려보낸다. 전체는 '보기'를 눌러 따로 받아 가고, 그때 기록을 남긴다
+    res.json({
+      success: true,
+      data: payouts.map(p => ({
+        ...p,
+        bankAccount: maskAccount(p.bankAccount),
+        hasAccount: !!(p.bankName && p.bankAccount && p.accountHolder),
+      })),
+    });
+  } catch (e) { next(e); }
+});
+
+/**
+ * 계좌번호 전체 보기. 누가 언제 어느 정산 건의 계좌를 봤는지 AuditLog에 남긴다.
+ * 돈과 직접 이어지는 정보라 목록에 함께 담지 않고 이 경로로만 내보낸다.
+ */
+router.get('/payouts/:id/account', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const payout = await prisma.payout.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, bankName: true, bankAccount: true, accountHolder: true },
+    });
+    if (!payout) throw new AppError('NOT_FOUND', 404, '정산 건을 찾을 수 없습니다');
+    if (!payout.bankAccount) throw new AppError('NO_ACCOUNT', 400, '등록된 계좌가 없습니다');
+
+    await prisma.auditLog.create({
+      data: {
+        actorId: req.user!.sub,
+        action: 'PAYOUT_ACCOUNT_VIEW',
+        targetTable: 'payouts',
+        targetId: payout.id,
+        // 계좌번호 자체는 기록에 남기지 않는다 (기록을 보는 것만으로 번호를 알 수 없게)
+        after: { bankName: payout.bankName },
+        ipAddress: req.ip ?? null,
+        userAgent: req.get('user-agent')?.slice(0, 500) ?? null,
+      },
+    });
+
+    res.json({ success: true, data: payout });
   } catch (e) { next(e); }
 });
 
 // 정산 처리
 router.patch('/payouts/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // 계좌가 없으면 지급 완료로 넘기지 못하게 막는다 (돈이 어디로 갔는지 남지 않기 때문)
+    if (req.body.status === 'COMPLETED') {
+      const current = await prisma.payout.findUnique({
+        where: { id: req.params.id },
+        select: { bankName: true, bankAccount: true, accountHolder: true },
+      });
+      if (!current) throw new AppError('NOT_FOUND', 404, '정산 건을 찾을 수 없습니다');
+      if (!current.bankName || !current.bankAccount || !current.accountHolder) {
+        throw new AppError('NO_ACCOUNT', 400, '계좌가 등록되지 않아 지급 완료로 바꿀 수 없습니다');
+      }
+    }
+
     const payout = await prisma.payout.update({
       where: { id: req.params.id },
       data: {

@@ -148,7 +148,7 @@ describeDb('리뷰 제출 확인 · 대가 표시', () => {
     fetcher.html = blogHtml('망원동 카페 후기', '분위기 최고', link.code);
     const sub = (await submit(p.token, mission.id, POST_URL)).body.data;
     await request(app).patch(`/api/v1/submissions/${sub.id}/review`).set('Authorization', `Bearer ${op.token}`)
-      .send({ status: 'REVISION', reviewNote: '제목에 [광고]를 넣어 주세요' }).expect(200);
+      .send({ status: 'REVISION', rejectionReason: '제목에 [광고]를 넣어 주세요' }).expect(200);
 
     fetcher.html = blogHtml('[광고] 망원동 카페 후기', '분위기 최고', link.code);
     const re = await request(app).patch(`/api/v1/submissions/${sub.id}/resubmit`).set('Authorization', `Bearer ${p.token}`).send({});
