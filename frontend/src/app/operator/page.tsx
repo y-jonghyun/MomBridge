@@ -6,10 +6,13 @@ import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { LogOutIcon } from '@/components/ui/icons';
 import MissionImageUploader, { uploadPendingImages, type PendingImage } from '@/components/missions/MissionImageUploader';
-import { BUSINESS_CATEGORIES, MOM_TAGS } from '@/lib/mission-options';
 import { missionDateError } from '@/lib/mission-dates';
 import { SettingsEditor, SubmissionCheckPanel, TrafficSummary } from '@/components/operator/OperatorCampaignTools';
-import ProvinceSelect from '@/components/common/ProvinceSelect';
+import RegisterMissionForm from '@/components/operator/RegisterMissionForm';
+import {
+  CardList, CardRow, DangerButton, EmptyRow, PrimaryButton, QuietButton,
+  ShortDate, StatusBadge, TableBox, TableHead, Won,
+} from '@/components/operator/ui';
 
 type Tab = 'overview' | 'missions' | 'applications' | 'submissions' | 'payouts' | 'users' | 'register-mission' | 'traffic' | 'settings';
 
@@ -39,9 +42,12 @@ export default function OperatorDashboard() {
   const [loading, setLoading] = useState(false);
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [photoMissionId, setPhotoMissionId] = useState<string | null>(null);
+  // 미션 수정 화면·API는 다음 PR에서 붙인다. 지금은 자리만 둔다
+  const [editMissionId, setEditMissionId] = useState<string | null>(null);
   const [registerForm, setRegisterForm] = useState({
     clientProfileId: '', title: '', description: '', category: 'SNS',
     rewardAmount: '', maxParticipants: '5', regionSi: '', regionGu: '',
+    regionDong: '', visitAddress: '',
     startDate: '', endDate: '', submissionDeadline: '', requirements: '', visitGuide: '',
     businessCategory: '', momTags: [] as string[], visitHours: '', announceDate: '',
     sendPaymentLink: false,
@@ -149,6 +155,7 @@ export default function OperatorDashboard() {
       setRegisterForm({
         clientProfileId: '', title: '', description: '', category: 'SNS',
         rewardAmount: '', maxParticipants: '5', regionSi: '', regionGu: '',
+        regionDong: '', visitAddress: '',
         startDate: '', endDate: '', submissionDeadline: '', requirements: '', visitGuide: '',
         businessCategory: '', momTags: [] as string[], visitHours: '', announceDate: '',
         sendPaymentLink: false,
@@ -294,9 +301,7 @@ export default function OperatorDashboard() {
                             <tr key={sb.id} className="border-b border-line-soft last:border-0">
                               <td className="max-w-[220px] truncate px-5 py-3">{sb.mission?.title}</td>
                               <td className="whitespace-nowrap px-5 py-3 text-ink-2">{sb.participant?.user?.name}</td>
-                              <td className="whitespace-nowrap px-5 py-3 text-muted">
-                                {sb.submittedAt ? new Date(sb.submittedAt).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }) : '-'}
-                              </td>
+                              <td className="px-5 py-3 text-muted"><ShortDate value={sb.submittedAt} /></td>
                               <td className="whitespace-nowrap px-5 py-3">
                                 <span className={`inline-flex h-[26px] items-center rounded-full px-2.5 text-xs ${ok ? 'bg-sage-tint text-sage' : 'bg-clay-tint text-clay-dark'}`}>
                                   {ok ? '확인됨' : '확인 필요'}
@@ -367,73 +372,78 @@ export default function OperatorDashboard() {
           {/* 미션 관리 */}
           {tab === 'missions' && !loading && (
             <div>
-              <h2 className="text-xl font-bold text-ink mb-4">미션 관리 ({missions.length}건)</h2>
-              {/* 모바일 카드형 */}
-              <div className="sm:hidden space-y-3">
+              <h2 className="mb-4 text-xl font-bold text-ink">미션 관리 ({missions.length}건)</h2>
+
+              {/* 1024px 미만 — 카드 목록 */}
+              <CardList>
                 {missions.map(m => (
-                  <div key={m.id} className="bg-paper rounded-card border p-4">
-                    <div className="flex items-start justify-between gap-2 mb-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-ink text-sm line-clamp-2">{m.title}</p>
-                        <p className="text-xs text-muted mt-0.5">{m.clientProfile?.businessName}</p>
+                  <CardRow key={m.id}>
+                    <div className="mb-3 flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="line-clamp-2 text-sm font-semibold text-ink">{m.title}</p>
+                        <p className="mt-0.5 text-xs text-muted">{m.clientProfile?.businessName}</p>
                       </div>
-                      <span className={`shrink-0 px-2 py-1 rounded-full text-xs font-medium ${MISSION_STATUS_COLOR[m.status] ?? 'bg-cream'}`}>
+                      <StatusBadge className={MISSION_STATUS_COLOR[m.status] ?? 'bg-cream text-ink-2'}>
                         {MISSION_STATUS_LABEL[m.status] ?? m.status}
-                      </span>
+                      </StatusBadge>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <div className="text-xs text-muted space-x-2">
-                        <span>지원 {m._count?.applications}건</span>
-                        <span>제출 {m._count?.submissions}건</span>
-                        <span className="text-ink-2 font-medium">{Number(m.rewardAmount).toLocaleString()}원</span>
-                      </div>
-                      <button type="button" onClick={() => setPhotoMissionId(m.id)}
-                        className="rounded-control border border-line px-2 py-1 text-xs text-ink-2">사진 관리</button>
+                    <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+                      <span className="whitespace-nowrap">지원 {m._count?.applications}건</span>
+                      <span className="whitespace-nowrap">제출 {m._count?.submissions}건</span>
+                      <Won value={m.rewardAmount} className="font-medium text-ink-2" />
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <QuietButton onClick={() => setEditMissionId(m.id)}>수정</QuietButton>
+                      <QuietButton onClick={() => setPhotoMissionId(m.id)}>사진</QuietButton>
                       <select value={m.status} onChange={e => updateMissionStatus(m.id, e.target.value)}
-                        className="text-xs border rounded px-2 py-1 text-ink-2">
-                        {['DRAFT', 'OPEN', 'IN_PROGRESS', 'REVIEWING', 'CLOSED'].map(s => (
-                          <option key={s} value={s}>{MISSION_STATUS_LABEL[s]}</option>
+                        aria-label="미션 상태"
+                        className="h-9 rounded-control border border-line bg-paper px-2 text-xs text-ink-2">
+                        {['DRAFT', 'OPEN', 'IN_PROGRESS', 'REVIEWING', 'CLOSED'].map(st => (
+                          <option key={st} value={st}>{MISSION_STATUS_LABEL[st]}</option>
                         ))}
                       </select>
                     </div>
-                  </div>
+                  </CardRow>
                 ))}
-                {missions.length === 0 && <div className="text-center py-12 text-muted bg-paper rounded-box">미션이 없습니다</div>}
-              </div>
-              {/* 데스크탑 테이블형 */}
-              <div className="hidden sm:block bg-paper rounded-box overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm min-w-[600px]">
-                    <thead className="bg-cream border-b">
-                      <tr>{['미션명', '고객사', '상태', '지원/제출', '보상', '작업'].map(h => <th key={h} className="text-left px-4 py-3 font-medium text-ink-2">{h}</th>)}</tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {missions.map(m => (
-                        <tr key={m.id} className="hover:bg-cream">
-                          <td className="px-4 py-3 font-medium text-ink max-w-xs truncate">{m.title}</td>
-                          <td className="px-4 py-3 text-muted">{m.clientProfile?.businessName}</td>
-                          <td className="px-4 py-3">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${MISSION_STATUS_COLOR[m.status] ?? 'bg-cream'}`}>
-                              {MISSION_STATUS_LABEL[m.status] ?? m.status}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-muted">{m._count?.applications} / {m._count?.submissions}</td>
-                          <td className="px-4 py-3 text-ink font-medium">{Number(m.rewardAmount).toLocaleString()}원</td>
-                          <td className="px-4 py-3">
+                {missions.length === 0 && <EmptyRow>미션이 없습니다</EmptyRow>}
+              </CardList>
+
+              {/* 1024px 이상 — 표 */}
+              <TableBox>
+                <table className="w-full min-w-[860px] text-sm">
+                  <TableHead columns={['미션명', '고객사', '상태', '지원', '제출', '보상', '작업']} />
+                  <tbody className="divide-y divide-line">
+                    {missions.map(m => (
+                      <tr key={m.id} className="hover:bg-cream">
+                        <td className="max-w-xs truncate px-4 py-3 font-medium text-ink" title={m.title}>{m.title}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-muted">{m.clientProfile?.businessName}</td>
+                        <td className="px-4 py-3">
+                          <StatusBadge className={MISSION_STATUS_COLOR[m.status] ?? 'bg-cream text-ink-2'}>
+                            {MISSION_STATUS_LABEL[m.status] ?? m.status}
+                          </StatusBadge>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-muted">{m._count?.applications}건</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-muted">{m._count?.submissions}건</td>
+                        <td className="px-4 py-3"><Won value={m.rewardAmount} className="font-medium text-ink" /></td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1.5">
+                            <QuietButton onClick={() => setEditMissionId(m.id)}>수정</QuietButton>
+                            <QuietButton onClick={() => setPhotoMissionId(m.id)}>사진</QuietButton>
                             <select value={m.status} onChange={e => updateMissionStatus(m.id, e.target.value)}
-                              className="text-xs border rounded px-2 py-1 text-ink-2">
-                              {['DRAFT', 'OPEN', 'IN_PROGRESS', 'REVIEWING', 'CLOSED'].map(s => (
-                                <option key={s} value={s}>{MISSION_STATUS_LABEL[s]}</option>
+                              aria-label="미션 상태"
+                              className="h-9 rounded-control border border-line bg-paper px-2 text-xs text-ink-2">
+                              {['DRAFT', 'OPEN', 'IN_PROGRESS', 'REVIEWING', 'CLOSED'].map(st => (
+                                <option key={st} value={st}>{MISSION_STATUS_LABEL[st]}</option>
                               ))}
                             </select>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {missions.length === 0 && <div className="text-center py-12 text-muted">미션이 없습니다</div>}
-                </div>
-              </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {missions.length === 0 && <div className="py-12 text-center text-muted">미션이 없습니다</div>}
+              </TableBox>
             </div>
           )}
 
@@ -452,9 +462,11 @@ export default function OperatorDashboard() {
                       </div>
                       <span className="text-sm font-bold text-ink-2">{Number(a.mission?.rewardAmount).toLocaleString()}원</span>
                     </div>
-                    <div className="flex gap-2 mt-4">
-                      <button onClick={() => reviewApplication(a.id, 'APPROVED')} className="px-4 py-2 bg-sage text-paper text-sm rounded-control hover:bg-sage">승인</button>
-                      <button onClick={() => reviewApplication(a.id, 'REJECTED')} className="px-4 py-2 bg-clay text-paper text-sm rounded-control hover:bg-clay-dark">반려</button>
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                      <PrimaryButton onClick={() => reviewApplication(a.id, 'APPROVED')}>승인</PrimaryButton>
+                      <DangerButton confirmLabel="반려할까요?" onConfirm={() => reviewApplication(a.id, 'REJECTED')}>
+                        반려
+                      </DangerButton>
                     </div>
                   </div>
                 ))}
@@ -485,13 +497,24 @@ export default function OperatorDashboard() {
                         {s.mediaUrls.map((url: string, i: number) => <a key={i} href={url} target="_blank" rel="noreferrer" className="text-xs bg-cream text-ink-2 px-2 py-1 rounded">첨부 {i + 1}</a>)}
                       </div>
                     )}
-                    <div className="flex gap-2">
-                      <button onClick={() => reviewSubmission(s.id, 'APPROVED')}
-                        disabled={s.mission?.category === 'REVIEW' && !['AUTO_PASSED', 'MANUAL_CONFIRMED'].includes(s.disclosureCheck)}
-                        title={s.mission?.category === 'REVIEW' && !['AUTO_PASSED', 'MANUAL_CONFIRMED'].includes(s.disclosureCheck) ? '대가 표시 확인 후 승인할 수 있습니다' : undefined}
-                        className="px-4 py-2 bg-sage text-paper text-sm rounded-control hover:bg-sage disabled:opacity-40 disabled:cursor-not-allowed">승인 (정산 생성)</button>
-                      <button onClick={() => reviewSubmission(s.id, 'REVISION')} className="px-4 py-2 border border-clay text-clay-dark text-sm rounded-control hover:bg-clay-tint">수정 요청</button>
-                      <button onClick={() => reviewSubmission(s.id, 'REJECTED')} className="px-4 py-2 bg-clay text-paper text-sm rounded-control hover:bg-clay-dark">반려</button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {(() => {
+                        const blocked = s.mission?.category === 'REVIEW'
+                          && !['AUTO_PASSED', 'MANUAL_CONFIRMED'].includes(s.disclosureCheck);
+                        return (
+                          <PrimaryButton
+                            onClick={() => reviewSubmission(s.id, 'APPROVED')}
+                            disabled={blocked}
+                            title={blocked ? '대가 표시 확인 후 승인할 수 있습니다' : undefined}
+                          >
+                            승인 (정산 생성)
+                          </PrimaryButton>
+                        );
+                      })()}
+                      <QuietButton onClick={() => reviewSubmission(s.id, 'REVISION')}>수정 요청</QuietButton>
+                      <DangerButton confirmLabel="반려할까요?" onConfirm={() => reviewSubmission(s.id, 'REJECTED')}>
+                        반려
+                      </DangerButton>
                     </div>
                   </div>
                 ))}
@@ -506,306 +529,147 @@ export default function OperatorDashboard() {
           {/* 정산 처리 */}
           {tab === 'payouts' && !loading && (
             <div>
-              <h2 className="text-xl font-bold text-ink mb-4">정산 대기 ({payouts.length}건)</h2>
-              {/* 모바일 카드형 */}
-              <div className="sm:hidden space-y-3">
+              <h2 className="mb-4 text-xl font-bold text-ink">정산 대기 ({payouts.length}건)</h2>
+
+              <CardList>
                 {payouts.map(p => (
-                  <div key={p.id} className="bg-paper rounded-card border p-4">
+                  <CardRow key={p.id}>
                     <div className="mb-2">
-                      <p className="font-semibold text-ink text-sm">{p.participant?.user?.name}</p>
+                      <p className="text-sm font-semibold text-ink">{p.participant?.user?.name}</p>
                       <p className="text-xs text-muted">{p.participant?.user?.email}</p>
-                      <p className="text-xs text-muted mt-1 line-clamp-1">{p.submission?.mission?.title}</p>
+                      <p className="mt-1 line-clamp-1 text-xs text-muted">{p.submission?.mission?.title}</p>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm space-x-2">
-                        <span className="text-muted line-through">{Number(p.amount).toLocaleString()}원</span>
-                        <span className="font-bold text-sage">{Number(p.netAmount).toLocaleString()}원</span>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex flex-wrap items-center gap-x-2 text-sm">
+                        <Won value={p.amount} className="text-muted line-through" />
+                        <Won value={p.netAmount} className="font-bold text-sage" />
                       </div>
-                      <button onClick={() => processPayout(p.id)} className="px-3 py-1.5 bg-ink text-paper text-xs rounded-control">지급 완료</button>
+                      <PrimaryButton onClick={() => processPayout(p.id)}>지급 완료 처리</PrimaryButton>
                     </div>
-                  </div>
+                  </CardRow>
                 ))}
-                {payouts.length === 0 && <div className="text-center py-12 text-muted bg-paper rounded-box">대기 중인 정산이 없습니다</div>}
-              </div>
-              {/* 데스크탑 테이블형 */}
-              <div className="hidden sm:block bg-paper rounded-box overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm min-w-[600px]">
-                    <thead className="bg-cream border-b">
-                      <tr>{['참여자', '미션', '지급액', '수수료', '실지급', '작업'].map(h => <th key={h} className="text-left px-4 py-3 font-medium text-ink-2">{h}</th>)}</tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {payouts.map(p => (
-                        <tr key={p.id} className="hover:bg-cream">
-                          <td className="px-4 py-3">
-                            <p className="font-medium text-ink">{p.participant?.user?.name}</p>
-                            <p className="text-xs text-muted">{p.participant?.user?.email}</p>
-                          </td>
-                          <td className="px-4 py-3 text-ink-2 max-w-xs truncate">{p.submission?.mission?.title}</td>
-                          <td className="px-4 py-3 font-medium">{Number(p.amount).toLocaleString()}원</td>
-                          <td className="px-4 py-3 text-clay-dark">-{Number(p.platformFee).toLocaleString()}원</td>
-                          <td className="px-4 py-3 font-bold text-sage">{Number(p.netAmount).toLocaleString()}원</td>
-                          <td className="px-4 py-3">
-                            <button onClick={() => processPayout(p.id)} className="px-3 py-1.5 bg-ink text-paper text-xs rounded-control">지급 완료 처리</button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {payouts.length === 0 && <div className="text-center py-12 text-muted">대기 중인 정산이 없습니다</div>}
-                </div>
-              </div>
+                {payouts.length === 0 && <EmptyRow>대기 중인 정산이 없습니다</EmptyRow>}
+              </CardList>
+
+              <TableBox>
+                <table className="w-full min-w-[820px] text-sm">
+                  <TableHead columns={['참여자', '미션', '지급액', '수수료', '실지급', '작업']} />
+                  <tbody className="divide-y divide-line">
+                    {payouts.map(p => (
+                      <tr key={p.id} className="hover:bg-cream">
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <p className="font-medium text-ink">{p.participant?.user?.name}</p>
+                          <p className="text-xs text-muted">{p.participant?.user?.email}</p>
+                        </td>
+                        <td className="max-w-xs truncate px-4 py-3 text-ink-2" title={p.submission?.mission?.title}>
+                          {p.submission?.mission?.title}
+                        </td>
+                        <td className="px-4 py-3"><Won value={p.amount} className="font-medium" /></td>
+                        <td className="px-4 py-3 text-clay-dark"><Won value={p.platformFee} /></td>
+                        <td className="px-4 py-3"><Won value={p.netAmount} className="font-bold text-sage" /></td>
+                        <td className="px-4 py-3">
+                          <PrimaryButton onClick={() => processPayout(p.id)}>지급 완료 처리</PrimaryButton>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {payouts.length === 0 && <div className="py-12 text-center text-muted">대기 중인 정산이 없습니다</div>}
+              </TableBox>
             </div>
           )}
 
           {/* 미션 대행 등록 */}
           {tab === 'register-mission' && !loading && (
             <div>
-              <h2 className="text-xl font-bold text-ink mb-2">고객사 대신 미션 등록</h2>
-              <p className="text-sm text-muted mb-6">고객사를 선택하고 미션을 대신 등록합니다. 결제 링크를 발송하면 고객사에게 SMS/카카오톡으로 전송됩니다.</p>
-              <div className="bg-paper rounded-box p-6">
-                <form onSubmit={handleRegisterMission} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-ink-2 mb-1">고객사 선택 *</label>
-                    <select required className="w-full border rounded-control px-3 py-2 text-sm"
-                      value={registerForm.clientProfileId} onChange={e => rf('clientProfileId', e.target.value)}>
-                      <option value="">고객사를 선택하세요</option>
-                      {clients.map(c => (
-                        <option key={c.id} value={c.id}>
-                          {c.businessName} ({c.user?.email}){c.contactPhone ? ` · ${c.contactPhone}` : ' · 연락처 없음'}
-                        </option>
-                      ))}
-                    </select>
-                    {clients.length === 0 && <p className="text-xs text-clay-dark mt-1">등록된 고객사가 없습니다. 먼저 CLIENT 계정을 만들어야 합니다.</p>}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-ink-2 mb-1">미션 제목 *</label>
-                    <input required className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none"
-                      value={registerForm.title} onChange={e => rf('title', e.target.value)} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-ink-2 mb-1">미션 설명 *</label>
-                    <textarea required rows={3} className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none resize-none"
-                      value={registerForm.description} onChange={e => rf('description', e.target.value)} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-ink-2 mb-1">미션 유형 *</label>
-                      <select required className="w-full border rounded-control px-3 py-2 text-sm" value={registerForm.category} onChange={e => rf('category', e.target.value)}>
-                        {[['SNS', 'SNS 게시'], ['VISIT', '방문 인증'], ['REVIEW', '리뷰 작성'], ['VIDEO', '영상 제작']].map(([v, l]) => (
-                          <option key={v} value={v}>{l}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-ink-2 mb-1">1인 보상금액 (원) *</label>
-                      <input required type="number" min="1000" className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none"
-                        value={registerForm.rewardAmount} onChange={e => rf('rewardAmount', e.target.value)} placeholder="예: 30000" />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-ink-2 mb-1">모집 인원 *</label>
-                      <input required type="number" min="1" className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none"
-                        value={registerForm.maxParticipants} onChange={e => rf('maxParticipants', e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-ink-2 mb-1">지역 (시·도) *</label>
-                      <ProvinceSelect required value={registerForm.regionSi} onChange={v => rf('regionSi', v)} />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-ink-2 mb-1">지역 (시·군·구) *</label>
-                    <input required className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none"
-                      value={registerForm.regionGu} onChange={e => rf('regionGu', e.target.value)} placeholder="예: 청주시 상당구, 마포구" />
-                  </div>
-                  <div className="grid grid-cols-3 gap-4">
-                    {([
-                      ['startDate', '신청 시작일 *', ''],
-                      ['endDate', '신청 마감일 *', 'startDate'],
-                      ['submissionDeadline', '후기 마감일 *', registerForm.announceDate ? 'announceDate' : 'endDate'],
-                    ] as const).map(([k, l, after]) => (
-                      <div key={k}>
-                        <label className="block text-sm font-medium text-ink-2 mb-1">{l}</label>
-                        <input required type="date" min={after ? registerForm[after as 'startDate'] || undefined : undefined}
-                          className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none"
-                          value={registerForm[k]} onChange={e => rf(k, e.target.value)} />
-                      </div>
-                    ))}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-ink-2 mb-1">수행 조건 (선택)</label>
-                    <textarea rows={2} className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none resize-none"
-                      value={registerForm.requirements} onChange={e => rf('requirements', e.target.value)} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-ink-2 mb-1">방문·예약 안내 (선택)</label>
-                    <textarea rows={3} className="w-full border rounded-control px-3 py-2 text-sm focus:ring-2 focus:ring-ink focus:outline-none resize-none"
-                      value={registerForm.visitGuide} onChange={e => rf('visitGuide', e.target.value)}
-                      placeholder={'한 줄에 하나씩. 예: 체험 가능: 평일 11:30~20:30 / 당일 예약 불가'} />
-                  </div>
-
-                  <div className="rounded-card border border-line bg-cream p-4">
-                    <MissionImageUploader pending={pendingImages} onPendingChange={setPendingImages} />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label htmlFor="op-biz" className="mb-1 block text-sm font-medium text-ink-2">업종</label>
-                      <select id="op-biz" className="w-full rounded-control border border-line bg-paper px-3 py-2 text-sm"
-                        value={registerForm.businessCategory} onChange={e => rf('businessCategory', e.target.value)}>
-                        <option value="">선택 안 함</option>
-                        {BUSINESS_CATEGORIES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label htmlFor="op-hours" className="mb-1 block text-sm font-medium text-ink-2">방문 가능 시간</label>
-                      <input id="op-hours" className="w-full rounded-control border border-line bg-paper px-3 py-2 text-sm"
-                        value={registerForm.visitHours} onChange={e => rf('visitHours', e.target.value)} placeholder="예: 평일 10:00~15:00" />
-                    </div>
-                  </div>
-
-                  <div>
-                    <span className="mb-1 block text-sm font-medium text-ink-2">엄마 시간 태그</span>
-                    <div className="flex flex-wrap gap-2">
-                      {MOM_TAGS.map(([v, l]) => {
-                        const on = registerForm.momTags.includes(v);
-                        return (
-                          <button key={v} type="button" aria-pressed={on}
-                            onClick={() => rf('momTags', on ? registerForm.momTags.filter(t => t !== v) : [...registerForm.momTags, v])}
-                            className={`flex h-9 items-center rounded-full px-3.5 text-[13px] ${on ? 'bg-ink font-medium text-paper' : 'border border-line bg-paper text-ink-2'}`}>
-                            {l}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label htmlFor="op-announce" className="mb-1 block text-sm font-medium text-ink-2">선정 발표일</label>
-                    <input id="op-announce" type="date" min={registerForm.endDate || undefined}
-                      className="w-full rounded-control border border-line bg-paper px-3 py-2 text-sm"
-                      value={registerForm.announceDate} onChange={e => rf('announceDate', e.target.value)} />
-                  </div>
-
-                  {/* 결제 옵션 */}
-                  <div className="bg-cream rounded-card p-4 border">
-                    <p className="text-sm font-medium text-ink-2 mb-3">결제 처리</p>
-                    <div className="space-y-2">
-                      <label className="flex items-start gap-3 cursor-pointer">
-                        <input type="radio" name="paymentOption" className="mt-0.5"
-                          checked={!registerForm.sendPaymentLink}
-                          onChange={() => rf('sendPaymentLink', false)} />
-                        <div>
-                          <p className="text-sm font-medium text-ink">결제 면제 (WAIVED)</p>
-                          <p className="text-xs text-muted">운영자 테스트, 프로모션 등 결제 없이 바로 등록</p>
-                        </div>
-                      </label>
-                      <label className="flex items-start gap-3 cursor-pointer">
-                        <input type="radio" name="paymentOption" className="mt-0.5"
-                          checked={registerForm.sendPaymentLink}
-                          onChange={() => rf('sendPaymentLink', true)} />
-                        <div>
-                          <p className="text-sm font-medium text-ink">결제 링크 발송 (SMS/카카오톡)</p>
-                          <p className="text-xs text-muted">
-                            고객사 연락처로 결제 링크를 발송합니다.
-                            {registerForm.clientProfileId && clients.find(c => c.id === registerForm.clientProfileId)?.contactPhone
-                              ? ` 수신: ${clients.find(c => c.id === registerForm.clientProfileId)?.contactPhone}`
-                              : ' (연락처가 없으면 발송되지 않습니다)'}
-                          </p>
-                        </div>
-                      </label>
-                    </div>
-                    {registerForm.sendPaymentLink && registerForm.rewardAmount && registerForm.maxParticipants && (
-                      <div className="mt-3 pt-3 border-t text-sm text-ink-2">
-                        결제 요청 금액: <strong>{(Number(registerForm.rewardAmount) * Number(registerForm.maxParticipants)).toLocaleString()}원</strong>
-                      </div>
-                    )}
-                  </div>
-
-                  <button type="submit" disabled={registerSubmitting}
-                    className="w-full bg-ink text-paper rounded-card py-3 font-semibold disabled:opacity-50 transition-colors">
-                    {registerSubmitting ? '등록 중...' : registerForm.sendPaymentLink ? '미션 등록 + 결제 링크 발송' : '미션 등록 (결제 면제)'}
-                  </button>
-                </form>
-              </div>
+              <h2 className="mb-2 text-xl font-bold text-ink">고객사 대신 미션 등록</h2>
+              <p className="mb-6 text-sm text-muted">고객사를 고르고 미션을 대신 등록합니다.</p>
+              <RegisterMissionForm
+                form={registerForm}
+                set={rf}
+                clients={clients}
+                pendingImages={pendingImages}
+                onPendingChange={setPendingImages}
+                submitting={registerSubmitting}
+                onSubmit={handleRegisterMission}
+              />
             </div>
           )}
 
           {/* 회원 관리 */}
           {tab === 'users' && !loading && (
             <div>
-              <h2 className="text-xl font-bold text-ink mb-4">회원 관리 ({users.length}명)</h2>
-              {/* 모바일 카드형 */}
-              <div className="sm:hidden space-y-3">
+              <h2 className="mb-4 text-xl font-bold text-ink">회원 관리 ({users.length}명)</h2>
+
+              <CardList>
                 {users.map(u => (
-                  <div key={u.id} className="bg-paper rounded-card border p-4">
+                  <CardRow key={u.id}>
                     <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
+                      <div className="min-w-0 flex-1">
                         <button type="button" onClick={() => openUserDetail(u.id)} className="text-left">
-                          <p className="font-semibold text-ink text-sm underline-offset-2 hover:underline">{u.name}</p>
+                          <p className="text-sm font-semibold text-ink underline-offset-2 hover:underline">{u.name}</p>
                         </button>
-                        <p className="text-xs text-muted truncate">{u.email}</p>
-                        <p className="text-xs text-muted">{u.phone ?? '번호 없음'}</p>
-                        <div className="flex gap-1.5 mt-1.5">
-                          <span className="px-2 py-0.5 bg-cream text-ink-2 rounded-full text-xs">{ROLE_LABEL[u.role] ?? u.role}</span>
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${u.isActive ? 'bg-sage-tint text-sage' : 'bg-clay-tint text-clay-dark'}`}>
+                        <p className="truncate text-xs text-muted">{u.email}</p>
+                        <p className="whitespace-nowrap text-xs text-muted">{u.phone ?? '번호 없음'}</p>
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          <StatusBadge>{ROLE_LABEL[u.role] ?? u.role}</StatusBadge>
+                          <StatusBadge className={u.isActive ? 'bg-sage-tint text-sage' : 'bg-clay-tint text-clay-dark'}>
                             {u.isActive ? '활성' : '비활성'}
-                          </span>
+                          </StatusBadge>
                         </div>
                       </div>
                       {u.id !== user.id && (
-                        <button onClick={() => toggleUserActive(u.id, u.isActive)}
-                          className={`shrink-0 px-3 py-1.5 text-xs rounded-control text-paper ${u.isActive ? 'bg-clay' : 'bg-sage'}`}>
-                          {u.isActive ? '비활성화' : '활성화'}
-                        </button>
+                        u.isActive
+                          ? (
+                            <DangerButton confirmLabel="비활성화할까요?" onConfirm={() => toggleUserActive(u.id, u.isActive)}>
+                              비활성화
+                            </DangerButton>
+                          )
+                          : <PrimaryButton onClick={() => toggleUserActive(u.id, u.isActive)}>활성화</PrimaryButton>
                       )}
                     </div>
-                  </div>
+                  </CardRow>
                 ))}
-                {users.length === 0 && <div className="text-center py-12 text-muted bg-paper rounded-box">회원이 없습니다</div>}
-              </div>
-              {/* 데스크탑 테이블형 */}
-              <div className="hidden sm:block bg-paper rounded-box overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm min-w-[600px]">
-                    <thead className="bg-cream border-b">
-                      <tr>{['이름/이메일', '휴대폰', '역할', '상태', '가입일', '최근 로그인', '작업'].map(h => <th key={h} className="text-left px-4 py-3 font-medium text-ink-2">{h}</th>)}</tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {users.map(u => (
-                        <tr key={u.id} className="hover:bg-cream">
-                          <td className="px-4 py-3">
-                            <button type="button" onClick={() => openUserDetail(u.id)}
-                              className="font-medium text-ink underline-offset-2 hover:underline">{u.name}</button>
-                            <p className="text-xs text-muted">{u.email}</p>
-                          </td>
-                          <td className="px-4 py-3 text-muted">{u.phone ?? '-'}</td>
-                          <td className="px-4 py-3">
-                            <span className="px-2 py-1 bg-cream text-ink-2 rounded-full text-xs">{ROLE_LABEL[u.role] ?? u.role}</span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${u.isActive ? 'bg-sage-tint text-sage' : 'bg-clay-tint text-clay-dark'}`}>
-                              {u.isActive ? '활성' : '비활성'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-muted">{new Date(u.createdAt).toLocaleDateString('ko-KR')}</td>
-                          <td className="px-4 py-3 text-muted">{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString('ko-KR') : '-'}</td>
-                          <td className="px-4 py-3">
-                            {u.id !== user.id && (
-                              <button onClick={() => toggleUserActive(u.id, u.isActive)}
-                                className={`px-3 py-1.5 text-xs rounded-control text-paper ${u.isActive ? 'bg-clay hover:bg-clay-dark' : 'bg-sage hover:bg-sage'}`}>
-                                {u.isActive ? '비활성화' : '활성화'}
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {users.length === 0 && <div className="text-center py-12 text-muted">회원이 없습니다</div>}
-                </div>
-              </div>
+                {users.length === 0 && <EmptyRow>회원이 없습니다</EmptyRow>}
+              </CardList>
+
+              <TableBox>
+                <table className="w-full min-w-[900px] text-sm">
+                  <TableHead columns={['이름', '이메일', '휴대폰', '역할', '상태', '가입일', '최근 로그인', '작업']} />
+                  <tbody className="divide-y divide-line">
+                    {users.map(u => (
+                      <tr key={u.id} className="hover:bg-cream">
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <button type="button" onClick={() => openUserDetail(u.id)}
+                            className="font-medium text-ink underline-offset-2 hover:underline">{u.name}</button>
+                        </td>
+                        <td className="max-w-[220px] truncate px-4 py-3 text-muted" title={u.email}>{u.email}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-muted">{u.phone ?? '-'}</td>
+                        <td className="px-4 py-3"><StatusBadge>{ROLE_LABEL[u.role] ?? u.role}</StatusBadge></td>
+                        <td className="px-4 py-3">
+                          <StatusBadge className={u.isActive ? 'bg-sage-tint text-sage' : 'bg-clay-tint text-clay-dark'}>
+                            {u.isActive ? '활성' : '비활성'}
+                          </StatusBadge>
+                        </td>
+                        <td className="px-4 py-3 text-muted"><ShortDate value={u.createdAt} /></td>
+                        <td className="px-4 py-3 text-muted"><ShortDate value={u.lastLoginAt} /></td>
+                        <td className="px-4 py-3">
+                          {u.id !== user.id && (
+                            u.isActive
+                              ? (
+                                <DangerButton confirmLabel="비활성화할까요?" onConfirm={() => toggleUserActive(u.id, u.isActive)}>
+                                  비활성화
+                                </DangerButton>
+                              )
+                              : <PrimaryButton onClick={() => toggleUserActive(u.id, u.isActive)}>활성화</PrimaryButton>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {users.length === 0 && <div className="py-12 text-center text-muted">회원이 없습니다</div>}
+              </TableBox>
             </div>
           )}
         </main>
@@ -822,6 +686,21 @@ export default function OperatorDashboard() {
             <MissionImageUploader missionId={photoMissionId} />
             <button onClick={() => { setPhotoMissionId(null); void loadTab('missions'); }}
               className="mt-4 h-11 w-full rounded-control bg-ink text-sm font-bold text-paper">완료</button>
+          </div>
+        </div>
+      )}
+
+      {/* 미션 수정 — 수정 화면·API는 다음 PR에서 붙인다 (지금은 자리만) */}
+      {editMissionId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-sm rounded-box bg-paper p-5 text-center">
+            <span className="font-accent text-sm italic text-clay">Coming</span>
+            <h2 className="mb-2 mt-1 font-serif text-section-sm font-bold">미션 수정은 준비 중이에요</h2>
+            <p className="break-keep text-[13px] leading-[1.7] text-muted">
+              지금은 상태 변경과 사진 관리만 할 수 있어요. 내용을 고쳐야 하면 미션을 임시저장으로 내리고 다시 등록해 주세요.
+            </p>
+            <button onClick={() => setEditMissionId(null)}
+              className="mt-4 h-11 w-full rounded-control bg-ink text-sm font-bold text-paper">닫기</button>
           </div>
         </div>
       )}
