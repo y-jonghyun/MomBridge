@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '@/lib/api';
+import { CameraIcon } from '@/components/ui/icons';
 
 /**
  * 미션 사진 업로드 — 고객사 등록, 운영자 대행 등록·수정에서 같이 쓴다.
@@ -37,6 +38,7 @@ export default function MissionImageUploader({
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dropping, setDropping] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -50,6 +52,7 @@ export default function MissionImageUploader({
   useEffect(() => { void load(); }, [load]);
 
   const count = missionId ? images.length : (pending?.length ?? 0);
+  const full = count >= MAX_IMAGES;
 
   async function handleFiles(files: FileList | null) {
     if (!files?.length) return;
@@ -181,12 +184,40 @@ export default function MissionImageUploader({
         </ul>
       )}
 
-      <input
-        ref={inputRef} type="file" accept={ALLOWED.join(',')} multiple
-        onChange={e => void handleFiles(e.target.files)}
-        disabled={busy || count >= MAX_IMAGES}
-        className="block w-full text-[13px] text-ink-2 file:mr-3 file:rounded-control file:border file:border-line file:bg-cream file:px-3 file:py-2 file:text-[13px] file:text-ink-2"
-      />
+      {/* 끌어 놓기 영역 — 브라우저 기본 '파일 선택' 버튼 대신 */}
+      <div
+        onDragOver={e => { e.preventDefault(); if (!full && !busy) setDropping(true); }}
+        onDragLeave={() => setDropping(false)}
+        onDrop={e => {
+          e.preventDefault();
+          setDropping(false);
+          if (!full && !busy) void handleFiles(e.dataTransfer.files);
+        }}
+        className={`rounded-photo border border-dashed px-4 py-6 text-center transition-colors ${
+          dropping ? 'border-clay bg-clay-tint' : 'border-line bg-cream'
+        } ${full || busy ? 'opacity-60' : ''}`}
+      >
+        <CameraIcon size={26} strokeWidth={1.4} className="mx-auto mb-2 block text-muted" />
+        <p className="text-[13px] text-ink-2">
+          {full ? `사진은 ${MAX_IMAGES}장까지예요` : '여기로 사진을 끌어다 놓으세요'}
+        </p>
+        {!full && (
+          <>
+            <p className="mt-0.5 text-[11px] text-muted">jpg · png · webp · 한 장 5MB까지</p>
+            <button
+              type="button" onClick={() => inputRef.current?.click()} disabled={busy}
+              className="mt-3 inline-flex h-9 items-center rounded-control border border-line bg-paper px-3.5 text-[13px] text-ink-2 disabled:opacity-50"
+            >
+              {busy ? '올리는 중…' : '사진 고르기'}
+            </button>
+          </>
+        )}
+        <input
+          ref={inputRef} type="file" accept={ALLOWED.join(',')} multiple className="sr-only"
+          onChange={e => void handleFiles(e.target.files)}
+          disabled={busy || full}
+        />
+      </div>
 
       {progress !== null && (
         <div className="mt-2 h-1 w-full overflow-hidden rounded bg-line" role="progressbar" aria-valuenow={progress}>

@@ -57,6 +57,8 @@ export const missionFieldsSchema = z.object({
   momTags: z.array(z.enum(['WEEKDAY_DAY', 'WEEKEND_OK', 'KID_FRIENDLY', 'AT_HOME'])).max(4).optional(),
   /// 방문 가능 시간 한 줄
   visitHours: optionalText(100),
+  /// 방문할 곳 주소 (비우면 화면이 고객사 프로필 주소를 보여 준다)
+  visitAddress: optionalText(500),
   /// 선정 발표일
   announceDate: z.preprocess(v => (v === '' || v === null ? undefined : v), z.coerce.date().optional()),
   startDate: z.coerce.date(),
