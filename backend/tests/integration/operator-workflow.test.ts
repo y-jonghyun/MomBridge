@@ -123,6 +123,8 @@ describeDb('관리자 업무', () => {
           missionId: mission.id, applicationId: application.id, participantId: participant.profile.id,
           status: 'SUBMITTED', contentUrl: 'https://blog.naver.com/a/1',
           snsPostUrl: 'https://blog.naver.com/a/1', mediaUrls: ['https://files.example/a.jpg'],
+          // 이 묶음의 관심사는 검수 사유·계좌 가림이라 대가 표시는 확인된 상태로 둔다
+          disclosureCheck: 'MANUAL_CONFIRMED',
         } as never,
       });
       return { submission, application, link };

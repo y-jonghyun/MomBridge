@@ -131,6 +131,9 @@ describeDb('재제출', () => {
     const { mission, p, op } = await setup();
     const created = await request(app).post('/api/v1/submissions').set('Authorization', `Bearer ${p.token}`).send({ missionId: mission.id });
     const id = created.body.data.id;
+    // 승인하려면 대가 표시 확인이 먼저다 (이 테스트의 관심사는 정산이 두 번 생기지 않는 것)
+    await request(app).post(`/api/v1/submissions/${id}/disclosure-confirm`)
+      .set('Authorization', `Bearer ${op.token}`).send({}).expect(200);
     await request(app).patch(`/api/v1/submissions/${id}/review`).set('Authorization', `Bearer ${op.token}`).send({ status: 'APPROVED' }).expect(200);
     const again = await request(app).patch(`/api/v1/submissions/${id}/review`).set('Authorization', `Bearer ${op.token}`).send({ status: 'APPROVED' });
     expect(again.status).toBe(409);

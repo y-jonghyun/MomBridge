@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import api from '@/lib/api';
 import { SubmissionCheckPanel } from './OperatorCampaignTools';
 import { DangerButton, PrimaryButton, QuietButton, ShortDate, StatusBadge } from './ui';
 
@@ -16,9 +17,67 @@ const DISCLOSURE: Record<string, { text: string; tone: string }> = {
   MANUAL_CONFIRMED: { text: '대가 표시 운영자 확인', tone: 'bg-sage-tint text-sage' },
   NEEDS_MANUAL_REVIEW: { text: '대가 표시 수동 확인 필요', tone: 'bg-clay-tint text-clay-dark' },
   NOT_FOUND: { text: '대가 표시 못 찾음', tone: 'bg-clay-tint text-clay-dark' },
-  // 블로그(리뷰) 캠페인만 자동으로 확인한다. 그 밖의 미션은 확인할 글 주소가 없어 애초에 대상이 아니다
-  NOT_APPLICABLE: { text: '대가 표시 자동 확인 대상 아님', tone: 'bg-cream text-muted' },
+  // 블로그(리뷰) 캠페인만 자동으로 확인한다. 그 밖의 유형은 운영자가 직접 보고 체크한다
+  SELF_CHECK: { text: '대가 표시 확인 전', tone: 'bg-clay-tint text-clay-dark' },
 };
+
+/**
+ * 자동 확인 대상이 아닌 유형의 대가 표시 확인.
+ * 체크하면 누가 언제 확인했는지가 기록에 남고(AuditLog), 그 뒤에야 승인할 수 있다.
+ */
+function SelfCheck({ submission, onConfirmed }: {
+  submission: Record<string, any>;
+  onConfirmed: (updated: Record<string, any>) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const done = submission.disclosureCheck === 'MANUAL_CONFIRMED';
+
+  async function confirm() {
+    setSaving(true);
+    setError('');
+    try {
+      const { data } = await api.post(`/submissions/${submission.id}/disclosure-confirm`, {});
+      onConfirmed(data.data);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: { message?: string } } } };
+      setError(e?.response?.data?.error?.message ?? '확인 처리를 하지 못했어요');
+    } finally { setSaving(false); }
+  }
+
+  if (done) {
+    return (
+      <div className="mb-3 rounded-control border border-sage-tint bg-sage-tint p-3 text-sm">
+        <p className="font-medium text-sage">대가 표시 운영자 확인</p>
+        <p className="mt-1 text-xs text-ink-2">
+          {submission.disclosureConfirmedBy?.user?.name ?? '운영자'}
+          {submission.disclosureConfirmedAt && ` · ${new Date(submission.disclosureConfirmedAt).toLocaleString('ko-KR')}`}
+          {submission.disclosureConfirmNote && ` · ${submission.disclosureConfirmNote}`}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-3 rounded-control border border-clay-tint bg-clay-tint p-3 text-sm">
+      <label className="flex items-start gap-2 break-keep text-clay-dark">
+        <input
+          type="checkbox" checked={false} disabled={saving}
+          onChange={() => void confirm()}
+          className="mt-0.5 h-4 w-4 shrink-0 accent-clay-dark"
+        />
+        <span>
+          <b className="font-medium">대가 표시를 직접 확인했어요</b>
+          <span className="mt-0.5 block text-xs text-ink-2">
+            게시글에 대가 표시(예: 제품·서비스 제공받아 작성)가 있는지 보고 체크해 주세요.
+            체크 전에는 승인할 수 없습니다.
+          </span>
+        </span>
+      </label>
+      {error && <p className="mt-1.5 text-[13px] text-clay-dark">{error}</p>}
+    </div>
+  );
+}
 
 export default function SubmissionReviewCard({ submission, onChange, onReview, busy }: {
   submission: Record<string, any>;
@@ -32,12 +91,14 @@ export default function SubmissionReviewCard({ submission, onChange, onReview, b
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
 
-  // 승인을 막는 것도, 배지 문구도 같은 기준을 쓴다 — 자동 확인은 블로그(리뷰) 캠페인만 한다
-  const checksDisclosure = s.mission?.category === 'REVIEW';
-  const disclosure = checksDisclosure
-    ? (DISCLOSURE[s.disclosureCheck] ?? DISCLOSURE.NEEDS_MANUAL_REVIEW)
-    : DISCLOSURE.NOT_APPLICABLE;
-  const blocked = checksDisclosure && !['AUTO_PASSED', 'MANUAL_CONFIRMED'].includes(s.disclosureCheck);
+  // 대가 표시가 확인돼야 승인할 수 있다 (서버도 같은 규칙으로 막는다).
+  // 자동 확인은 블로그(리뷰) 캠페인만 돌고, 그 밖의 유형은 운영자가 직접 확인에 체크한다.
+  const autoChecked = s.mission?.category === 'REVIEW';
+  const confirmed = ['AUTO_PASSED', 'MANUAL_CONFIRMED'].includes(s.disclosureCheck);
+  const disclosure = confirmed
+    ? DISCLOSURE[s.disclosureCheck]
+    : (autoChecked ? (DISCLOSURE[s.disclosureCheck] ?? DISCLOSURE.NEEDS_MANUAL_REVIEW) : DISCLOSURE.SELF_CHECK);
+  const blocked = !confirmed;
   const photos: string[] = s.mediaUrls ?? [];
   const traffic = s.traffic ?? { clicks: 0, uniqueVisitors: 0 };
 
@@ -76,7 +137,10 @@ export default function SubmissionReviewCard({ submission, onChange, onReview, b
           className="mb-3 block text-xs text-clay underline">게시글 보기 →</a>
       )}
 
-      <SubmissionCheckPanel submission={s} onConfirmed={onChange} />
+      {/* 블로그(리뷰) 캠페인은 자동 확인 결과를, 그 밖의 유형은 직접 확인 체크를 보여 준다 */}
+      {autoChecked
+        ? <SubmissionCheckPanel submission={s} onConfirmed={onChange} />
+        : <SelfCheck submission={s} onConfirmed={onChange} />}
 
       {/* 제출 사진 미리보기 */}
       {photos.length > 0 && (
@@ -121,7 +185,7 @@ export default function SubmissionReviewCard({ submission, onChange, onReview, b
             onClick={() => onReview(s.id, 'APPROVED')}
             disabled={blocked}
             busy={busy}
-            title={blocked ? '대가 표시 확인 후 승인할 수 있습니다' : undefined}
+            title={blocked ? '대가 표시를 확인한 뒤 승인할 수 있습니다' : undefined}
           >
             승인 (정산 생성)
           </PrimaryButton>

@@ -46,8 +46,13 @@ const reviewSchema = z.object({
 });
 
 const disclosureConfirmSchema = z.object({
-  reason: z.string().trim().min(2, '확인 사유를 입력하세요').max(2000),
+  // 리뷰(블로그) 캠페인은 자동 확인을 뒤집는 것이라 사유를 받는다.
+  // 그 밖의 유형은 운영자가 글을 보고 체크만 하므로 사유가 없어도 된다.
+  reason: z.string().trim().min(2, '확인 사유를 입력하세요').max(2000).optional(),
 });
+
+/** 체크만 받았을 때 기록에 남길 문구 */
+const SELF_CHECK_NOTE = '운영자가 게시글에서 대가 표시를 직접 확인';
 
 /** 리뷰(블로그) 캠페인: 네이버 블로그 URL 필수 + 게시글 자동 확인 + 대가 표시 확인 전 승인 불가 */
 const isReviewCampaign = (mission: { category: string }) => mission.category === 'REVIEW';
@@ -215,11 +220,14 @@ router.patch('/:id/review', authenticate, requireRole('OPERATOR'), async (req: R
       throw new AppError('ALREADY_REVIEWED', 409, '검수 대기 중인 제출물만 처리할 수 있습니다');
     }
     if (input.status === 'APPROVED') {
+      // 대가 표시(경제적 이해관계 표시)는 유형과 상관없이 확인돼야 승인할 수 있다.
+      // 리뷰(블로그) 캠페인은 자동 확인이 돌고, 그 밖의 유형은 운영자가 직접 확인에 체크한다.
       const missionForGate = await prisma.mission.findUniqueOrThrow({ where: { id: current.missionId }, select: { category: true } });
       const disclosureOk = current.disclosureCheck === 'AUTO_PASSED' || current.disclosureCheck === 'MANUAL_CONFIRMED';
-      if (isReviewCampaign(missionForGate) && !disclosureOk) {
-        throw new AppError('DISCLOSURE_REQUIRED', 422,
-          '대가 표시(경제적 이해관계 표시)가 확인되지 않아 승인할 수 없습니다. 게시글을 직접 확인한 뒤 수동 확인 처리하거나 수정 요청을 보내세요');
+      if (!disclosureOk) {
+        throw new AppError('DISCLOSURE_REQUIRED', 422, isReviewCampaign(missionForGate)
+          ? '대가 표시(경제적 이해관계 표시)가 확인되지 않아 승인할 수 없습니다. 게시글을 직접 확인한 뒤 수동 확인 처리하거나 수정 요청을 보내세요'
+          : '대가 표시(경제적 이해관계 표시)를 직접 확인했는지 체크한 뒤 승인할 수 있습니다');
       }
     }
 
@@ -298,9 +306,26 @@ router.post('/:id/disclosure-confirm', authenticate, requireRole('OPERATOR'), as
 
     const current = await prisma.submission.findUnique({ where: { id: req.params.id } });
     if (!current) throw new AppError('NOT_FOUND', 404, '제출물을 찾을 수 없습니다');
-    if (current.disclosureCheck !== 'NEEDS_MANUAL_REVIEW') {
+    // 이미 검수가 끝난 제출물은 건드리지 않는다
+    if (current.status !== 'SUBMITTED') {
+      throw new AppError('ALREADY_REVIEWED', 409, '검수 대기 중인 제출물만 확인할 수 있습니다');
+    }
+
+    const mission = await prisma.mission.findUniqueOrThrow({
+      where: { id: current.missionId }, select: { category: true },
+    });
+    // 리뷰 캠페인은 자동 확인이 '수동 확인 필요'로 넘긴 건만,
+    // 그 밖의 유형은 자동 확인 자체가 없으므로 아직 확인 전인 건을 받는다
+    const canConfirm = isReviewCampaign(mission)
+      ? current.disclosureCheck === 'NEEDS_MANUAL_REVIEW'
+      : current.disclosureCheck == null || current.disclosureCheck === 'NEEDS_MANUAL_REVIEW';
+    if (!canConfirm) {
       throw new AppError('NOT_PENDING_MANUAL_REVIEW', 409, '수동 확인이 필요한 제출물이 아닙니다');
     }
+    if (isReviewCampaign(mission) && !reason) {
+      throw new AppError('VALIDATION_ERROR', 400, '확인 사유를 입력하세요');
+    }
+    const note = reason ?? SELF_CHECK_NOTE;
 
     const now = new Date();
     const [updated] = await prisma.$transaction([
@@ -310,8 +335,9 @@ router.post('/:id/disclosure-confirm', authenticate, requireRole('OPERATOR'), as
           disclosureCheck: 'MANUAL_CONFIRMED',
           disclosureConfirmedById: opProfile.id,
           disclosureConfirmedAt: now,
-          disclosureConfirmNote: reason,
+          disclosureConfirmNote: note,
         },
+        include: { disclosureConfirmedBy: { include: { user: { select: { name: true } } } } },
       }),
       prisma.auditLog.create({
         data: {
@@ -320,7 +346,7 @@ router.post('/:id/disclosure-confirm', authenticate, requireRole('OPERATOR'), as
           targetTable: 'submissions',
           targetId: current.id,
           before: { disclosureCheck: current.disclosureCheck },
-          after: { disclosureCheck: 'MANUAL_CONFIRMED', reason, confirmedAt: now.toISOString() },
+          after: { disclosureCheck: 'MANUAL_CONFIRMED', reason: note, confirmedAt: now.toISOString() },
         },
       }),
     ]);
