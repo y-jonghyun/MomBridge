@@ -14,23 +14,30 @@ type Decision = 'REJECTED' | 'REVISION';
 const DISCLOSURE: Record<string, { text: string; tone: string }> = {
   AUTO_PASSED: { text: '대가 표시 자동 확인', tone: 'bg-sage-tint text-sage' },
   MANUAL_CONFIRMED: { text: '대가 표시 운영자 확인', tone: 'bg-sage-tint text-sage' },
+  NEEDS_MANUAL_REVIEW: { text: '대가 표시 수동 확인 필요', tone: 'bg-clay-tint text-clay-dark' },
   NOT_FOUND: { text: '대가 표시 못 찾음', tone: 'bg-clay-tint text-clay-dark' },
-  PENDING: { text: '대가 표시 확인 전', tone: 'bg-cream text-ink-2' },
+  // 블로그(리뷰) 캠페인만 자동으로 확인한다. 그 밖의 미션은 확인할 글 주소가 없어 애초에 대상이 아니다
+  NOT_APPLICABLE: { text: '대가 표시 자동 확인 대상 아님', tone: 'bg-cream text-muted' },
 };
 
-export default function SubmissionReviewCard({ submission, onChange, onReview }: {
+export default function SubmissionReviewCard({ submission, onChange, onReview, busy }: {
   submission: Record<string, any>;
   onChange: (updated: Record<string, any>) => void;
   onReview: (id: string, status: 'APPROVED' | Decision, reason?: string) => void;
+  /** 처리 중이면 버튼을 막는다 (두 번 눌러 중복 처리되는 것을 막는다) */
+  busy?: boolean;
 }) {
   const s = submission;
   const [asking, setAsking] = useState<Decision | null>(null);
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
 
-  const disclosure = DISCLOSURE[s.disclosureCheck] ?? DISCLOSURE.PENDING;
-  const blocked = s.mission?.category === 'REVIEW'
-    && !['AUTO_PASSED', 'MANUAL_CONFIRMED'].includes(s.disclosureCheck);
+  // 승인을 막는 것도, 배지 문구도 같은 기준을 쓴다 — 자동 확인은 블로그(리뷰) 캠페인만 한다
+  const checksDisclosure = s.mission?.category === 'REVIEW';
+  const disclosure = checksDisclosure
+    ? (DISCLOSURE[s.disclosureCheck] ?? DISCLOSURE.NEEDS_MANUAL_REVIEW)
+    : DISCLOSURE.NOT_APPLICABLE;
+  const blocked = checksDisclosure && !['AUTO_PASSED', 'MANUAL_CONFIRMED'].includes(s.disclosureCheck);
   const photos: string[] = s.mediaUrls ?? [];
   const traffic = s.traffic ?? { clicks: 0, uniqueVisitors: 0 };
 
@@ -102,7 +109,7 @@ export default function SubmissionReviewCard({ submission, onChange, onReview }:
             className="w-full resize-none rounded-control border border-line bg-paper p-2.5 text-sm outline-none focus:border-ink" />
           {error && <p className="mt-1 text-[13px] text-clay-dark">{error}</p>}
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <PrimaryButton tone="clay" onClick={submitDecision}>
+            <PrimaryButton tone="clay" busy={busy} onClick={submitDecision}>
               {asking === 'REJECTED' ? '반려하기' : '수정 요청 보내기'}
             </PrimaryButton>
             <QuietButton onClick={() => { setAsking(null); setReason(''); setError(''); }}>취소</QuietButton>
@@ -113,12 +120,13 @@ export default function SubmissionReviewCard({ submission, onChange, onReview }:
           <PrimaryButton
             onClick={() => onReview(s.id, 'APPROVED')}
             disabled={blocked}
+            busy={busy}
             title={blocked ? '대가 표시 확인 후 승인할 수 있습니다' : undefined}
           >
             승인 (정산 생성)
           </PrimaryButton>
-          <QuietButton onClick={() => setAsking('REVISION')}>수정 요청</QuietButton>
-          <DangerButton confirmLabel="사유를 적는 칸이 열려요" onConfirm={() => setAsking('REJECTED')}>반려</DangerButton>
+          <QuietButton busy={busy} onClick={() => setAsking('REVISION')}>수정 요청</QuietButton>
+          <DangerButton busy={busy} confirmLabel="사유를 적는 칸이 열려요" onConfirm={() => setAsking('REJECTED')}>반려</DangerButton>
         </div>
       )}
     </div>

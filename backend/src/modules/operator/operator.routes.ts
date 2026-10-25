@@ -80,11 +80,36 @@ router.get('/applications', async (req: Request, res: Response, next: NextFuncti
       orderBy: { createdAt: 'desc' },
       take: 50,
       include: {
-        mission: { select: { title: true, rewardAmount: true } },
-        participant: { include: { user: { select: { name: true, email: true } } } },
+        mission: { select: { title: true, rewardAmount: true, regionSi: true, regionGu: true } },
+        participant: {
+          include: {
+            user: { select: { name: true, email: true } },
+            // 운영자가 승인 여부를 판단할 자료 (#26: 지원 단계 정보는 운영자만 본다)
+            snsAccounts: {
+              select: { id: true, platform: true, handle: true, url: true, followerCount: true },
+              orderBy: { platform: 'asc' },
+            },
+          },
+        },
       },
     });
-    res.json({ success: true, data: applications });
+
+    // 지난 참여 이력 — 승인된 후기 수와 반려된 수
+    const participantIds = [...new Set(applications.map(a => a.participantId))];
+    const past = participantIds.length === 0 ? [] : await prisma.submission.groupBy({
+      by: ['participantId', 'status'],
+      where: { participantId: { in: participantIds } },
+      _count: { _all: true },
+    });
+    const historyOf = (participantId: string) => ({
+      approved: past.find(p => p.participantId === participantId && p.status === 'APPROVED')?._count._all ?? 0,
+      rejected: past.find(p => p.participantId === participantId && p.status === 'REJECTED')?._count._all ?? 0,
+    });
+
+    res.json({
+      success: true,
+      data: applications.map(a => ({ ...a, history: historyOf(a.participantId) })),
+    });
   } catch (e) { next(e); }
 });
 

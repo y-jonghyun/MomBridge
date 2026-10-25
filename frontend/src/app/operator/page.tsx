@@ -7,6 +7,7 @@ import { useAuthHydrated, useAuthStore } from '@/store/auth';
 import { LogOutIcon } from '@/components/ui/icons';
 import MissionImageUploader, { pendingUploadNotice, uploadPendingImages, type PendingImage } from '@/components/missions/MissionImageUploader';
 import { missionDateError } from '@/lib/mission-dates';
+import { SNS_LABEL } from '@/lib/mission-options';
 import { SubmissionCheckPanel, TrafficSummary } from '@/components/operator/OperatorCampaignTools';
 import SettingsEditor from '@/components/operator/SettingsEditor';
 import PayoutAccount from '@/components/operator/PayoutAccount';
@@ -17,6 +18,7 @@ import {
   CardList, CardRow, DangerButton, EmptyRow, PrimaryButton, QuietButton,
   ShortDate, StatusBadge, TableBox, TableHead, Won,
 } from '@/components/operator/ui';
+import { Modal } from '@/components/ui';
 
 type Tab = 'overview' | 'missions' | 'applications' | 'submissions' | 'payouts' | 'users' | 'register-mission' | 'traffic' | 'settings';
 
@@ -57,6 +59,8 @@ export default function OperatorDashboard() {
     sendPaymentLink: false,
   });
   const [registerSubmitting, setRegisterSubmitting] = useState(false);
+  /** 지금 처리 중인 지원서·제출물 id (버튼을 '처리 중…'으로 막는다) */
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   useEffect(() => {
     // 저장해 둔 로그인 정보를 다 읽기 전에는 판단하지 않는다 (새로고침 때 /login으로 튕기던 원인)
@@ -96,13 +100,20 @@ export default function OperatorDashboard() {
 
   async function reviewApplication(id: string, status: 'APPROVED' | 'REJECTED') {
     const reason = status === 'REJECTED' ? prompt('반려 사유') : undefined;
-    await api.patch(`/operator/applications/${id}`, { status, rejectionReason: reason });
-    setApplications(prev => prev.filter(a => a.id !== id));
-    loadStats();
+    // 처리 중에는 버튼을 막는다 (두 번 눌러 중복 처리되는 것을 막는다)
+    setBusyId(id);
+    try {
+      await api.patch(`/operator/applications/${id}`, { status, rejectionReason: reason });
+      setApplications(prev => prev.filter(a => a.id !== id));
+      loadStats();
+    } catch (err: any) {
+      alert(err?.response?.data?.error?.message ?? '처리에 실패했습니다');
+    } finally { setBusyId(null); }
   }
 
   async function reviewSubmission(id: string, status: 'APPROVED' | 'REJECTED' | 'REVISION', reason?: string) {
     // 사유는 카드에서 받아 온다 (prompt는 화면을 멈춰서 쓰지 않는다)
+    setBusyId(id);
     try {
       await api.patch(`/submissions/${id}/review`, {
         status,
@@ -114,7 +125,7 @@ export default function OperatorDashboard() {
       loadStats();
     } catch (err: any) {
       alert(err?.response?.data?.error?.message ?? '처리에 실패했습니다');
-    }
+    } finally { setBusyId(null); }
   }
 
   /** 계좌번호 전체 보기 — 서버가 AuditLog에 기록한다 */
@@ -484,17 +495,53 @@ ${photoNotice}` : msg);
               <div className="space-y-3">
                 {applications.map(a => (
                   <div key={a.id} className="bg-paper rounded-box p-5">
-                    <div className="flex items-start justify-between">
-                      <div>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
                         <p className="font-semibold text-ink">{a.mission?.title}</p>
                         <p className="text-sm text-muted mt-1">{a.participant?.user?.name} ({a.participant?.user?.email})</p>
                         {a.message && <p className="text-sm text-ink-2 mt-2 bg-cream rounded-control p-2">{a.message}</p>}
                       </div>
-                      <span className="text-sm font-bold text-ink-2">{Number(a.mission?.rewardAmount).toLocaleString()}원</span>
+                      <span className="shrink-0 text-sm font-bold text-ink-2">{Number(a.mission?.rewardAmount).toLocaleString()}원</span>
                     </div>
+
+                    {/* 승인 여부를 판단할 자료 — 활동 지역 · SNS 채널 · 지난 참여 */}
+                    <dl className="mt-3 space-y-1.5 rounded-control bg-cream p-3 text-[13px]">
+                      <div className="flex gap-2">
+                        <dt className="w-[72px] shrink-0 text-muted">활동 지역</dt>
+                        <dd className="min-w-0 text-ink-2">
+                          {[a.participant?.regionSi, a.participant?.regionGu, a.participant?.regionDong]
+                            .filter(Boolean).join(' ') || '미등록'}
+                          {a.mission?.regionGu && (
+                            <span className={`ml-1.5 ${a.participant?.regionGu === a.mission.regionGu ? 'text-sage' : 'text-muted'}`}>
+                              {a.participant?.regionGu === a.mission.regionGu ? '· 미션과 같은 지역' : `· 미션은 ${a.mission.regionGu}`}
+                            </span>
+                          )}
+                        </dd>
+                      </div>
+                      <div className="flex gap-2">
+                        <dt className="w-[72px] shrink-0 text-muted">SNS 채널</dt>
+                        <dd className="flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-ink-2">
+                          {(a.participant?.snsAccounts ?? []).length === 0 && <span className="text-muted">등록 없음</span>}
+                          {(a.participant?.snsAccounts ?? []).map((sns: any) => (
+                            <a key={sns.id} href={sns.url} target="_blank" rel="noreferrer"
+                              className="text-clay underline">
+                              {SNS_LABEL[sns.platform] ?? sns.platform} {sns.handle}
+                              {sns.followerCount != null && ` (${Number(sns.followerCount).toLocaleString()})`}
+                            </a>
+                          ))}
+                        </dd>
+                      </div>
+                      <div className="flex gap-2">
+                        <dt className="w-[72px] shrink-0 text-muted">지난 참여</dt>
+                        <dd className="text-ink-2">
+                          완료 {a.history?.approved ?? 0}건 · 반려 {a.history?.rejected ?? 0}건
+                        </dd>
+                      </div>
+                    </dl>
+
                     <div className="mt-4 flex flex-wrap items-center gap-2">
-                      <PrimaryButton onClick={() => reviewApplication(a.id, 'APPROVED')}>승인</PrimaryButton>
-                      <DangerButton confirmLabel="반려할까요?" onConfirm={() => reviewApplication(a.id, 'REJECTED')}>
+                      <PrimaryButton busy={busyId === a.id} onClick={() => reviewApplication(a.id, 'APPROVED')}>승인</PrimaryButton>
+                      <DangerButton busy={busyId === a.id} confirmLabel="반려할까요?" onConfirm={() => reviewApplication(a.id, 'REJECTED')}>
                         반려
                       </DangerButton>
                     </div>
@@ -516,6 +563,7 @@ ${photoNotice}` : msg);
                     submission={s}
                     onChange={u => setSubmissions(prev => prev.map(x => (x.id === u.id ? { ...x, ...u } : x)))}
                     onReview={reviewSubmission}
+                    busy={busyId === s.id}
                   />
                 ))}
                 {submissions.length === 0 && <EmptyRow>대기 중인 제출물이 없습니다</EmptyRow>}
@@ -693,17 +741,16 @@ ${photoNotice}` : msg);
 
       {/* 사진 관리 — 미션 수정 화면이 아직 없어, 기존 미션의 사진만 여기서 바꾼다 */}
       {photoMissionId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4">
-          <div className="w-full max-w-lg rounded-box bg-paper p-5">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-serif text-section-sm font-bold">사진 관리</h2>
-              <button onClick={() => setPhotoMissionId(null)} aria-label="닫기" className="h-11 w-11 text-xl text-muted">×</button>
-            </div>
-            <MissionImageUploader missionId={photoMissionId} />
+        <Modal onClose={() => { setPhotoMissionId(null); void loadTab('missions'); }} labelledBy="photo-modal-title">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 id="photo-modal-title" className="font-serif text-section-sm font-bold">사진 관리</h2>
             <button onClick={() => { setPhotoMissionId(null); void loadTab('missions'); }}
-              className="mt-4 h-11 w-full rounded-control bg-ink text-sm font-bold text-paper">완료</button>
+              aria-label="닫기" className="h-11 w-11 text-xl text-muted">×</button>
           </div>
-        </div>
+          <MissionImageUploader missionId={photoMissionId} />
+          <button onClick={() => { setPhotoMissionId(null); void loadTab('missions'); }}
+            className="mt-4 h-11 w-full rounded-control bg-ink text-sm font-bold text-paper">완료</button>
+        </Modal>
       )}
 
       {/* 미션 수정 */}

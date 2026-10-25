@@ -143,7 +143,14 @@ router.post('/', authenticate, requireRole('PARTICIPANT'), async (req: Request, 
       throw new AppError('ALREADY_SUBMITTED', 409, '이미 제출했습니다. 수정 요청을 받은 경우 재제출을 이용하세요');
     }
 
-    const mission = await prisma.mission.findUniqueOrThrow({ where: { id: input.missionId }, select: { id: true, category: true } });
+    const mission = await prisma.mission.findUniqueOrThrow({
+      where: { id: input.missionId },
+      select: { id: true, category: true, status: true },
+    });
+    // 종료된 미션에는 후기를 받지 않는다 (화면에서도 '진행 중'에서 빠진다)
+    if (mission.status === 'CLOSED') {
+      throw new AppError('MISSION_CLOSED', 422, '종료된 미션이라 후기를 제출할 수 없습니다. 운영자에게 문의해 주세요');
+    }
     const check = await reviewCheckFields(mission, application.id, input.snsPostUrl);
 
     const submission = await prisma.submission.create({

@@ -237,7 +237,11 @@ function ParticipantBody({ initialTab }: { initialTab: string }) {
   ).length;
   const totalEarned = payouts.filter(p => p.status === 'COMPLETED').reduce((sum, p) => sum + Number(p.netAmount ?? 0), 0);
   const applyingCount = applications.filter(a => a.status === 'PENDING').length;
-  const activeApps = applications.filter(a => a.status === 'APPROVED' && payoutByMission.get(a.missionId)?.status !== 'COMPLETED');
+  // 지급까지 끝났거나 미션이 종료됐으면 '진행 중'이 아니다
+  const activeApps = applications.filter(a =>
+    a.status === 'APPROVED'
+    && payoutByMission.get(a.missionId)?.status !== 'COMPLETED'
+    && a.mission?.status !== 'CLOSED');
   /** 계좌는 지급 기록에만 남는다 — 가장 최근 것을 보여 준다 */
   const account = payouts.find(p => p.bankAccount);
 
@@ -369,11 +373,17 @@ function ParticipantBody({ initialTab }: { initialTab: string }) {
                       <div className="flex items-center gap-3">
                         <div className={`h-14 w-14 shrink-0 rounded-control ${tone.bg}`} />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-[15px] font-medium">
-                            {a.mission?.clientProfile?.businessName
-                              ? `[${a.mission.regionDong || a.mission.regionGu}] ${a.mission.clientProfile.businessName}`
-                              : a.mission?.title}
+                          {/* 무슨 미션인지가 먼저다. 가게·지역은 그 아래 보조 줄로 */}
+                          <p className="line-clamp-2 break-keep text-[15px] font-bold leading-[1.4]">
+                            {a.mission?.title ?? '미션'}
                           </p>
+                          {a.mission?.clientProfile?.businessName && (
+                            <p className="mt-[3px] truncate text-[13px] text-ink-2">
+                              {a.mission.clientProfile.businessName}
+                              {(a.mission.regionDong || a.mission.regionGu)
+                                && <span className="text-muted"> · {a.mission.regionDong || a.mission.regionGu}</span>}
+                            </p>
+                          )}
                           <p className="mt-[3px] text-xs text-muted">
                             {deadline ? <>후기 마감 {dateK(deadline)}{dday !== null && dday >= 0 && <> · <b className="font-medium text-clay">D-{dday}</b></>}</> : '일정 미정'}
                           </p>
