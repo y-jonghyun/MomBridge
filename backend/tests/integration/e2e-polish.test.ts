@@ -52,6 +52,94 @@ describeDb('화면 개선에 필요한 서버 동작', () => {
     });
   });
 
+  describe('대가 표시 확인 없이는 승인하지 않는다', () => {
+    /** 자동 확인 대상이 아닌 유형(SNS)의 검수 대기 제출물 */
+    async function submitted(category = 'SNS') {
+      const client = await createClient();
+      const participant = await createParticipant();
+      const mission = await createMission(client.profile.id, { category });
+      const application = await prisma.application.create({
+        data: { missionId: mission.id, participantId: participant.profile.id, status: 'APPROVED' },
+      });
+      const submission = await prisma.submission.create({
+        data: {
+          missionId: mission.id, applicationId: application.id, participantId: participant.profile.id,
+          status: 'SUBMITTED', contentUrl: 'https://instagram.com/p/1', snsPostUrl: 'https://instagram.com/p/1',
+        } as never,
+      });
+      return { submission, participant };
+    }
+
+    const review = (id: string, body: Record<string, unknown>) =>
+      request(app).patch(`/api/v1/submissions/${id}/review`).set(auth(operator.token)).send(body);
+    const confirm = (id: string, body: Record<string, unknown> = {}) =>
+      request(app).post(`/api/v1/submissions/${id}/disclosure-confirm`).set(auth(operator.token)).send(body);
+
+    it('체크 전에는 승인할 수 없다', async () => {
+      const { submission } = await submitted();
+
+      const res = await review(submission.id, { status: 'APPROVED' });
+
+      expect(res.status).toBe(422);
+      expect(res.body.error.code).toBe('DISCLOSURE_REQUIRED');
+      expect(res.body.error.message).toContain('체크한 뒤 승인');
+      // 정산도 만들어지지 않는다
+      expect(await prisma.payout.count()).toBe(0);
+    });
+
+    it('체크하면 누가 언제 확인했는지 남고, 그 뒤에 승인된다', async () => {
+      const { submission } = await submitted();
+
+      const checked = await confirm(submission.id);
+      expect(checked.status).toBe(200);
+      expect(checked.body.data.disclosureConfirmedBy.user.name).toBeTruthy();
+
+      const stored = await prisma.submission.findUniqueOrThrow({ where: { id: submission.id } });
+      expect(stored.disclosureCheck).toBe('MANUAL_CONFIRMED');
+      expect(stored.disclosureConfirmedById).toBe(operator.profile.id);
+      expect(stored.disclosureConfirmedAt).toBeInstanceOf(Date);
+      expect(stored.disclosureConfirmNote).toContain('직접 확인');
+
+      const audit = await prisma.auditLog.findFirstOrThrow({ where: { targetId: submission.id } });
+      expect(audit.action).toBe('SUBMISSION_DISCLOSURE_MANUAL_CONFIRM');
+
+      expect((await review(submission.id, { status: 'APPROVED' })).status).toBe(200);
+      expect(await prisma.payout.count()).toBe(1);
+    });
+
+    it('반려·수정 요청은 체크하지 않아도 할 수 있다', async () => {
+      const { submission } = await submitted();
+
+      const res = await review(submission.id, { status: 'REVISION', rejectionReason: '대가 표시를 넣어 주세요' });
+
+      expect(res.status).toBe(200);
+    });
+
+    it('이미 검수가 끝난 제출물은 확인 처리하지 않는다', async () => {
+      const { submission } = await submitted();
+      await confirm(submission.id);
+      await review(submission.id, { status: 'APPROVED' });
+      const approved = await prisma.submission.findUniqueOrThrow({ where: { id: submission.id } });
+
+      const again = await confirm(submission.id, { reason: '다시 확인' });
+
+      expect(again.status).toBe(409);
+      const after = await prisma.submission.findUniqueOrThrow({ where: { id: submission.id } });
+      expect(after.disclosureConfirmedAt).toEqual(approved.disclosureConfirmedAt);
+      expect(after.disclosureConfirmNote).toBe(approved.disclosureConfirmNote);
+    });
+
+    it('리뷰(블로그) 캠페인은 전처럼 사유를 받는다', async () => {
+      const { submission } = await submitted('REVIEW');
+      await prisma.submission.update({
+        where: { id: submission.id }, data: { disclosureCheck: 'NEEDS_MANUAL_REVIEW' },
+      });
+
+      expect((await confirm(submission.id)).status).toBe(400);
+      expect((await confirm(submission.id, { reason: '본문 첫 이미지에서 확인' })).status).toBe(200);
+    });
+  });
+
   describe('지원서 승인 화면이 쓸 자료', () => {
     it('활동 지역·SNS 채널·지난 참여를 함께 내려준다', async () => {
       const client = await createClient();
