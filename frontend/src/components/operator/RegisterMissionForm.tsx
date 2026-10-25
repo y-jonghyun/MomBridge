@@ -46,6 +46,25 @@ export interface ClientOption {
   user?: { email?: string | null } | null;
 }
 
+/**
+ * 고객사 목록의 한 줄. 가게 이름이 없는 계정은 그 사실을 먼저 적는다.
+ * (이름 없이 "(이메일) · 연락처 없음"만 뜨면 누구인지 알 수 없었다)
+ */
+export function clientOptionLabel(c: ClientOption): string {
+  const email = c.user?.email ?? '이메일 없음';
+  if (!c.businessName?.trim()) return `가게 이름 미등록 · ${email}`;
+  return `${c.businessName} (${email})${c.contactPhone ? ` · ${c.contactPhone}` : ' · 연락처 없음'}`;
+}
+
+/** 가게 이름이 있는 계정을 먼저, 이름 없는 계정은 맨 아래로 */
+export function sortClientOptions(clients: ClientOption[]): ClientOption[] {
+  return [...clients].sort((a, b) => {
+    const named = Number(!!b.businessName?.trim()) - Number(!!a.businessName?.trim());
+    if (named !== 0) return named;
+    return (a.businessName || a.user?.email || '').localeCompare(b.businessName || b.user?.email || '', 'ko');
+  });
+}
+
 const input = 'w-full rounded-control border border-line bg-paper px-3 py-2 text-sm outline-none focus:border-ink';
 const label = 'mb-1 block text-sm font-medium text-ink-2';
 
@@ -90,6 +109,7 @@ export default function RegisterMissionForm({
   submitLabel?: string;
 }) {
   const chosen = clients.find(c => c.id === form.clientProfileId);
+  const sortedClients = sortClientOptions(clients);
   const editing = mode === 'edit';
 
   /** 이 칸이 잠겼는지와 이유 */
@@ -115,7 +135,7 @@ export default function RegisterMissionForm({
       <Section step={1} title="기본 정보">
         {editing ? (
           <p className="text-sm text-ink-2">
-            고객사 <strong className="text-ink">{chosen?.businessName ?? form.clientProfileId}</strong>
+            고객사 <strong className="text-ink">{chosen?.businessName?.trim() || '가게 이름 미등록'}</strong>
             <span className="ml-1 text-xs text-muted">(수정 화면에서는 바꿀 수 없어요)</span>
           </p>
         ) : (
@@ -136,10 +156,8 @@ export default function RegisterMissionForm({
                 if (!form.businessCategory && picked.businessCategory) set('businessCategory', picked.businessCategory);
               }}>
               <option value="">고객사를 선택하세요</option>
-              {clients.map(c => (
-                <option key={c.id} value={c.id}>
-                  {c.businessName} ({c.user?.email}){c.contactPhone ? ` · ${c.contactPhone}` : ' · 연락처 없음'}
-                </option>
+              {sortedClients.map(c => (
+                <option key={c.id} value={c.id}>{clientOptionLabel(c)}</option>
               ))}
             </select>
             {clients.length === 0 && (

@@ -15,35 +15,37 @@ const BASE = 'inline-flex h-9 shrink-0 items-center justify-center gap-1 whitesp
 
 /** 주 동작 */
 export function PrimaryButton({
-  children, onClick, disabled, title, tone = 'ink', type = 'button',
+  children, onClick, disabled, busy, title, tone = 'ink', type = 'button',
 }: {
   children: React.ReactNode;
   onClick?: () => void;
   disabled?: boolean;
+  /** 처리 중이면 눌리지 않고 '처리 중…'으로 바뀐다 (두 번 눌러 중복 처리되는 것을 막는다) */
+  busy?: boolean;
   title?: string;
   tone?: 'ink' | 'clay';
   type?: 'button' | 'submit';
 }) {
   return (
     <button
-      type={type} onClick={onClick} disabled={disabled} title={title}
+      type={type} onClick={onClick} disabled={disabled || busy} title={title}
       className={`${BASE} ${tone === 'clay' ? 'bg-clay text-paper' : 'bg-ink text-paper'}`}
     >
-      {children}
+      {busy ? '처리 중…' : children}
     </button>
   );
 }
 
 /** 보조 동작 — 테두리만 */
 export function QuietButton({
-  children, onClick, disabled, title,
+  children, onClick, disabled, busy, title,
 }: {
-  children: React.ReactNode; onClick?: () => void; disabled?: boolean; title?: string;
+  children: React.ReactNode; onClick?: () => void; disabled?: boolean; busy?: boolean; title?: string;
 }) {
   return (
-    <button type="button" onClick={onClick} disabled={disabled} title={title}
+    <button type="button" onClick={onClick} disabled={disabled || busy} title={title}
       className={`${BASE} border border-line bg-paper text-ink-2`}>
-      {children}
+      {busy ? '처리 중…' : children}
     </button>
   );
 }
@@ -53,16 +55,27 @@ export function QuietButton({
  * 확인 창은 브라우저 confirm 대신 버튼 자리에서 바로 묻는다 (화면이 멈추지 않게).
  */
 export function DangerButton({
-  children, confirmLabel = '정말 할까요?', onConfirm, disabled, title,
+  children, confirmLabel = '정말 할까요?', onConfirm, disabled, busy, title,
 }: {
   children: React.ReactNode;
   /** 확인 단계에서 보여 줄 문구 */
   confirmLabel?: string;
   onConfirm: () => void;
   disabled?: boolean;
+  /** 처리 중이면 눌리지 않고 '처리 중…'으로 바뀐다 */
+  busy?: boolean;
   title?: string;
 }) {
   const [asking, setAsking] = useState(false);
+
+  if (busy) {
+    return (
+      <button type="button" disabled
+        className={`${BASE} border border-clay-dark bg-paper text-clay-dark`}>
+        처리 중…
+      </button>
+    );
+  }
 
   if (asking) {
     return (

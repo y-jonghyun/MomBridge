@@ -91,6 +91,8 @@ export default function MissionDetailPage() {
     try {
       await api.post('/submissions/apply', { missionId: id, message: applyMsg });
       setApplied(true);
+      // 신청 현황을 바로 반영한다 (다시 불러오지 않아도 숫자가 맞게)
+      setMission((prev: any) => (prev ? { ...prev, currentCount: (prev.currentCount ?? 0) + 1 } : prev));
     } catch (err: any) {
       alert(err?.response?.data?.error?.message ?? '지원에 실패했습니다');
     } finally { setApplying(false); }
@@ -124,15 +126,18 @@ export default function MissionDetailPage() {
   const images: { id: string; url: string }[] = mission.images ?? [];
   const momTags: string[] = mission.momTags ?? [];
 
+  const visitFrom = mission.announceDate ?? mission.endDate;
+
   const steps: ScheduleStep[] = [
     { label: '신청', when: `${day(mission.startDate)} – ${day(mission.endDate)}`, current: isOpen, note: isOpen && dday >= 0 ? (dday === 0 ? 'D-Day' : `D-${dday}`) : null },
     // 발표일을 적지 않은 미션은 이 단계를 보여주지 않는다
     { label: '선정 발표', when: mission.announceDate ? day(mission.announceDate) : null },
-    // 제출 마감이 모집 마감보다 앞서는 데이터도 있어, 역전되면 마감일만 보여준다
+    // 선정 발표일이 있으면 그날부터 다닐 수 있다. 없으면 신청 마감 다음이다.
+    // 제출 마감이 그보다 앞서는 데이터도 있어, 역전되면 마감일만 보여준다
     {
       label: '방문 · 후기 등록',
-      when: new Date(mission.submissionDeadline) > new Date(mission.endDate)
-        ? `${day(mission.endDate)} – ${day(mission.submissionDeadline)}`
+      when: new Date(mission.submissionDeadline) > new Date(visitFrom)
+        ? `${day(visitFrom)} – ${day(mission.submissionDeadline)}`
         : `${day(mission.submissionDeadline)}까지`,
       current: !isOpen,
     },
