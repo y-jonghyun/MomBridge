@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { BottomTabBar, BottomTabBarSpacer, SiteHeader } from '@/components/ui';
 import api from '@/lib/api';
-import { useAuthStore } from '@/store/auth';
+import { useAuthHydrated, useAuthStore } from '@/store/auth';
 
 const CATEGORIES = [
   { key: 'ALL', label: '전체' },
@@ -37,7 +37,7 @@ type SortKey = 'NEWEST' | 'POPULAR' | 'VIEWS';
 export default function CommunityPage() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
-  const [hydrated, setHydrated] = useState(false);
+  const hydrated = useAuthHydrated();
 
   const [tab, setTab] = useState<'LIST' | 'BEST' | 'MY'>('LIST');
   const [category, setCategory] = useState('ALL');
@@ -54,8 +54,6 @@ export default function CommunityPage() {
   const [showWrite, setShowWrite] = useState(false);
   const [writeForm, setWriteForm] = useState({ category: '체험후기', title: '', content: '' });
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => { setHydrated(true); }, []);
 
   const loadPosts = useCallback(async (p = 1, cat = category, s = sort, kw = keyword) => {
     setLoading(true);

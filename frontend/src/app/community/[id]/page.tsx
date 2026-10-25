@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { HeartIcon } from '@/components/ui/icons';
 import api from '@/lib/api';
-import { useAuthStore } from '@/store/auth';
+import { useAuthHydrated, useAuthStore } from '@/store/auth';
 
 const ROLE_BADGE: Record<string, string> = {
   OPERATOR: 'bg-clay-tint text-ink-2',
@@ -27,6 +27,7 @@ export default function CommunityPostPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
+  const hydrated = useAuthHydrated();
   const [post, setPost] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [comment, setComment] = useState('');
@@ -44,6 +45,8 @@ export default function CommunityPostPage() {
   }, [id]);
 
   async function handleLike() {
+    // 로그인 정보를 다 읽기 전에는 판단하지 않는다
+    if (!hydrated) return;
     if (!user) { router.push('/login'); return; }
     try {
       const r = await api.post(`/community/posts/${id}/like`);
@@ -54,6 +57,7 @@ export default function CommunityPostPage() {
 
   async function handleComment(e: React.FormEvent) {
     e.preventDefault();
+    if (!hydrated) return;
     if (!user) { router.push('/login'); return; }
     if (!comment.trim()) return;
     setSubmittingComment(true);

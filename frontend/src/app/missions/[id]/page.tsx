@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
-import { useAuthStore } from '@/store/auth';
+import { useAuthHydrated, useAuthStore } from '@/store/auth';
 import { KeywordBox, NoticeBox, ScheduleTimeline, StickyCTA, Tag, type ScheduleStep } from '@/components/ui';
 import { CameraIcon, ChevronLeftIcon, DocIcon, KeywordIcon, LinkIcon, PinIcon, ShareIcon } from '@/components/ui/icons';
 import MissionGallery from '@/components/missions/MissionGallery';
@@ -54,6 +54,7 @@ export default function MissionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const user = useAuthStore(s => s.user);
+  const hydrated = useAuthHydrated();
   const [mission, setMission] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [applyMsg, setApplyMsg] = useState('');
@@ -81,6 +82,8 @@ export default function MissionDetailPage() {
   }, [canSave]);
 
   async function handleApply() {
+    // 로그인 정보를 다 읽기 전에는 판단하지 않는다
+    if (!hydrated) return;
     if (!user) { router.push('/login'); return; }
     // 프로필이 덜 찼으면 지원 대신 프로필 화면으로 보낸다 (서버도 422로 막는다)
     if (profileComplete === false) { router.push('/participant?tab=profile'); return; }

@@ -4,10 +4,13 @@ import { useAuthStore } from '@/store/auth';
 const baseURL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api/v1';
 
 // Render 무료 플랜은 잠들었다 깨는 데 최대 50초쯤 걸린다 → 첫 요청이 시간 초과로 실패하지 않게 넉넉히
+//
+// Content-Type은 **기본값으로 두지 않는다.** 'application/json'을 깔아 두면 axios가
+// FormData까지 JSON으로 바꿔 보내서 파일이 통째로 빠진다(사진 업로드가 400으로 실패했다).
+// 평범한 객체는 axios가 알아서 application/json으로, FormData는 multipart로 보낸다.
 const api = axios.create({
   baseURL,
   timeout: 70_000,
-  headers: { 'Content-Type': 'application/json' },
 });
 
 // ── 서버 기동 대기 안내 ──
@@ -43,6 +46,11 @@ const AUTH_PATHS = ['/auth/login', '/auth/register', '/auth/refresh'];
 const isAuthRequest = (url?: string) => !!url && AUTH_PATHS.some(p => url.startsWith(p));
 
 api.interceptors.request.use((config: RetryConfig) => {
+  // 혹시 어딘가에서 Content-Type을 json으로 지정해도 파일 전송은 지켜 준다
+  // (경계 문자열이 들어간 multipart 헤더는 axios가 직접 만들어야 한다)
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
   const token = typeof window !== 'undefined' ? useAuthStore.getState().token : null;
   if (token && !isAuthRequest(config.url)) config.headers.Authorization = `Bearer ${token}`;
   if (typeof window !== 'undefined' && !config._tracked) { config._tracked = true; requestStarted(); }
