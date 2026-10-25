@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
 import { syncSelfClickCookie } from '@/lib/self-click';
-import { useAuthStore } from '@/store/auth';
+import { useAuthHydrated, useAuthStore } from '@/store/auth';
 import { PostCheckSummary, ReviewGuideModal } from '@/components/campaign/ReviewGuide';
 import { BottomTabBar, BottomTabBarSpacer, CategoryTabs, SiteHeader } from '@/components/ui';
 import { photoTone } from '@/components/ui/MissionCard';
@@ -89,7 +89,7 @@ function ParticipantBody({ initialTab }: { initialTab: string }) {
   const user = useAuthStore(s => s.user);
   const clearAuth = useAuthStore(s => s.clearAuth);
 
-  const [hydrated, setHydrated] = useState(false);
+  const hydrated = useAuthHydrated();
   // 가입 직후 ?tab=profile 로 들어온다
   const [tab, setTab] = useState<Tab>(
     () => (TABS.some(t => t.value === initialTab) ? (initialTab as Tab) : 'active'),
@@ -127,8 +127,6 @@ function ParticipantBody({ initialTab }: { initialTab: string }) {
     document.addEventListener('mousedown', onClickOutside);
     return () => document.removeEventListener('mousedown', onClickOutside);
   }, []);
-
-  useEffect(() => { setHydrated(true); }, []);
 
   const loadAll = useCallback(async () => {
     setLoading(true);

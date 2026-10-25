@@ -1,4 +1,5 @@
 'use client';
+import { useEffect, useState } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
@@ -33,3 +34,24 @@ export const useAuthStore = create<AuthState>()(
     { name: 'mombridge-auth' }
   )
 );
+
+/**
+ * 저장해 둔 로그인 정보를 다 읽어 왔는지.
+ *
+ * 첫 그림(서버와 맞추는 렌더)에서는 저장소를 읽기 전이라 user가 null이다.
+ * 그때 화면 가드가 돌면 토큰이 멀쩡한데도 /login으로 튕긴다
+ * (주소창으로 열거나 새로고침할 때만 생기고, 앱 안에서 이동하면 멀쩡해 보인다).
+ *
+ * 그래서 **가드는 이 값이 true가 된 다음에만** 판단한다. 그 전에는 기존 로딩 화면을 보여 준다.
+ */
+export function useAuthHydrated(): boolean {
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    // 이미 끝났으면 바로, 아직이면 끝날 때 알려 준다
+    if (useAuthStore.persist.hasHydrated()) setHydrated(true);
+    return useAuthStore.persist.onFinishHydration(() => setHydrated(true));
+  }, []);
+
+  return hydrated;
+}

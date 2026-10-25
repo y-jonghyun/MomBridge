@@ -232,12 +232,37 @@ export default function MissionImageUploader({
   );
 }
 
-/** 미션을 만든 뒤, 등록 화면에서 고른 파일을 차례로 올린다 */
-export async function uploadPendingImages(missionId: string, pending: PendingImage[]) {
+/**
+ * 미션을 만든 뒤, 등록 화면에서 고른 파일을 차례로 올린다.
+ * 한 장이 실패해도 나머지는 계속 올리고, 몇 장이 빠졌는지 돌려준다
+ * (등록 화면이 '사진 n장을 올리지 못했어요'를 그대로 보여 준다).
+ */
+export interface PendingUploadResult {
+  uploaded: number;
+  failed: number;
+}
+
+export async function uploadPendingImages(
+  missionId: string, pending: PendingImage[],
+): Promise<PendingUploadResult> {
+  let uploaded = 0;
+  let failed = 0;
   for (const item of pending) {
-    const body = new FormData();
-    body.append('image', item.file);
-    await api.post(`/missions/${missionId}/images`, body);
+    try {
+      const body = new FormData();
+      body.append('image', item.file);
+      await api.post(`/missions/${missionId}/images`, body);
+      uploaded++;
+    } catch {
+      failed++;
+    }
     URL.revokeObjectURL(item.previewUrl);
   }
+  return { uploaded, failed };
+}
+
+/** 등록 화면에서 보여 줄 안내. 다 올라갔으면 빈 문자열 */
+export function pendingUploadNotice(failed: number, where: string): string {
+  if (failed <= 0) return '';
+  return `미션은 등록됐지만 사진 ${failed}장을 올리지 못했어요. ${where}에서 다시 올려 주세요.`;
 }

@@ -3,9 +3,9 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
-import { useAuthStore } from '@/store/auth';
+import { useAuthHydrated, useAuthStore } from '@/store/auth';
 import { LogOutIcon } from '@/components/ui/icons';
-import MissionImageUploader, { uploadPendingImages, type PendingImage } from '@/components/missions/MissionImageUploader';
+import MissionImageUploader, { pendingUploadNotice, uploadPendingImages, type PendingImage } from '@/components/missions/MissionImageUploader';
 import { missionDateError } from '@/lib/mission-dates';
 import { SubmissionCheckPanel, TrafficSummary } from '@/components/operator/OperatorCampaignTools';
 import SettingsEditor from '@/components/operator/SettingsEditor';
@@ -33,6 +33,7 @@ const ROLE_LABEL: Record<string, string> = { OPERATOR: '운영자', PARTICIPANT:
 export default function OperatorDashboard() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
+  const hydrated = useAuthHydrated();
   const clearAuth = useAuthStore((s) => s.clearAuth);
   const [tab, setTab] = useState<Tab>('overview');
   const [stats, setStats] = useState<Record<string, number> & { missionsByStatus?: { status: string; _count: number }[] } | null>(null);
@@ -58,10 +59,12 @@ export default function OperatorDashboard() {
   const [registerSubmitting, setRegisterSubmitting] = useState(false);
 
   useEffect(() => {
+    // 저장해 둔 로그인 정보를 다 읽기 전에는 판단하지 않는다 (새로고침 때 /login으로 튕기던 원인)
+    if (!hydrated) return;
     if (!user) { router.push('/login'); return; }
     if (user.role !== 'OPERATOR') { router.push('/'); return; }
     loadStats();
-  }, [user]);
+  }, [user, hydrated]);
 
   async function loadStats() {
     const { data } = await api.get('/operator/stats');
@@ -164,15 +167,21 @@ export default function OperatorDashboard() {
       });
       // 등록 화면에서 고른 사진을 만들어진 미션에 올린다 (실패해도 미션은 남는다)
       const createdId = createdRes?.data?.id;
-      if (pendingImages.length > 0 && createdId) {
-        await uploadPendingImages(createdId, pendingImages)
-          .catch(() => alert('미션은 등록됐지만 사진을 올리지 못했습니다. 미션 관리에서 다시 올려 주세요.'));
+      let photoNotice = '';
+      if (pendingImages.length > 0) {
+        const { failed } = createdId
+          ? await uploadPendingImages(createdId, pendingImages)
+          : { failed: pendingImages.length };
+        photoNotice = pendingUploadNotice(failed, '미션 관리 > 사진');
         setPendingImages([]);
       }
       const msg = sendPaymentLink
         ? '미션이 등록됐습니다. 고객사에게 결제 링크를 발송했습니다.'
         : '미션이 등록됐습니다 (결제 면제).';
-      alert(msg);
+      // 사진이 빠졌으면 성공만 알리고 끝내지 않는다
+      alert(photoNotice ? `${msg}
+
+${photoNotice}` : msg);
       setRegisterForm({
         clientProfileId: '', title: '', description: '', category: 'SNS',
         rewardAmount: '', maxParticipants: '5', regionSi: '', regionGu: '',
@@ -189,7 +198,7 @@ export default function OperatorDashboard() {
   const rf = (k: keyof typeof registerForm, v: string | boolean | string[]) =>
     setRegisterForm(prev => ({ ...prev, [k]: v }));
 
-  if (!user) return null;
+  if (!hydrated || !user) return null;
 
   const tabs: { key: Tab; label: string; badge?: number }[] = [
     { key: 'overview', label: '개요' },

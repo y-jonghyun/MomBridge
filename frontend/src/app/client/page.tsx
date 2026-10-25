@@ -3,13 +3,13 @@ import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
-import { useAuthStore } from '@/store/auth';
+import { useAuthHydrated, useAuthStore } from '@/store/auth';
 import { LogOutIcon } from '@/components/ui/icons';
 import KeywordRecommender, { KeywordSelection } from '@/components/campaign/KeywordRecommender';
 import CampaignPanel from '@/components/campaign/CampaignPanel';
 import ProvinceSelect from '@/components/common/ProvinceSelect';
 import { CategoryTabs, SiteHeader } from '@/components/ui';
-import MissionImageUploader, { uploadPendingImages, type PendingImage } from '@/components/missions/MissionImageUploader';
+import MissionImageUploader, { pendingUploadNotice, uploadPendingImages, type PendingImage } from '@/components/missions/MissionImageUploader';
 import { BUSINESS_CATEGORIES, MOM_TAGS } from '@/lib/mission-options';
 import { formatPhone, isMobilePhone, phoneDigits } from '@/lib/phone';
 import { ClientPerformanceCard, MissionProgress, clientMissionStage } from '@/components/client/ClientOverview';
@@ -76,7 +76,7 @@ function ClientPageContent() {
   const searchParams = useSearchParams();
   const user = useAuthStore((s) => s.user);
   const clearAuth = useAuthStore((s) => s.clearAuth);
-  const [hydrated, setHydrated] = useState(false);
+  const hydrated = useAuthHydrated();
   const [tab, setTab] = useState<Tab>('my-missions');
   const [missions, setMissions] = useState<any[]>([]);
   const [form, setForm] = useState(defaultForm);
@@ -91,8 +91,6 @@ function ClientPageContent() {
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [storeComplete, setStoreComplete] = useState(true);
   const [editMissionId, setEditMissionId] = useState<string | null>(null);
-
-  useEffect(() => { setHydrated(true); }, []);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -209,12 +207,21 @@ function ClientPageContent() {
         paymentKey, orderId, amount,
       });
       const created = createdRes?.data;
-      alert('미션이 등록됐습니다. 운영자 승인 후 오픈됩니다.');
       // 등록 화면에서 고른 사진을 만들어진 미션에 올린다 (실패해도 미션은 남는다)
-      if (pendingImages.length > 0 && created?.id) {
-        await uploadPendingImages(created.id, pendingImages).catch(() => alert('미션은 등록됐지만 사진을 올리지 못했습니다. 미션 목록에서 다시 올려 주세요.'));
+      let photoNotice = '';
+      if (pendingImages.length > 0) {
+        const { failed } = created?.id
+          ? await uploadPendingImages(created.id, pendingImages)
+          : { failed: pendingImages.length };
+        photoNotice = pendingUploadNotice(failed, "내 미션 > '수정' > 사진");
         setPendingImages([]);
       }
+      // 사진이 빠졌으면 성공만 알리고 끝내지 않는다
+      alert(photoNotice
+        ? `미션이 등록됐습니다. 운영자 승인 후 오픈됩니다.
+
+${photoNotice}`
+        : '미션이 등록됐습니다. 운영자 승인 후 오픈됩니다.');
       setForm(defaultForm);
       setKeywords(null);
       router.replace('/client');
