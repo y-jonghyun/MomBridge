@@ -30,6 +30,8 @@ describeDb('정산 금액 계산', () => {
         missionId: mission.id, applicationId: application.id, participantId: participant.profile.id,
         status: 'SUBMITTED', contentUrl: 'https://blog.naver.com/a/1',
         snsPostUrl: 'https://blog.naver.com/a/1',
+        // 이 테스트의 관심사는 정산 금액이라 대가 표시는 확인된 상태로 둔다
+        disclosureCheck: 'MANUAL_CONFIRMED',
       } as never,
     });
 
