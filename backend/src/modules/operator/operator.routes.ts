@@ -31,6 +31,9 @@ const createClientSchema = z.object({
   contactPhone: z.string().trim().max(20).optional(),
 });
 
+/** 가게 정보 수정 — 보낸 칸만 바꾼다. 이메일·비밀번호는 이 경로로 바꾸지 않는다 */
+const updateClientSchema = createClientSchema.partial();
+
 /** 메일이 가지 않는 내부용 주소. 이 도메인으로는 어떤 메일·알림도 보내지 않는다 */
 const MANAGED_EMAIL_DOMAIN = 'managed.mombridge.local';
 export const isManagedEmail = (email: string) => email.toLowerCase().endsWith(`@${MANAGED_EMAIL_DOMAIN}`);
@@ -274,6 +277,9 @@ router.get('/users', async (req: Request, res: Response, next: NextFunction) => 
       take: 100,
       select: {
         id: true, email: true, name: true, role: true, isActive: true, createdAt: true, lastLoginAt: true, phone: true,
+        managedByOperator: true,
+        // 고객사 줄에서 '가게 정보'를 바로 열 수 있게 가게 id와 이름을 함께 준다
+        clientProfile: { select: { id: true, businessName: true } },
       },
     });
     res.json({ success: true, data: users.map(u => ({ ...u, phone: maskPhone(u.phone) })) });
@@ -399,6 +405,100 @@ router.post('/clients', async (req: Request, res: Response, next: NextFunction) 
         ...created,
         contactPhone: formatPhone(created.user.phone ?? '') || null,
         managedByOperator: true,
+      },
+    });
+  } catch (e) { next(e); }
+});
+
+/**
+ * 가게 정보 수정 — 이름·업종·지역·주소·대표 연락처.
+ *
+ * 운영자가 만든 가게와 직접 가입한 고객사 모두 고칠 수 있다.
+ * 다만 **이메일과 비밀번호는 이 경로로 바꾸지 않는다** — 본인 계정의 로그인 수단이라서다.
+ * 이미 등록된 미션의 지역은 미션마다 따로 저장돼 있어 함께 바꾸지 않는다(가게 이름은 참조라 바로 반영된다).
+ */
+router.patch('/clients/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const input = parseInput(updateClientSchema, req.body);
+    const before = await prisma.clientProfile.findUnique({
+      where: { id: req.params.id },
+      select: {
+        id: true, businessName: true, businessCategory: true, address: true,
+        regionSi: true, regionGu: true, regionDong: true,
+        user: { select: { id: true, phone: true } },
+      },
+    });
+    if (!before) throw new AppError('NOT_FOUND', 404, '가게를 찾을 수 없습니다');
+
+    const phone = input.contactPhone === undefined
+      ? undefined
+      : (input.contactPhone ? normalizePhone(input.contactPhone) : null);
+    if (phone) {
+      const taken = await prisma.user.findUnique({ where: { phone }, select: { id: true } });
+      if (taken && taken.id !== before.user.id) {
+        throw new AppError('PHONE_TAKEN', 409, '이미 등록된 연락처입니다. 다른 번호를 적어 주세요');
+      }
+    }
+
+    const updated = await prisma.clientProfile.update({
+      where: { id: before.id },
+      data: {
+        ...(input.businessName !== undefined && { businessName: input.businessName }),
+        ...(input.businessCategory !== undefined && {
+          businessCategory: input.businessCategory,
+          category: input.businessCategory,
+        }),
+        ...(input.regionSi !== undefined && { regionSi: input.regionSi }),
+        ...(input.regionGu !== undefined && { regionGu: input.regionGu }),
+        ...(input.regionDong !== undefined && { regionDong: input.regionDong || null }),
+        ...(input.address !== undefined && { address: input.address ?? '' }),
+        ...(phone !== undefined && { user: { update: { phone } } }),
+      },
+      select: {
+        id: true, businessName: true, category: true, businessCategory: true,
+        address: true, regionSi: true, regionGu: true, regionDong: true,
+        user: { select: { id: true, name: true, email: true, phone: true, managedByOperator: true } },
+      },
+    });
+
+    // 무엇이 바뀌었는지만 남긴다
+    const changedBefore: Record<string, unknown> = {};
+    const changedAfter: Record<string, unknown> = {};
+    const fields = ['businessName', 'businessCategory', 'address', 'regionSi', 'regionGu', 'regionDong'] as const;
+    for (const field of fields) {
+      if (before[field] !== updated[field]) {
+        changedBefore[field] = before[field];
+        changedAfter[field] = updated[field];
+      }
+    }
+    if (phone !== undefined && before.user.phone !== updated.user.phone) {
+      // 번호 자체는 기록에 남기지 않는다 (바뀌었다는 사실만)
+      changedBefore.contactPhone = before.user.phone ? '있음' : '없음';
+      changedAfter.contactPhone = updated.user.phone ? '있음' : '없음';
+    }
+
+    if (Object.keys(changedAfter).length > 0) {
+      await prisma.auditLog.create({
+        data: {
+          actorId: req.user!.sub,
+          action: 'OPERATOR_CLIENT_UPDATE',
+          targetTable: 'client_profiles',
+          targetId: before.id,
+          before: changedBefore as object,
+          after: changedAfter as object,
+          ipAddress: req.ip ?? null,
+          userAgent: req.get('user-agent')?.slice(0, 500) ?? null,
+        },
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        ...updated,
+        contactPhone: formatPhone(updated.user.phone ?? '') || null,
+        managedByOperator: updated.user.managedByOperator,
+        changed: Object.keys(changedAfter),
       },
     });
   } catch (e) { next(e); }
