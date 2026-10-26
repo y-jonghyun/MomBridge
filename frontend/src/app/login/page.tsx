@@ -62,8 +62,9 @@ function LoginForm() {
       title="로그인"
       footer={
         <>
-          <p><Link href="/forgot-password" className="text-muted">비밀번호를 잊으셨나요?</Link></p>
-          <p>계정이 없으신가요? <Link href="/register" className="font-medium text-clay">회원가입</Link></p>
+          {/* 글 안의 링크라 세로 패딩으로만 누를 영역을 넓힌다 */}
+          <p><Link href="/forgot-password" className="py-3.5 text-muted">비밀번호를 잊으셨나요?</Link></p>
+          <p>계정이 없으신가요? <Link href="/register" className="py-3.5 font-medium text-clay">회원가입</Link></p>
         </>
       }
     >

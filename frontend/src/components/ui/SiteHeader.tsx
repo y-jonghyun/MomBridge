@@ -43,7 +43,7 @@ export default function SiteHeader({
 
   return (
     <header className="mx-auto flex w-full max-w-shell items-center justify-between gap-6 px-5 pb-3 pt-[18px]">
-      <Link href="/" className="flex shrink-0 flex-col text-ink">
+      <Link href="/" className="flex min-h-[44px] shrink-0 flex-col justify-center text-ink">
         <span className="font-accent text-[13px] italic tracking-[0.08em] text-muted">MomBridge</span>
         <span className="font-serif text-[22px] font-bold tracking-[-0.02em]">맘브릿지</span>
       </Link>
