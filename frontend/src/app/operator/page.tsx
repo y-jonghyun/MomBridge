@@ -14,8 +14,8 @@ import SettingsEditor from '@/components/operator/SettingsEditor';
 import PayoutAccount from '@/components/operator/PayoutAccount';
 import SubmissionReviewCard from '@/components/operator/SubmissionReviewCard';
 import MissionEditModal from '@/components/missions/MissionEditModal';
-import RegisterMissionForm from '@/components/operator/RegisterMissionForm';
-import CreateClientModal from '@/components/operator/CreateClientModal';
+import RegisterMissionForm, { type ClientOption } from '@/components/operator/RegisterMissionForm';
+import ShopFormModal from '@/components/operator/ShopFormModal';
 import {
   CardList, CardRow, DangerButton, EmptyRow, PrimaryButton, QuietButton,
   ShortDate, StatusBadge, TableBox, TableHead, Won,
@@ -62,8 +62,21 @@ export default function OperatorDashboard() {
   const [registerSubmitting, setRegisterSubmitting] = useState(false);
   /** 지금 처리 중인 지원서·제출물 id (버튼을 '처리 중…'으로 막는다) */
   const [busyId, setBusyId] = useState<string | null>(null);
-  /** 가게 대신 등록 창 */
-  const [creatingClient, setCreatingClient] = useState(false);
+  /** 가게 창 — 'new'면 새로 등록, 가게를 담으면 그 가게를 고친다 */
+  const [shopForm, setShopForm] = useState<'new' | ClientOption | null>(null);
+
+  /** 회원 관리에서 고객사 줄의 '가게 정보'를 눌렀을 때 — 가게 자료를 받아 창을 연다 */
+  async function openShopForm(clientProfileId: string) {
+    try {
+      const { data } = await api.get('/operator/clients');
+      const found = (data.data as ClientOption[]).find(c => c.id === clientProfileId);
+      if (!found) { alert('가게를 찾을 수 없습니다'); return; }
+      setClients(data.data);
+      setShopForm(found);
+    } catch {
+      alert('가게 정보를 불러오지 못했습니다');
+    }
+  }
 
   useEffect(() => {
     // 저장해 둔 로그인 정보를 다 읽기 전에는 판단하지 않는다 (새로고침 때 /login으로 튕기던 원인)
@@ -667,7 +680,8 @@ ${photoNotice}` : msg);
                 onPendingChange={setPendingImages}
                 submitting={registerSubmitting}
                 onSubmit={handleRegisterMission}
-                onCreateClient={() => setCreatingClient(true)}
+                onCreateClient={() => setShopForm('new')}
+                onEditClient={client => setShopForm(client)}
               />
             </div>
           )}
@@ -694,15 +708,20 @@ ${photoNotice}` : msg);
                           </StatusBadge>
                         </div>
                       </div>
-                      {u.id !== user.id && (
-                        u.isActive
-                          ? (
-                            <DangerButton confirmLabel="비활성화할까요?" onConfirm={() => toggleUserActive(u.id, u.isActive)}>
-                              비활성화
-                            </DangerButton>
-                          )
-                          : <PrimaryButton onClick={() => toggleUserActive(u.id, u.isActive)}>활성화</PrimaryButton>
-                      )}
+                      <div className="flex shrink-0 flex-col items-end gap-1.5">
+                        {u.clientProfile && (
+                          <QuietButton onClick={() => openShopForm(u.clientProfile.id)}>가게 정보</QuietButton>
+                        )}
+                        {u.id !== user.id && (
+                          u.isActive
+                            ? (
+                              <DangerButton confirmLabel="비활성화할까요?" onConfirm={() => toggleUserActive(u.id, u.isActive)}>
+                                비활성화
+                              </DangerButton>
+                            )
+                            : <PrimaryButton onClick={() => toggleUserActive(u.id, u.isActive)}>활성화</PrimaryButton>
+                        )}
+                      </div>
                     </div>
                   </CardRow>
                 ))}
@@ -730,15 +749,20 @@ ${photoNotice}` : msg);
                         <td className="px-4 py-3 text-muted"><ShortDate value={u.createdAt} /></td>
                         <td className="px-4 py-3 text-muted"><ShortDate value={u.lastLoginAt} /></td>
                         <td className="px-4 py-3">
-                          {u.id !== user.id && (
-                            u.isActive
-                              ? (
-                                <DangerButton confirmLabel="비활성화할까요?" onConfirm={() => toggleUserActive(u.id, u.isActive)}>
-                                  비활성화
-                                </DangerButton>
-                              )
-                              : <PrimaryButton onClick={() => toggleUserActive(u.id, u.isActive)}>활성화</PrimaryButton>
-                          )}
+                          <div className="flex items-center gap-1.5">
+                            {u.clientProfile && (
+                              <QuietButton onClick={() => openShopForm(u.clientProfile.id)}>가게 정보</QuietButton>
+                            )}
+                            {u.id !== user.id && (
+                              u.isActive
+                                ? (
+                                  <DangerButton confirmLabel="비활성화할까요?" onConfirm={() => toggleUserActive(u.id, u.isActive)}>
+                                    비활성화
+                                  </DangerButton>
+                                )
+                                : <PrimaryButton onClick={() => toggleUserActive(u.id, u.isActive)}>활성화</PrimaryButton>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -765,19 +789,28 @@ ${photoNotice}` : msg);
         </Modal>
       )}
 
-      {/* 가게 대신 등록 — 만들면 목록에 넣고 바로 고른다 */}
-      {creatingClient && (
-        <CreateClientModal
-          onClose={() => setCreatingClient(false)}
-          onCreated={created => {
-            setClients(prev => [...prev, created]);
-            rf('clientProfileId', created.id);
-            if (created.regionSi) rf('regionSi', created.regionSi);
-            if (created.regionGu) rf('regionGu', created.regionGu);
-            if (created.regionDong) rf('regionDong', created.regionDong);
-            if (created.address) rf('visitAddress', created.address);
-            if (created.businessCategory) rf('businessCategory', created.businessCategory);
-            setCreatingClient(false);
+      {/* 가게 창 — 새로 등록하면 목록에 넣고 바로 고른다. 고치면 목록만 갈아 끼운다 */}
+      {shopForm && (
+        <ShopFormModal
+          shop={shopForm === 'new' ? null : shopForm}
+          onClose={() => setShopForm(null)}
+          onSaved={saved => {
+            setClients(prev => (
+              prev.some(c => c.id === saved.id)
+                ? prev.map(c => (c.id === saved.id ? saved : c))
+                : [...prev, saved]
+            ));
+            if (shopForm === 'new') {
+              rf('clientProfileId', saved.id);
+              if (saved.regionSi) rf('regionSi', saved.regionSi);
+              if (saved.regionGu) rf('regionGu', saved.regionGu);
+              if (saved.regionDong) rf('regionDong', saved.regionDong);
+              if (saved.address) rf('visitAddress', saved.address);
+              if (saved.businessCategory) rf('businessCategory', saved.businessCategory);
+            }
+            // 목록 어딘가에 쓰인 가게 이름도 새로 받아 온다
+            if (tab === 'users') void loadTab('users');
+            setShopForm(null);
           }}
         />
       )}

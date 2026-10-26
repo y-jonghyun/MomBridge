@@ -97,7 +97,7 @@ function Section({ step, title, hint, children }: {
 export interface FieldRule { locked: boolean; onlyBetter: boolean; reason?: string }
 
 export default function RegisterMissionForm({
-  form, set, clients, pendingImages, onPendingChange, submitting, onSubmit, onCreateClient,
+  form, set, clients, pendingImages, onPendingChange, submitting, onSubmit, onCreateClient, onEditClient,
   mode = 'create', rules, missionId, submitLabel,
 }: {
   form: RegisterForm;
@@ -105,6 +105,8 @@ export default function RegisterMissionForm({
   clients: ClientOption[];
   /** '가게 새로 등록'을 눌렀을 때 (대행 등록 화면에서만 쓴다) */
   onCreateClient?: () => void;
+  /** 고른 가게의 '가게 정보 수정'을 눌렀을 때 */
+  onEditClient?: (client: ClientOption) => void;
   pendingImages: PendingImage[];
   onPendingChange: (next: PendingImage[]) => void;
   submitting: boolean;
@@ -180,10 +182,16 @@ export default function RegisterMissionForm({
             {clients.length === 0 && (
               <p className="mt-1 text-xs text-clay-dark">등록된 고객사가 없습니다. 먼저 고객사 계정을 만들어야 합니다.</p>
             )}
-            {chosen?.managedByOperator && (
-              <p className="mt-1 text-xs text-muted">
-                운영자가 등록한 가게예요. 결제 링크·알림톡은 보내지 않습니다.
-              </p>
+            {chosen && onEditClient && (
+              <div className="mt-1 flex flex-wrap items-center gap-x-2">
+                {chosen.managedByOperator && (
+                  <span className="text-xs text-muted">운영자가 등록한 가게예요. 결제 링크·알림톡은 보내지 않습니다.</span>
+                )}
+                <button type="button" onClick={() => onEditClient(chosen)}
+                  className="flex min-h-[44px] items-center text-[13px] font-medium text-clay">
+                  가게 정보 수정
+                </button>
+              </div>
             )}
             {chosen && (
               <p className="mt-1 text-xs text-muted">
