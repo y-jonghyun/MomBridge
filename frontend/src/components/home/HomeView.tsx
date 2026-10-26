@@ -80,13 +80,13 @@ export default function HomeView() {
       <div className="mx-auto max-w-shell">
         <section className="px-5 pb-7 pt-3">
           {/* 활동 지역을 읽어올 API가 아직 없어 지역 고르기 화면으로 보낸다 */}
-          <Link
-            href="/missions"
-            className="inline-flex h-[34px] items-center gap-1.5 rounded-full border border-line bg-paper px-3.5 text-[13px] text-ink-2"
-          >
-            <PinIcon size={14} strokeWidth={1.8} className="text-clay" />
-            지역 선택
-            <ChevronDownIcon size={12} strokeWidth={2} />
+          {/* 보이는 알약은 34px 그대로, 누를 수 있는 영역만 44px로 넓힌다 (-my로 자리는 그대로) */}
+          <Link href="/missions" className="-my-[5px] inline-flex min-h-[44px] items-center">
+            <span className="inline-flex h-[34px] items-center gap-1.5 rounded-full border border-line bg-paper px-3.5 text-[13px] text-ink-2">
+              <PinIcon size={14} strokeWidth={1.8} className="text-clay" />
+              지역 선택
+              <ChevronDownIcon size={12} strokeWidth={2} />
+            </span>
           </Link>
 
           <h1 className="mb-2.5 mt-[22px] font-serif text-hero font-bold">

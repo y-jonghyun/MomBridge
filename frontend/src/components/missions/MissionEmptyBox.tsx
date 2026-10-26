@@ -16,12 +16,13 @@ export default function MissionEmptyBox({
     <div className="rounded-photo border border-dashed border-[#D8CBB8] bg-paper p-4 text-[13px] leading-[1.6] text-ink-2">
       {message}
       {actionLabel && actionHref && (
-        <Link href={actionHref} className="ml-1 font-medium text-clay underline-offset-2 hover:underline">
+        /* 글 안에 있는 링크라 세로 패딩으로만 누를 영역을 넓힌다 (줄 높이는 그대로다) */
+        <Link href={actionHref} className="ml-1 py-3.5 font-medium text-clay underline-offset-2 hover:underline">
           {actionLabel}
         </Link>
       )}
       {actionLabel && !actionHref && onAction && (
-        <button type="button" onClick={onAction} className="ml-1 font-medium text-clay underline-offset-2 hover:underline">
+        <button type="button" onClick={onAction} className="ml-1 py-3.5 font-medium text-clay underline-offset-2 hover:underline">
           {actionLabel}
         </button>
       )}

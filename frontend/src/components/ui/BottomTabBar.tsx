@@ -26,7 +26,7 @@ export default function BottomTabBar() {
         return (
           <Link
             key={href} href={href} aria-current={on ? 'page' : undefined}
-            className={`flex flex-col items-center justify-center gap-1 text-[11px] ${
+            className={`flex min-h-[44px] flex-col items-center justify-center gap-1 text-[11px] ${
               on ? 'font-medium text-ink' : 'text-muted'
             }`}
           >
