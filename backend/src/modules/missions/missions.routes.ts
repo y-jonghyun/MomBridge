@@ -140,9 +140,10 @@ router.post('/', authenticate, requireRole('OPERATOR'), async (req: Request, res
     if (sendPaymentLink) {
       const clientProfile = await prisma.clientProfile.findUnique({
         where: { id: clientProfileId },
-        select: { businessName: true, user: { select: { phone: true } } },
+        select: { businessName: true, user: { select: { phone: true, managedByOperator: true } } },
       });
-      const contactPhone = clientProfile?.user.phone ?? null;
+      // 운영자가 대신 만든 가게에는 결제 링크를 보내지 않는다 (받을 계정이 없다)
+      const contactPhone = clientProfile?.user.managedByOperator ? null : clientProfile?.user.phone ?? null;
       // 존재하지 않는 기본 도메인으로 결제 링크를 보내지 않도록 FRONTEND_URL이 없으면 발송하지 않는다
       if (contactPhone && !env.FRONTEND_URL) {
         logger.error('FRONTEND_URL is not set; payment link SMS skipped', { missionId: mission.id });

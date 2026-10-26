@@ -58,7 +58,9 @@ router.get('/missions/:id/report', async (req: Request, res: Response, next: Nex
   try {
     const mission = await requireCampaignAccess(req, req.params.id);
     const range = resolveRange(parseDay(req.query.from), parseDay(req.query.to), mission.createdAt);
-    res.json({ success: true, data: await buildCampaignReport(mission.id, range, { maskNames: false }) });
+    // 고객사에게는 가린 이름을, 운영자에게는 실명을 내려준다
+    const maskNames = req.user!.role === 'CLIENT';
+    res.json({ success: true, data: await buildCampaignReport(mission.id, range, { maskNames }) });
   } catch (e) { next(e); }
 });
 

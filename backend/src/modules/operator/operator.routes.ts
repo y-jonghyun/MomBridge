@@ -6,9 +6,34 @@ import { parseInput } from '../../middleware/validate';
 import { missionStatusSchema } from '../missions/missions.schema';
 import { ensureTrackingLink } from '../tracking/links';
 import { reportIssue } from '../../lib/monitoring';
-import { formatPhone, maskPhone } from '../../lib/phone';
+import { formatPhone, maskPhone, normalizePhone } from '../../lib/phone';
 import { maskAccount } from '../../lib/account';
 import { AppError } from '../../middleware/errorHandler';
+import { randomBytes, randomUUID } from 'crypto';
+import { normalizeProvince } from '../../lib/regions';
+
+
+/**
+ * 운영자가 대신 만드는 가게 계정.
+ * 가입하지 않은 가게도 미션을 대행 등록할 수 있게, 로그인할 수 없는 고객사 계정을 만든다.
+ */
+const createClientSchema = z.object({
+  businessName: z.string().trim().min(1).max(200),
+  businessCategory: z.enum(['FOOD', 'CAFE', 'KIDS', 'BEAUTY', 'LIVING', 'ETC']).optional(),
+  regionSi: z.string().trim().max(50).transform((v, ctx) => {
+    const name = normalizeProvince(v);
+    if (!name) { ctx.addIssue({ code: 'custom', message: '시·도를 선택해 주세요 (예: 충청북도)' }); return z.NEVER; }
+    return name;
+  }),
+  regionGu: z.string().trim().min(1, '시·군·구를 선택해 주세요').max(50),
+  regionDong: z.string().trim().max(50).optional(),
+  address: z.string().trim().max(500).optional(),
+  contactPhone: z.string().trim().max(20).optional(),
+});
+
+/** 메일이 가지 않는 내부용 주소. 이 도메인으로는 어떤 메일·알림도 보내지 않는다 */
+const MANAGED_EMAIL_DOMAIN = 'managed.mombridge.local';
+export const isManagedEmail = (email: string) => email.toLowerCase().endsWith(`@${MANAGED_EMAIL_DOMAIN}`);
 
 const applicationReviewSchema = z.object({
   status: z.enum(['APPROVED', 'REJECTED']),
@@ -292,13 +317,89 @@ router.get('/clients', async (_req: Request, res: Response, next: NextFunction) 
         id: true, businessName: true, category: true, businessCategory: true,
         // 대행 등록 화면이 고객사를 고르면 주소·지역을 자동으로 채운다
         address: true, regionSi: true, regionGu: true, regionDong: true,
-        user: { select: { id: true, name: true, email: true, phone: true } },
+        user: { select: { id: true, name: true, email: true, phone: true, managedByOperator: true } },
       },
     });
     // 결제 링크를 어디로 보내는지 확인해야 하는 자리라 번호는 전체로 둔다 (운영자 전용 경로)
     res.json({
       success: true,
-      data: clients.map(c => ({ ...c, contactPhone: formatPhone(c.user.phone ?? '') || null })),
+      data: clients.map(c => ({
+        ...c,
+        contactPhone: formatPhone(c.user.phone ?? '') || null,
+        /** 운영자가 대신 만든 가게인지 (목록에 배지를 단다) */
+        managedByOperator: c.user.managedByOperator,
+      })),
+    });
+  } catch (e) { next(e); }
+});
+
+/**
+ * 가게 대신 등록 — 가입하지 않은 가게의 고객사 계정을 운영자가 만든다.
+ *
+ * 만들어지는 계정은 **로그인할 수 없다**: 쓸 수 없는 비밀번호와 managedByOperator 표시를 함께 둔다.
+ * 이메일도 메일이 가지 않는 내부용 주소라 어떤 메일·알림도 나가지 않는다.
+ * 나중에 사장님이 직접 가입하면 이 가게에 계정을 이어 붙이는 '초대'를 따로 만들 자리다.
+ */
+router.post('/clients', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const input = parseInput(createClientSchema, req.body);
+    const phone = input.contactPhone ? normalizePhone(input.contactPhone) : null;
+    if (phone && (await prisma.user.findUnique({ where: { phone } }))) {
+      throw new AppError('PHONE_TAKEN', 409, '이미 등록된 연락처입니다. 고객사 목록에서 찾아 주세요');
+    }
+
+    const email = `shop-${randomUUID()}@${MANAGED_EMAIL_DOMAIN}`;
+    const created = await prisma.clientProfile.create({
+      data: {
+        businessName: input.businessName,
+        businessCategory: input.businessCategory ?? null,
+        category: input.businessCategory ?? 'ETC',
+        address: input.address ?? '',
+        regionSi: input.regionSi,
+        regionGu: input.regionGu,
+        regionDong: input.regionDong || null,
+        user: {
+          create: {
+            email,
+            // 어떤 비밀번호와도 맞지 않는 값. 로그인은 managedByOperator로 한 번 더 막는다
+            passwordHash: `managed:${randomBytes(32).toString('hex')}`,
+            role: 'CLIENT',
+            name: input.businessName,
+            phone,
+            managedByOperator: true,
+          },
+        },
+      },
+      select: {
+        id: true, businessName: true, category: true, businessCategory: true,
+        address: true, regionSi: true, regionGu: true, regionDong: true,
+        user: { select: { id: true, name: true, email: true, phone: true, managedByOperator: true } },
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actorId: req.user!.sub,
+        action: 'OPERATOR_CLIENT_CREATE',
+        targetTable: 'client_profiles',
+        targetId: created.id,
+        after: {
+          businessName: created.businessName,
+          region: [created.regionSi, created.regionGu, created.regionDong].filter(Boolean).join(' '),
+          managedByOperator: true,
+        },
+        ipAddress: req.ip ?? null,
+        userAgent: req.get('user-agent')?.slice(0, 500) ?? null,
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      data: {
+        ...created,
+        contactPhone: formatPhone(created.user.phone ?? '') || null,
+        managedByOperator: true,
+      },
     });
   } catch (e) { next(e); }
 });

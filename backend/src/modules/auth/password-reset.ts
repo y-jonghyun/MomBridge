@@ -44,6 +44,8 @@ export async function requestPasswordReset(email: string): Promise<void> {
   void (async () => {
     const user = await findUserByEmail(email);
     if (!user || !user.isActive || user.deletedAt) return;
+    // 운영자가 대신 만든 가게 계정에는 메일을 보내지 않는다 (받는 사람이 없는 내부용 주소다)
+    if (user.managedByOperator) return;
 
     const token = randomBytes(32).toString('base64url');
     const now = clock.now();

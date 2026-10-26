@@ -229,6 +229,37 @@ describeDb('미션 수정', () => {
     });
   });
 
+  describe('종료된 미션', () => {
+    it('고객사도 운영자도 수정할 수 없다', async () => {
+      const m = await mission({ status: 'CLOSED' });
+
+      for (const token of [client.token, operator.token]) {
+        const res = await put(token, m.id, body({ description: '설명을 고쳐요' }));
+        expect(res.status).toBe(422);
+        expect(res.body.error.code).toBe('MISSION_CLOSED');
+        expect(res.body.error.message).toContain('상태를 되돌린 뒤');
+      }
+
+      // 아무것도 바뀌지 않는다
+      const saved = await prisma.mission.findUniqueOrThrow({ where: { id: m.id } });
+      expect(saved.description).toBe('설명');
+    });
+
+    it('수정 화면은 종료됐다는 것을 함께 알려 준다', async () => {
+      const m = await mission({ status: 'CLOSED' });
+
+      const res = await get(operator.token, m.id);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.closed).toBe(true);
+    });
+
+    it('종료가 아니면 지금처럼 고칠 수 있다', async () => {
+      const m = await mission({ status: 'REVIEWING' });
+      expect((await put(client.token, m.id, body({ description: '설명을 고쳐요' }))).status).toBe(200);
+    });
+  });
+
   describe('검사는 등록과 같다', () => {
     it('날짜 순서가 어긋나면 막는다', async () => {
       const m = await mission();

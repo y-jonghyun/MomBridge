@@ -37,6 +37,8 @@ export interface RegisterForm {
 export interface ClientOption {
   id: string;
   businessName: string;
+  /** 운영자가 대신 만든 가게 (가입하지 않은 가게) */
+  managedByOperator?: boolean;
   contactPhone?: string | null;
   businessCategory?: string | null;
   address?: string | null;
@@ -51,6 +53,11 @@ export interface ClientOption {
  * (이름 없이 "(이메일) · 연락처 없음"만 뜨면 누구인지 알 수 없었다)
  */
 export function clientOptionLabel(c: ClientOption): string {
+  // 운영자가 대신 만든 가게는 내부용 주소라 이메일 대신 그 사실을 적는다
+  if (c.managedByOperator) {
+    const name = c.businessName?.trim() || '가게 이름 미등록';
+    return `${name} · 운영자 등록${c.contactPhone ? ` · ${c.contactPhone}` : ''}`;
+  }
   const email = c.user?.email ?? '이메일 없음';
   if (!c.businessName?.trim()) return `가게 이름 미등록 · ${email}`;
   return `${c.businessName} (${email})${c.contactPhone ? ` · ${c.contactPhone}` : ' · 연락처 없음'}`;
@@ -90,12 +97,14 @@ function Section({ step, title, hint, children }: {
 export interface FieldRule { locked: boolean; onlyBetter: boolean; reason?: string }
 
 export default function RegisterMissionForm({
-  form, set, clients, pendingImages, onPendingChange, submitting, onSubmit,
+  form, set, clients, pendingImages, onPendingChange, submitting, onSubmit, onCreateClient,
   mode = 'create', rules, missionId, submitLabel,
 }: {
   form: RegisterForm;
   set: (key: keyof RegisterForm, value: string | string[] | boolean) => void;
   clients: ClientOption[];
+  /** '가게 새로 등록'을 눌렀을 때 (대행 등록 화면에서만 쓴다) */
+  onCreateClient?: () => void;
   pendingImages: PendingImage[];
   onPendingChange: (next: PendingImage[]) => void;
   submitting: boolean;
@@ -140,7 +149,15 @@ export default function RegisterMissionForm({
           </p>
         ) : (
           <div>
-            <label htmlFor="op-client" className={label}>고객사 *</label>
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <label htmlFor="op-client" className={`${label} mb-0`}>고객사 *</label>
+              {onCreateClient && (
+                <button type="button" onClick={onCreateClient}
+                  className="flex min-h-[44px] items-center text-[13px] font-medium text-clay">
+                  + 가게 새로 등록
+                </button>
+              )}
+            </div>
             <select id="op-client" required className={input}
               value={form.clientProfileId}
               onChange={e => {
@@ -162,6 +179,11 @@ export default function RegisterMissionForm({
             </select>
             {clients.length === 0 && (
               <p className="mt-1 text-xs text-clay-dark">등록된 고객사가 없습니다. 먼저 고객사 계정을 만들어야 합니다.</p>
+            )}
+            {chosen?.managedByOperator && (
+              <p className="mt-1 text-xs text-muted">
+                운영자가 등록한 가게예요. 결제 링크·알림톡은 보내지 않습니다.
+              </p>
             )}
             {chosen && (
               <p className="mt-1 text-xs text-muted">

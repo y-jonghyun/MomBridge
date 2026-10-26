@@ -1,7 +1,7 @@
 import request from 'supertest';
 import app from '../../src/app';
 import { describeDb, resetDb, prisma } from '../helpers/db';
-import { createClient, createMission, createParticipant, createTrackingLink } from '../helpers/factory';
+import { createClient, createMission, createOperator, createParticipant, createTrackingLink } from '../helpers/factory';
 
 /**
  * 고객사에게 내려가는 응답에 화면이 쓰지 않는 체험단원 개인정보가 섞이지 않는지 지킨다.
@@ -63,7 +63,8 @@ describeDb('고객사 응답의 체험단원 정보 범위', () => {
     expect(res.status).toBe(200);
     const [row] = res.body.data;
     expect(Object.keys(row).sort()).toEqual(['description', 'id', 'participant', 'snsPostUrl', 'status']);
-    expect(row.participant).toEqual({ user: { name: '홍길동' } });
+    // 이름은 가려서 내려온다 (서버가 바꿔서 보낸다)
+    expect(row.participant).toEqual({ user: { name: '홍○동' } });
     expect(row.snsPostUrl).toBe('https://blog.example/post');
   });
 
@@ -72,7 +73,16 @@ describeDb('고객사 응답의 체험단원 정보 범위', () => {
     expect(res.status).toBe(200);
     expect(Object.keys(res.body.data.ranking[0]).sort())
       .toEqual(['clicks', 'disclosure', 'linkCode', 'participantName', 'postUrl', 'uniqueVisitors']);
-    // 고객사 경로는 마스킹하지 않는다 (공유 링크만 마스킹) — 방침에 그대로 적힌 동작
+    // 고객사 경로도 가린 이름으로 내려준다 (운영자 경로만 실명)
+    expect(res.body.data.ranking[0].participantName).toBe('홍○동');
+  });
+
+  it('운영자 경로에는 실명이 그대로 내려간다', async () => {
+    const operator = await createOperator();
+    const res = await request(app).get(`/api/v1/client/missions/${missionId}/report`)
+      .set('Authorization', `Bearer ${operator.token}`);
+
+    expect(res.status).toBe(200);
     expect(res.body.data.ranking[0].participantName).toBe('홍길동');
   });
 
@@ -84,6 +94,7 @@ describeDb('고객사 응답의 체험단원 정보 범위', () => {
     ]);
     const all = bodies.map(b => JSON.stringify(b.body)).join('\n');
     for (const leaked of [
+      '홍길동',                   // 체험단원 실명 (고객사에게는 가린 이름만)
       '01000009999',              // 휴대폰 번호 (숫자만 저장)
       '010-0000-9999',            // 하이픈을 붙여 내보내는 경우도 막는다
       '0000-9999',                // 마스킹한 형태(010-****-9999)로도 나가면 안 된다

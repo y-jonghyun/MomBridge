@@ -93,6 +93,8 @@ export async function changePhone(userId: string, rawPhone: string) {
 export async function login(body: { email: string; password: string }) {
   const user = typeof body.email === 'string' ? await findUserByEmail(body.email) : null;
   if (!user || !user.isActive || user.deletedAt) throw new AppError('INVALID_CREDENTIALS', 401, '이메일 또는 비밀번호가 올바르지 않습니다');
+  // 운영자가 대신 만든 가게 계정은 로그인할 수 없다 (쓸 수 있는 비밀번호가 없다)
+  if (user.managedByOperator) throw new AppError('INVALID_CREDENTIALS', 401, '이메일 또는 비밀번호가 올바르지 않습니다');
 
   const valid = await bcrypt.compare(String(body.password ?? ''), user.passwordHash);
   if (!valid) throw new AppError('INVALID_CREDENTIALS', 401, '이메일 또는 비밀번호가 올바르지 않습니다');

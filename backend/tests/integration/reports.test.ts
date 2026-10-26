@@ -58,7 +58,8 @@ describeDb('성과 리포트 · 접근 제어 · 보관 기간', () => {
       { day: '2026-10-20', clicks: 5, uniqueVisitors: 3 },
       { day: '2026-10-21', clicks: 2, uniqueVisitors: 2 },
     ]);
-    expect(r.ranking.map((x: any) => [x.participantName, x.clicks])).toEqual([['홍길동', 5], ['김철수', 2]]);
+    // 고객사 화면에는 가린 이름이 내려간다 (운영자 경로만 실명)
+    expect(r.ranking.map((x: any) => [x.participantName, x.clicks])).toEqual([['홍○동', 5], ['김○수', 2]]);
     expect(r.disclosure.NOT_SUBMITTED).toBe(2);
   });
 
@@ -93,7 +94,7 @@ describeDb('성과 리포트 · 접근 제어 · 보관 기간', () => {
 
     const shared = await request(app).get(`/api/v1/reports/shared/${token}`);
     expect(shared.status).toBe(200);
-    expect(shared.body.data.ranking.map((x: any) => x.participantName).sort()).toEqual(['김*수', '홍*동'].sort());
+    expect(shared.body.data.ranking.map((x: any) => x.participantName).sort()).toEqual(['김○수', '홍○동'].sort());
     expect(shared.body.data.mission.destinationUrl).toBeUndefined();
 
     clock.set(() => new Date(Date.now() + 8 * 86400000));

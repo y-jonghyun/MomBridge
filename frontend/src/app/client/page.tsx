@@ -19,10 +19,10 @@ import { BUSINESS_INFO } from '@/lib/legal';
 import { PASSWORD_HINT, passwordError } from '@/lib/password';
 import ClientStoreForm from '@/components/profile/ClientStoreForm';
 import MissionEditModal from '@/components/missions/MissionEditModal';
+import { MISSION_STATUS_LABEL, submissionStatusLabel, submissionStatusTone } from '@/lib/status-labels';
 
 type Tab = 'my-missions' | 'create' | 'results' | 'profile';
 
-const STATUS_LABEL: Record<string, string> = { DRAFT: '임시저장', OPEN: '모집중', IN_PROGRESS: '진행중', REVIEWING: '검수중', CLOSED: '종료' };
 const STATUS_COLOR: Record<string, string> = { DRAFT: 'border border-line text-muted', OPEN: 'bg-clay-tint text-clay-dark', IN_PROGRESS: 'bg-clay-tint text-clay-dark', REVIEWING: 'bg-clay-tint text-clay-dark', CLOSED: 'bg-ink text-paper' };
 
 const defaultForm = {
@@ -405,7 +405,7 @@ ${photoNotice}`
                     </p>
                   </div>
                   <span className={`flex h-[26px] shrink-0 items-center rounded-full px-2.5 text-xs ${STATUS_COLOR[m.status] ?? 'border border-line text-muted'}`}>
-                    {STATUS_LABEL[m.status] ?? m.status}
+                    {MISSION_STATUS_LABEL[m.status] ?? m.status}
                   </span>
                 </div>
 
@@ -431,12 +431,15 @@ ${photoNotice}`
                   >
                     성과 리포트 보기
                   </button>
+                  {/* 종료된 미션은 고칠 수 없다 (서버도 422로 막는다) */}
+                  {m.status !== 'CLOSED' && (
                   <button
                     onClick={() => setEditMissionId(m.id)}
                     className="flex h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-control border border-line px-4 text-sm text-ink-2"
                   >
                     수정
                   </button>
+                  )}
                 </div>
               </section>
             ))}
@@ -704,7 +707,7 @@ ${photoNotice}`
                   <h3 className="font-bold text-ink text-lg mb-1">{selectedMission.title}</h3>
                   <div className="flex gap-4 text-sm text-muted">
                     <span>보상 {Number(selectedMission.rewardAmount).toLocaleString()}원</span>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLOR[selectedMission.status] ?? 'bg-cream'}`}>{STATUS_LABEL[selectedMission.status]}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLOR[selectedMission.status] ?? 'bg-cream'}`}>{MISSION_STATUS_LABEL[selectedMission.status]}</span>
                   </div>
                 </div>
                 {missionDetail && (
@@ -730,7 +733,9 @@ ${photoNotice}`
                             <div key={s.id} className="border rounded-card p-3">
                               <div className="flex items-center justify-between mb-2">
                                 <p className="text-sm font-medium text-ink-2">{s.participant?.user?.name}</p>
-                                <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLOR[s.status] ?? 'bg-cream text-ink-2'}`}>{STATUS_LABEL[s.status] ?? s.status}</span>
+                                <span className={`rounded-full px-2 py-0.5 text-xs ${submissionStatusTone(s.status)}`}>
+                                  {submissionStatusLabel(s.status)}
+                                </span>
                               </div>
                               {s.description && <p className="text-sm text-ink-2">{s.description}</p>}
                               {s.snsPostUrl && <a href={s.snsPostUrl} target="_blank" rel="noreferrer" className="text-xs text-clay underline">SNS 링크 →</a>}

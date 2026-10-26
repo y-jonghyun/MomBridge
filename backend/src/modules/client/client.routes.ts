@@ -4,6 +4,7 @@ import { prisma } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
 import { parseInput } from '../../middleware/validate';
 import { formatBusinessNumber, isStoreComplete, missingStoreParts, storeSchema } from './store';
+import { maskName } from '../../lib/mask';
 
 const router = Router();
 router.use(authenticate, requireRole('CLIENT', 'OPERATOR'));
@@ -100,7 +101,7 @@ router.get('/missions/:id/submissions', async (req: Request, res: Response, next
     const mission = await prisma.mission.findFirst({ where: { id: req.params.id, clientProfileId: profile.id } });
     if (!mission) throw new AppError('NOT_FOUND', 404, '미션을 찾을 수 없습니다');
 
-    // 화면이 쓰는 것만: 작상자 이름, 검수 상태, 설명, 게시글 주소.
+    // 화면이 쓰는 것만: 작성자 이름, 검수 상태, 설명, 게시글 주소.
     // 운영자 검수 메모(reviewNote·rejectionReason)와 업로드 파일 주소는 고객사 화면에 쓰이지 않아 제외한다.
     const submissions = await prisma.submission.findMany({
       where: { missionId: req.params.id },
@@ -110,7 +111,14 @@ router.get('/missions/:id/submissions', async (req: Request, res: Response, next
       },
       orderBy: { createdAt: 'desc' },
     });
-    res.json({ success: true, data: submissions });
+    // 이름은 가려서 내려보낸다 — 응답에 실명이 남지 않게 서버에서 바꾼다
+    res.json({
+      success: true,
+      data: submissions.map(s => ({
+        ...s,
+        participant: { user: { name: maskName(s.participant.user.name) } },
+      })),
+    });
   } catch (e) { next(e); }
 });
 
