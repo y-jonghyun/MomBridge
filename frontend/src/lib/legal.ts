@@ -1,14 +1,28 @@
 /**
  * 약관·방침 시행일.
  *
- * 주의: 공개(머지)하는 날짜로 바꿀 때 **세 곳을 같은 값으로** 맞춰야 한다.
- *   1) 이 파일의 TERMS_EFFECTIVE_DATE · PRIVACY_EFFECTIVE_DATE  (화면에 보이는 시행일)
- *   2) backend/src/modules/auth/consent.ts 의 CONSENT_VERSION    (동의 기록에 남는 버전)
- * 백엔드가 기록한 버전과 화면에 보여준 시행일이 다르면, 회원이 무엇에 동의했는지 추적할 수 없다.
- * 공개한 뒤 문구를 고칠 때도 같은 방식으로 날짜를 올리고 재동의를 받는다.
+ * 문서를 고칠 때는 **무엇이 바뀌는지**에 따라 올리는 값이 다르다.
+ *
+ * 1) 회원에게 불리해지거나 처리 범위가 넓어지는 변경 (받는 항목·제공처·목적이 늘어남)
+ *    → 이 파일의 시행일과 backend/src/modules/auth/consent.ts 의 CONSENT_VERSION을
+ *      **같은 날짜로 함께** 올린다. 버전이 올라가면 다시 동의를 받는다.
+ * 2) 제공 범위가 좁아지거나 문구만 또렷해지는 변경 (가림 처리 추가, 오탈자 등)
+ *    → 시행일만 올리고 CONSENT_VERSION은 그대로 둔다. 이미 받은 동의가 그대로 유효하다.
+ *      화면의 '변경 이력'에 무엇이 바뀌었는지 한 줄을 남긴다.
+ *
+ * 어느 쪽이든 화면에 보여 준 시행일과 동의 기록이 어긋나면 회원이 무엇에 동의했는지
+ * 추적할 수 없으니, 두 값의 관계를 바꿀 때는 이 주석도 함께 고친다.
  */
 export const TERMS_EFFECTIVE_DATE = '2026-10-23';
-export const PRIVACY_EFFECTIVE_DATE = '2026-10-23';
+export const PRIVACY_EFFECTIVE_DATE = '2026-10-26';
+
+/**
+ * 개인정보처리방침 변경 이력 (새 것이 위).
+ * 재동의 없이 시행일만 올린 변경도 여기에 남긴다 — 무엇이 언제 바뀌었는지 보이게.
+ */
+export const PRIVACY_CHANGES: { date: string; summary: string }[] = [
+  { date: '2026-10-26', summary: '고객사에 제공되는 참여자 이름을 일부 가림 처리' },
+];
 
 interface BusinessInfo {
   /** 상호 */
