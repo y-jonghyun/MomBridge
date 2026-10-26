@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { LegalPage, Section } from '@/components/legal/LegalPage';
-import { BACKUP_RETENTION_DAYS, BUSINESS_INFO, PRIVACY_EFFECTIVE_DATE, PRIVACY_OFFICER } from '@/lib/legal';
+import { BACKUP_RETENTION_DAYS, BUSINESS_INFO, PRIVACY_CHANGES, PRIVACY_EFFECTIVE_DATE, PRIVACY_OFFICER } from '@/lib/legal';
 
 export const metadata: Metadata = { title: '개인정보처리방침 — 맘브릿지' };
 
@@ -112,6 +112,16 @@ export default function PrivacyPage() {
 
       <Section title="11. 방침 변경">
         <p>이 방침은 {PRIVACY_EFFECTIVE_DATE}부터 적용됩니다. 내용이 바뀌면 시행 7일 전부터 서비스 화면에 알립니다.</p>
+        {PRIVACY_CHANGES.length > 0 && (
+          <>
+            <p className="font-medium">변경 이력</p>
+            <ul className="list-disc pl-5">
+              {PRIVACY_CHANGES.map(c => (
+                <li key={c.date}>{c.date} — {c.summary}</li>
+              ))}
+            </ul>
+          </>
+        )}
       </Section>
     </LegalPage>
   );
