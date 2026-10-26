@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Cormorant_Garamond, Gowun_Batang, Noto_Sans_KR } from 'next/font/google';
 import './globals.css';
 import ServerWakeNotice from '@/components/common/ServerWakeNotice';
+import LogoutNotice from '@/components/ui/LogoutNotice';
 import { SITE_URL } from '@/lib/site';
 
 // 디자인 기준: docs/design/mombridge-design/cream-editorial-v1.md
@@ -47,6 +48,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-screen bg-cream font-sans text-ink antialiased">
         {children}
+        <LogoutNotice />
         <ServerWakeNotice />
       </body>
     </html>

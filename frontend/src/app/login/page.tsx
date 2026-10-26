@@ -3,9 +3,15 @@ import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import api, { apiErrorMessage } from '@/lib/api';
-import { useAuthStore } from '@/store/auth';
+import { useAuthHydrated, useAuthStore, type Role } from '@/store/auth';
 import { syncSelfClickCookie } from '@/lib/self-click';
 import AuthShell, { authButtonClass, authInputClass } from '@/components/auth/AuthShell';
+
+const ROLE_LABEL: Record<Role, string> = { PARTICIPANT: '참여자', CLIENT: '고객사', OPERATOR: '관리자' };
+const HOME_BY_ROLE: Record<Role, string> = { PARTICIPANT: '/participant', CLIENT: '/client', OPERATOR: '/operator' };
+const MY_SCREEN_LABEL: Record<Role, string> = {
+  PARTICIPANT: '내 활동으로', CLIENT: '내 가게로', OPERATOR: '관리자 화면으로',
+};
 
 /** 로그인 후 돌아갈 경로. 다른 사이트로 보내지 않도록 같은 사이트 경로만 허용 */
 function safeNext(next: string | null): string | null {
@@ -22,6 +28,12 @@ function LoginForm() {
   const expired = searchParams.get('expired') === '1';
   const next = safeNext(searchParams.get('next'));
   const setAuth = useAuthStore((s) => s.setAuth);
+  const user = useAuthStore((s) => s.user);
+  const clearAuth = useAuthStore((s) => s.clearAuth);
+  const hydrated = useAuthHydrated();
+  // 이미 로그인한 사람에게는 폼 대신 누구로 들어와 있는지부터 알려 준다
+  const [switching, setSwitching] = useState(false);
+  const signedIn = hydrated && !!user && !switching;
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -56,10 +68,35 @@ function LoginForm() {
       }
     >
       <>
+        {signedIn && (
+          <div className="mb-4 rounded-card border border-line bg-cream p-4">
+            <p className="break-keep text-sm text-ink">
+              <strong className="font-medium">{user!.name}</strong>({ROLE_LABEL[user!.role]})으로 로그인되어 있어요
+            </p>
+            {/* 좁은 화면에서는 글이 접히지 않게 한 줄씩 둔다 */}
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <Link
+                href={HOME_BY_ROLE[user!.role]}
+                className="flex min-h-[44px] flex-1 items-center justify-center whitespace-nowrap rounded-control bg-ink px-4 text-sm font-bold text-paper"
+              >
+                {MY_SCREEN_LABEL[user!.role]}
+              </Link>
+              <button
+                type="button"
+                onClick={() => { clearAuth(); setSwitching(true); }}
+                className="flex min-h-[44px] flex-1 items-center justify-center whitespace-nowrap rounded-control border border-line bg-paper px-4 text-sm text-ink-2"
+              >
+                다른 계정으로 로그인
+              </button>
+            </div>
+          </div>
+        )}
+
         {expired && !error && (
           <p className="mb-4 rounded-control bg-clay-tint px-3 py-2 text-sm text-clay-dark">로그인이 만료됐습니다. 다시 로그인해 주세요.</p>
         )}
 
+        {/* 안내 상자는 폼 위에 둔다 — 폼은 그대로 쓸 수 있다 */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="login-email" className="mb-1 block text-[13px] text-muted">이메일</label>

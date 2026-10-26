@@ -3,7 +3,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
-import { useAuthHydrated, useAuthStore } from '@/store/auth';
+import { logout, useAuthHydrated, useAuthStore } from '@/store/auth';
 import { LogOutIcon } from '@/components/ui/icons';
 import KeywordRecommender, { KeywordSelection } from '@/components/campaign/KeywordRecommender';
 import CampaignPanel from '@/components/campaign/CampaignPanel';
@@ -75,7 +75,6 @@ function ClientPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const user = useAuthStore((s) => s.user);
-  const clearAuth = useAuthStore((s) => s.clearAuth);
   const hydrated = useAuthHydrated();
   const [tab, setTab] = useState<Tab>('my-missions');
   const [missions, setMissions] = useState<any[]>([]);
@@ -322,7 +321,7 @@ ${photoNotice}`
           )}
           <button
             type="button" aria-label="로그아웃"
-            onClick={() => { clearAuth(); router.push('/login'); }}
+            onClick={() => logout()}
             className="flex h-11 w-11 items-center justify-center text-muted"
           >
             <LogOutIcon size={20} />
