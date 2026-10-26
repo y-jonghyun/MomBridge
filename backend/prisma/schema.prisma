@@ -109,6 +109,9 @@ model User {
   profileImage String?   @db.VarChar(2048)
   isActive     Boolean   @default(true)
   isVerified   Boolean   @default(false)
+  /// 운영자가 대신 만든 가게 계정. 로그인·비밀번호 재설정·메일/알림톡 발송에서 모두 제외한다
+  /// (가입하지 않은 가게의 미션을 운영자가 대행 등록하려고 만든 자리다)
+  managedByOperator Boolean @default(false)
   /// 올리면 그 전에 발급된 리프레시 토큰이 모두 무효가 된다 (비밀번호 변경·비활성화)
   tokenVersion Int       @default(0)
   lastLoginAt  DateTime?

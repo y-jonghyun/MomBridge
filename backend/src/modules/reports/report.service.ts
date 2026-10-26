@@ -30,13 +30,9 @@ function sumRows(rows: DailyRow[]): Totals {
   }), { clicks: 0, uniqueVisitors: 0, mobile: 0, pc: 0, unknown: 0 });
 }
 
-/** 홍길동 → 홍*동, 김철 → 김*, 한 글자는 * */
-export function maskName(name: string): string {
-  const chars = [...name.trim()];
-  if (chars.length <= 1) return '*';
-  if (chars.length === 2) return `${chars[0]}*`;
-  return `${chars[0]}${'*'.repeat(chars.length - 2)}${chars[chars.length - 1]}`;
-}
+// 이름 가리기는 고객사 응답과 공유 리포트가 같은 규칙을 쓴다 (lib/mask.ts)
+export { maskName } from '../../lib/mask';
+import { maskName } from '../../lib/mask';
 
 export type DisclosureState = 'AUTO_PASSED' | 'MANUAL_CONFIRMED' | 'NEEDS_MANUAL_REVIEW' | 'NOT_CHECKED' | 'NOT_SUBMITTED';
 

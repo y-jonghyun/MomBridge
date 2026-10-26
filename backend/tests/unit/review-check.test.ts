@@ -88,10 +88,11 @@ describe('게시글 분석 · 대가 표시 위치', () => {
 
 describe('리포트 유틸', () => {
   it('masks names', () => {
-    expect(maskName('홍길동')).toBe('홍*동');
-    expect(maskName('김철')).toBe('김*');
-    expect(maskName('남궁민수')).toBe('남**수');
-    expect(maskName('A')).toBe('*');
+    // 규칙은 lib/mask.ts 한 곳에 있다 (tests/unit/mask.test.ts에서 자세히 본다)
+    expect(maskName('홍길동')).toBe('홍○동');
+    expect(maskName('김철')).toBe('김○');
+    expect(maskName('남궁민수')).toBe('남○○수');
+    expect(maskName('A')).toBe('A');
   });
 
   it('writes a BOM-prefixed CSV and neutralises spreadsheet formulas', () => {

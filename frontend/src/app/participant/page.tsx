@@ -14,6 +14,7 @@ import { MissionCard } from '@/components/ui';
 import { toCardData, type MissionListItem } from '@/components/missions/MissionBrowser';
 import { useBookmarks } from '@/lib/bookmarks';
 import { PAYOUT_DELAY_HINT, fetchNextPayoutDate, payoutLabel } from '@/lib/payout';
+import { submissionStatusLabel } from '@/lib/status-labels';
 import ParticipantProfileForm from '@/components/profile/ParticipantProfileForm';
 
 /** 기준: docs/design/mombridge-design/cream-editorial-v1.md 3번 '참여자 내 활동' + Participant.html */
@@ -29,11 +30,6 @@ const TABS = [
   { value: 'profile', label: '내 정보' },
 ];
 
-const STATUS_LABEL: Record<string, string> = {
-  PENDING: '검토 중', APPROVED: '승인', REJECTED: '반려', CANCELED: '취소',
-  SUBMITTED: '검수 중', REVISION: '수정 요청',
-  PENDING_PAYOUT: '정산 대기', COMPLETED: '지급 완료',
-};
 
 /** 상태 배지 — 진행·확인 필요는 clay, 완료는 sage, 그 밖은 선 */
 function StatusBadge({ status }: { status: string }) {
@@ -43,7 +39,7 @@ function StatusBadge({ status }: { status: string }) {
     : 'bg-clay-tint text-clay-dark';
   return (
     <span className={`flex h-[26px] shrink-0 items-center rounded-full px-2.5 text-xs ${tone}`}>
-      {STATUS_LABEL[status] ?? status}
+      {submissionStatusLabel(status)}
     </span>
   );
 }

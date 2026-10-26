@@ -8,12 +8,14 @@ import { LogOutIcon } from '@/components/ui/icons';
 import MissionImageUploader, { pendingUploadNotice, uploadPendingImages, type PendingImage } from '@/components/missions/MissionImageUploader';
 import { missionDateError } from '@/lib/mission-dates';
 import { SNS_LABEL } from '@/lib/mission-options';
+import { MISSION_STATUS_LABEL } from '@/lib/status-labels';
 import { SubmissionCheckPanel, TrafficSummary } from '@/components/operator/OperatorCampaignTools';
 import SettingsEditor from '@/components/operator/SettingsEditor';
 import PayoutAccount from '@/components/operator/PayoutAccount';
 import SubmissionReviewCard from '@/components/operator/SubmissionReviewCard';
 import MissionEditModal from '@/components/missions/MissionEditModal';
 import RegisterMissionForm from '@/components/operator/RegisterMissionForm';
+import CreateClientModal from '@/components/operator/CreateClientModal';
 import {
   CardList, CardRow, DangerButton, EmptyRow, PrimaryButton, QuietButton,
   ShortDate, StatusBadge, TableBox, TableHead, Won,
@@ -28,7 +30,6 @@ const MISSION_STATUS_BAR: Record<string, string> = {
   REVIEWING: 'bg-[#E3C2AC]', CLOSED: 'bg-ink', COMPLETED: 'bg-sage',
 };
 
-const MISSION_STATUS_LABEL: Record<string, string> = { DRAFT: '임시저장', OPEN: '모집중', IN_PROGRESS: '진행중', REVIEWING: '검수중', CLOSED: '종료' };
 const MISSION_STATUS_COLOR: Record<string, string> = { DRAFT: 'bg-cream text-ink-2', OPEN: 'bg-sage-tint text-sage', IN_PROGRESS: 'bg-sage-tint text-sage', REVIEWING: 'bg-clay-tint text-clay-dark', CLOSED: 'bg-clay-tint text-clay-dark' };
 const ROLE_LABEL: Record<string, string> = { OPERATOR: '운영자', PARTICIPANT: '참여자', CLIENT: '고객사' };
 
@@ -61,6 +62,8 @@ export default function OperatorDashboard() {
   const [registerSubmitting, setRegisterSubmitting] = useState(false);
   /** 지금 처리 중인 지원서·제출물 id (버튼을 '처리 중…'으로 막는다) */
   const [busyId, setBusyId] = useState<string | null>(null);
+  /** 가게 대신 등록 창 */
+  const [creatingClient, setCreatingClient] = useState(false);
 
   useEffect(() => {
     // 저장해 둔 로그인 정보를 다 읽기 전에는 판단하지 않는다 (새로고침 때 /login으로 튕기던 원인)
@@ -434,7 +437,11 @@ ${photoNotice}` : msg);
                       <Won value={m.rewardAmount} className="font-medium text-ink-2" />
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <QuietButton onClick={() => setEditMissionId(m.id)}>수정</QuietButton>
+                      <QuietButton
+                        onClick={() => setEditMissionId(m.id)}
+                        disabled={m.status === 'CLOSED'}
+                        title={m.status === 'CLOSED' ? '종료된 미션입니다. 상태를 되돌린 뒤 수정해 주세요' : undefined}
+                      >수정</QuietButton>
                       <QuietButton onClick={() => setPhotoMissionId(m.id)}>사진</QuietButton>
                       <select value={m.status} onChange={e => updateMissionStatus(m.id, e.target.value)}
                         aria-label="미션 상태"
@@ -468,7 +475,11 @@ ${photoNotice}` : msg);
                         <td className="px-4 py-3"><Won value={m.rewardAmount} className="font-medium text-ink" /></td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1.5">
-                            <QuietButton onClick={() => setEditMissionId(m.id)}>수정</QuietButton>
+                            <QuietButton
+                              onClick={() => setEditMissionId(m.id)}
+                              disabled={m.status === 'CLOSED'}
+                              title={m.status === 'CLOSED' ? '종료된 미션입니다. 상태를 되돌린 뒤 수정해 주세요' : undefined}
+                            >수정</QuietButton>
                             <QuietButton onClick={() => setPhotoMissionId(m.id)}>사진</QuietButton>
                             <select value={m.status} onChange={e => updateMissionStatus(m.id, e.target.value)}
                               aria-label="미션 상태"
@@ -656,6 +667,7 @@ ${photoNotice}` : msg);
                 onPendingChange={setPendingImages}
                 submitting={registerSubmitting}
                 onSubmit={handleRegisterMission}
+                onCreateClient={() => setCreatingClient(true)}
               />
             </div>
           )}
@@ -751,6 +763,23 @@ ${photoNotice}` : msg);
           <button onClick={() => { setPhotoMissionId(null); void loadTab('missions'); }}
             className="mt-4 h-11 w-full rounded-control bg-ink text-sm font-bold text-paper">완료</button>
         </Modal>
+      )}
+
+      {/* 가게 대신 등록 — 만들면 목록에 넣고 바로 고른다 */}
+      {creatingClient && (
+        <CreateClientModal
+          onClose={() => setCreatingClient(false)}
+          onCreated={created => {
+            setClients(prev => [...prev, created]);
+            rf('clientProfileId', created.id);
+            if (created.regionSi) rf('regionSi', created.regionSi);
+            if (created.regionGu) rf('regionGu', created.regionGu);
+            if (created.regionDong) rf('regionDong', created.regionDong);
+            if (created.address) rf('visitAddress', created.address);
+            if (created.businessCategory) rf('businessCategory', created.businessCategory);
+            setCreatingClient(false);
+          }}
+        />
       )}
 
       {/* 미션 수정 */}

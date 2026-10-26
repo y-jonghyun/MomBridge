@@ -66,6 +66,8 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
         images,
         rules: editRules(role, state),
         applicationCount: state.applicationCount,
+        /** 종료된 미션은 아예 저장할 수 없다 */
+        closed: mission.status === 'CLOSED',
         // 고객사에게만 뜻이 있는 값 (운영자는 결제 확인 안내로 대신한다)
         paid: mission.paymentStatus === 'PAID',
       },
@@ -77,6 +79,12 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 router.put('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { mission, role, state } = await loadForEdit(req);
+
+    // 종료된 미션은 고치지 않는다. 고쳐야 하면 운영자가 상태를 되돌린 뒤에 한다
+    // (운영자도 같은 규칙이다 — 되돌릴 수단이 있어 막아도 막히지 않는다)
+    if (mission.status === 'CLOSED') {
+      throw new AppError('MISSION_CLOSED', 422, '종료된 미션은 수정할 수 없습니다. 상태를 되돌린 뒤 수정해 주세요');
+    }
 
     // 고객사는 가게 정보가 다 차 있어야 한다 (등록과 같은 조건)
     if (role === 'CLIENT' && !isStoreComplete(mission.clientProfile)) {
