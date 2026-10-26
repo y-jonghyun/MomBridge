@@ -55,3 +55,21 @@ export function useAuthHydrated(): boolean {
 
   return hydrated;
 }
+
+/** 로그아웃한 뒤 홈에서 한 번만 보여 줄 안내 (sessionStorage 열쇠) */
+export const LOGOUT_NOTICE_KEY = 'mombridge-logout-notice';
+
+/**
+ * 로그아웃 — 화면마다 다르게 하지 않도록 한 곳에 둔다.
+ * 저장된 로그인 정보를 지우고, 홈으로 보내고, 홈에서 "로그아웃했어요"를 한 번 보여 준다.
+ *
+ * 화면 이동이 필요 없는 곳(로그인 화면에서 '다른 계정으로 로그인')은 clearAuth()만 쓴다.
+ */
+export function logout(options: { redirectTo?: string } = {}): void {
+  useAuthStore.getState().clearAuth();
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem(LOGOUT_NOTICE_KEY, '1');
+  } catch { /* 저장소를 막아 둔 브라우저에서는 안내만 건너뛴다 */ }
+  window.location.href = options.redirectTo ?? '/';
+}

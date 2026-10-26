@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
-import { BellIcon, SearchIcon } from './icons';
+import { SearchIcon } from './icons';
+import AccountMenu from './AccountMenu';
 
 /** 역할별로 '내 활동'이 가리키는 곳 */
 const HOME_BY_ROLE = { PARTICIPANT: '/participant', CLIENT: '/client', OPERATOR: '/operator' } as const;
@@ -11,7 +12,7 @@ const MY_LABEL_BY_ROLE = { PARTICIPANT: '내 활동', CLIENT: '내 가게', OPER
 
 /**
  * 상단 바. 로고(영문 머리말 + 한글 serif)와 오른쪽 동작.
- * 로그인 상태를 반영한다 — 로그인 전에는 '로그인', 후에는 내 화면으로 가는 링크와 알림.
+ * 로그인 전에는 '로그인', 후에는 계정 메뉴(이름·역할 · 내 화면 · 로그아웃)를 보여 준다.
  * 1024px 이상에서는 하단 탭바가 숨겨지므로 여기에 상단 메뉴를 함께 보여 준다.
  */
 export default function SiteHeader({
@@ -71,14 +72,7 @@ export default function SiteHeader({
             <SearchIcon />
           </button>
         )}
-        {signedIn ? (showMyLink && (
-          <Link
-            href={myHref} aria-label={myLabel}
-            className="flex h-11 w-11 items-center justify-center text-ink"
-          >
-            <BellIcon />
-          </Link>
-        )) : (
+        {signedIn ? (showMyLink && <AccountMenu />) : (
           ready && (
             <Link
               href="/login"

@@ -4,6 +4,7 @@ export { default as MissionCard, photoTone } from './MissionCard';
 export type { MissionCardData } from './MissionCard';
 export { default as SiteHeader } from './SiteHeader';
 export { default as Modal } from './Modal';
+export { default as AccountMenu } from './AccountMenu';
 export { default as BottomTabBar, BottomTabBarSpacer } from './BottomTabBar';
 export { Badge, CategoryTabs, Chip, NoticeBox, SectionHeader, Tag } from './primitives';
 export { KeywordBox, ScheduleTimeline, StickyCTA } from './detail';

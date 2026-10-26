@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
 import { syncSelfClickCookie } from '@/lib/self-click';
-import { useAuthHydrated, useAuthStore } from '@/store/auth';
+import { logout, useAuthHydrated, useAuthStore } from '@/store/auth';
 import { PostCheckSummary, ReviewGuideModal } from '@/components/campaign/ReviewGuide';
 import { BottomTabBar, BottomTabBarSpacer, CategoryTabs, SiteHeader } from '@/components/ui';
 import { photoTone } from '@/components/ui/MissionCard';
@@ -83,7 +83,6 @@ function StageBar({ current }: { current: number }) {
 function ParticipantBody({ initialTab }: { initialTab: string }) {
   const router = useRouter();
   const user = useAuthStore(s => s.user);
-  const clearAuth = useAuthStore(s => s.clearAuth);
 
   const hydrated = useAuthHydrated();
   // 가입 직후 ?tab=profile 로 들어온다
@@ -302,7 +301,7 @@ function ParticipantBody({ initialTab }: { initialTab: string }) {
             </div>
             <button
               type="button" aria-label="로그아웃"
-              onClick={() => { clearAuth(); router.push('/login'); }}
+              onClick={() => logout()}
               className="flex h-11 w-11 items-center justify-center text-muted"
             >
               <LogOutIcon size={20} />

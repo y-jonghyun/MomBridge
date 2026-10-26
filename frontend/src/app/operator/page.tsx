@@ -3,8 +3,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
-import { useAuthHydrated, useAuthStore } from '@/store/auth';
-import { LogOutIcon } from '@/components/ui/icons';
+import { logout, useAuthHydrated, useAuthStore } from '@/store/auth';
 import MissionImageUploader, { pendingUploadNotice, uploadPendingImages, type PendingImage } from '@/components/missions/MissionImageUploader';
 import { missionDateError } from '@/lib/mission-dates';
 import { SNS_LABEL } from '@/lib/mission-options';
@@ -20,7 +19,7 @@ import {
   CardList, CardRow, DangerButton, EmptyRow, PrimaryButton, QuietButton,
   ShortDate, StatusBadge, TableBox, TableHead, Won,
 } from '@/components/operator/ui';
-import { Modal } from '@/components/ui';
+import { AccountMenu, Modal } from '@/components/ui';
 
 type Tab = 'overview' | 'missions' | 'applications' | 'submissions' | 'payouts' | 'users' | 'register-mission' | 'traffic' | 'settings';
 
@@ -37,7 +36,6 @@ export default function OperatorDashboard() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const hydrated = useAuthHydrated();
-  const clearAuth = useAuthStore((s) => s.clearAuth);
   const [tab, setTab] = useState<Tab>('overview');
   const [stats, setStats] = useState<Record<string, number> & { missionsByStatus?: { status: string; _count: number }[] } | null>(null);
   const [missions, setMissions] = useState<any[]>([]);
@@ -248,13 +246,7 @@ ${photoNotice}` : msg);
             <span className="font-accent text-[11px] italic tracking-[0.08em] text-muted">Operator</span>
             <span className="font-serif text-section font-bold">맘브릿지</span>
           </span>
-          <button
-            type="button" aria-label="로그아웃"
-            onClick={() => { clearAuth(); router.push('/login'); }}
-            className="flex h-11 w-11 items-center justify-center text-muted"
-          >
-            <LogOutIcon size={20} />
-          </button>
+          <AccountMenu />
         </div>
         <div className="no-scrollbar overflow-x-auto px-5">
           <div className="flex min-w-max">
@@ -295,8 +287,8 @@ ${photoNotice}` : msg);
             <Link href="/client" className="block rounded-control px-3 py-2 text-sm text-ink-2">고객사 화면</Link>
             <button
               type="button"
-              onClick={() => { clearAuth(); router.push('/login'); }}
-              className="block w-full rounded-control px-3 py-2 text-left text-sm text-muted"
+              onClick={() => logout()}
+              className="block min-h-[44px] w-full rounded-control px-3 py-2 text-left text-sm text-muted"
             >
               로그아웃
             </button>
