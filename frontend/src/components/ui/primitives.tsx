@@ -18,7 +18,12 @@ export function Badge({ tone = 'paper', children }: { tone?: 'paper' | 'ink'; ch
   );
 }
 
-/** 필터용 둥근 버튼. 선택되면 ink 배경 */
+/**
+ * 필터용 둥근 버튼. 선택되면 ink 배경.
+ *
+ * 보이는 알약은 36px 그대로 두고, 누를 수 있는 영역만 44px로 넓힌다
+ * (-my-1로 위아래 4px씩 되돌려 줄 높이는 그대로다 — 디자인 기준 1번의 44px).
+ */
 export function Chip({
   selected = false, onClick, children, icon,
 }: {
@@ -33,10 +38,12 @@ export function Chip({
   return (
     <button
       type="button" onClick={onClick} aria-pressed={selected}
-      className={`flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] ${toneClass}`}
+      className="-my-1 flex min-h-[44px] shrink-0 items-center"
     >
-      {icon}
-      {children}
+      <span className={`flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] ${toneClass}`}>
+        {icon}
+        {children}
+      </span>
     </button>
   );
 }
