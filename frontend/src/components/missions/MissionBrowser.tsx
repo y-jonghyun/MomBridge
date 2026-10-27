@@ -141,20 +141,23 @@ export default function MissionBrowser({
           탭 줄을 둘로 쌓지 않으려고 유형(방문형·SNS·리뷰·영상)도 이 줄에 둔다.
           유형은 하나만, 엄마 시간 태그는 여러 개 고를 수 있다 */}
       <div className="no-scrollbar flex gap-2 overflow-x-auto px-5 pb-1">
-        {/* 지역 칩. Chip은 button이라 select를 품을 수 없어 같은 모양의 label로 만든다 */}
-        <label
-          className={`flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] ${
-            filter.regionSi ? 'bg-ink font-medium text-paper' : 'border border-line bg-paper text-ink-2'
-          }`}
-        >
-          <PinIcon size={13} strokeWidth={2} />
-          <span className="sr-only">지역</span>
-          <ProvinceSelect
-            value={filter.regionSi}
-            emptyLabel="전체 지역"
-            onChange={v => apply({ regionSi: v })}
-            className="cursor-pointer appearance-none bg-transparent text-[13px] text-inherit outline-none"
-          />
+        {/* 지역 칩. Chip은 button이라 select를 품을 수 없어 같은 모양의 label로 만든다.
+            다른 칩과 같이 보이는 알약은 36px, 누를 수 있는 영역은 44px로 둔다 */}
+        <label className="-my-1 flex min-h-[44px] shrink-0 items-center">
+          <span
+            className={`flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] ${
+              filter.regionSi ? 'bg-ink font-medium text-paper' : 'border border-line bg-paper text-ink-2'
+            }`}
+          >
+            <PinIcon size={13} strokeWidth={2} />
+            <span className="sr-only">지역</span>
+            <ProvinceSelect
+              value={filter.regionSi}
+              emptyLabel="전체 지역"
+              onChange={v => apply({ regionSi: v })}
+              className="h-9 cursor-pointer appearance-none bg-transparent text-[13px] text-inherit outline-none"
+            />
+          </span>
         </label>
         {Object.entries(CATEGORY_LABEL).map(([value, label]) => (
           <Chip
@@ -192,7 +195,8 @@ export default function MissionBrowser({
             placeholder="가게 이름, 동네로 찾기"
             className="min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-muted"
           />
-          <button type="submit" className="shrink-0 text-[13px] font-medium text-clay">검색</button>
+          {/* 입력칸 안의 버튼이라 세로 패딩으로만 누를 영역을 넓힌다 (줄 높이는 그대로) */}
+          <button type="submit" className="shrink-0 py-3.5 text-[13px] font-medium text-clay">검색</button>
         </form>
       )}
 
@@ -202,9 +206,10 @@ export default function MissionBrowser({
         </span>
         <label className="flex items-center gap-1 text-[13px] text-ink-2">
           <span className="sr-only">정렬</span>
+          {/* 테두리가 없는 칸이라 높이를 44px로 키워도 보이는 모습은 그대로다 */}
           <select
             value={filter.sort} onChange={e => apply({ sort: e.target.value })}
-            className="h-9 bg-transparent text-[13px] text-ink-2 outline-none"
+            className="-my-1 min-h-[44px] bg-transparent text-[13px] text-ink-2 outline-none"
           >
             {SORTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>

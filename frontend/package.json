@@ -11,7 +11,8 @@
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "measure:tap": "node scripts/measure-tap.mjs"
   },
   "dependencies": {
     "@sentry/nextjs": "10.75.3",

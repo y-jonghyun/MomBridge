@@ -7,6 +7,7 @@ import LoginPage from '@/app/login/page';
 import HomeView from '@/components/home/HomeView';
 import AboutPage from '@/app/about/page';
 import ForShopsPage from '@/app/for-shops/page';
+import MissionsPage from '@/app/missions/page';
 import { useAuthStore } from '@/store/auth';
 
 /**
@@ -82,6 +83,13 @@ describe('주요 화면의 누를 수 있는 것', () => {
 
   it('사장님 안내 (/for-shops)', () => {
     const { container } = render(<ForShopsPage />);
+    expect(smallTouchTargets(container)).toEqual([]);
+  });
+
+  it('미션 목록 (/missions)', async () => {
+    const { container } = render(<MissionsPage />);
+    // 목록을 받아 오고 칩 줄이 그려질 때까지 기다린다
+    await screen.findByText('전체 업종');
     expect(smallTouchTargets(container)).toEqual([]);
   });
 
