@@ -166,7 +166,7 @@ export default function MissionDetailPage() {
   );
 
   return (
-    <div className="min-h-screen bg-cream pb-[88px]">
+    <div className="min-h-screen bg-cream pb-[calc(88px+env(safe-area-inset-bottom))]">
       {/* 사진 — 여러 장이면 옆으로 넘기고 '1 / n'을 보여준다 */}
       <MissionGallery missionId={mission.id} businessCategory={mission.businessCategory} images={images}>
         <Link
