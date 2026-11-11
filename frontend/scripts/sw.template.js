@@ -24,17 +24,35 @@ const PRECACHE = [
 /** 배포가 쌓여도 정적 캐시가 끝없이 커지지 않게 */
 const STATIC_LIMIT = 300;
 
+/**
+ * 오프라인 화면 HTML에서 그 화면을 그리는 데 필요한 JS·CSS 주소만 뽑는다.
+ * - 확장자로 끝나는 주소만 잡는다: HTML 안 RSC 데이터의 이스케이프 때문에 잘린 주소(확장자 없음)가 섞이면 404가 난다
+ * - 글꼴(/_next/static/media/*.woff2)은 받지 않는다: 한글 글꼴 조각이 100개 가까이 preload되는데
+ *   안내 문구 몇 줄에는 과하다. 오프라인에서는 시스템 글꼴로 보인다 (온라인일 때 받은 글꼴은 아래 cache-first로 쌓인다)
+ */
+function offlineAssets(html) {
+  const found = html.match(/\/_next\/static\/(?:chunks|css)\/[\w\-./]+?\.(?:js|css)(?![\w.])/g) ?? [];
+  return [...new Set(found)];
+}
+
+/** 하나씩 받아서 성공한 것만 저장한다 — 한두 개 실패로 설치 전체가 무너지지 않게 (addAll은 하나만 실패해도 전부 실패) */
+async function cacheEach(cache, urls) {
+  await Promise.allSettled(
+    urls.map(async url => {
+      const res = await fetch(url, { cache: 'reload' });
+      if (res.ok) await cache.put(url, res);
+    }),
+  );
+}
+
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
-    const pages = await caches.open(PAGES);
-    const statics = await caches.open(STATIC);
+    // 꼭 있어야 하는 것은 /offline HTML 하나뿐 — 이것만 실패하면 설치를 멈춘다 (다음 방문 때 다시 시도)
     const res = await fetch(OFFLINE_URL, { cache: 'reload' });
     if (!res.ok) throw new Error(`offline page ${res.status}`);
-    // 오프라인 화면이 쓰는 JS·CSS·글꼴도 함께 받아 둬야 네트워크 없이 제대로 그려진다
     const html = await res.clone().text();
-    const assets = [...new Set(html.match(/\/_next\/static\/[^"'\s)\\]+/g) ?? [])];
-    await pages.put(OFFLINE_URL, res);
-    await statics.addAll([...PRECACHE, ...assets]);
+    await (await caches.open(PAGES)).put(OFFLINE_URL, res);
+    await cacheEach(await caches.open(STATIC), [...PRECACHE, ...offlineAssets(html)]);
     await self.skipWaiting();
   })());
 });
