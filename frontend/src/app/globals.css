@@ -3,10 +3,44 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* 움직임 토큰 (디자인 시안 app-feel의 움직임 표). 쓰는 곳: tailwind의 duration-press·ease-mb 등 */
+    --mb-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --mb-dur-press: 90ms;     /* 누르는 순간 */
+    --mb-dur-quick: 160ms;    /* 탭 바꾸기, 작은 상태 변화 */
+    --mb-dur-push: 280ms;     /* 목록 → 상세 */
+    --mb-dur-sheet-in: 320ms; /* 바텀 시트 열기 */
+    --mb-dur-sheet-out: 220ms;/* 바텀 시트 닫기 */
+    /* 입력칸 테두리 — tailwind line.strong과 같은 값 */
+    --mb-field-border: #8F8373;
+  }
   * { @apply box-border; }
-  html { @apply scroll-smooth; }
-  /* 설치 배너가 떠 있는 동안 그 높이만큼 아래 여백을 둔다 (lib/bottom-chrome.ts) */
-  body { padding-bottom: var(--mb-install-banner, 0px); }
+  html {
+    @apply scroll-smooth;
+    /* 탭할 때 뜨는 파란 강조를 끈다 — 누른 느낌은 아래 .press·button의 눌림으로 준다 */
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    /* 설치 배너가 떠 있는 동안 그 높이만큼 아래 여백을 둔다 (lib/bottom-chrome.ts) */
+    padding-bottom: var(--mb-install-banner, 0px);
+    /* 노치·둥근 모서리 안쪽으로 (viewport-fit=cover). 위·옆 여백이 없는 기기에서는 0이다 */
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+  /* 메뉴·버튼은 길게 눌러도 글자 선택·미리보기 메뉴가 뜨지 않게 (본문 글은 그대로 선택된다) */
+  button, nav a, [role='tab'], .press {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  /* 누르는 반응: 살짝 눌린다. transform 대신 scale 속성을 써서 기존 이동·회전과 겹치지 않게 */
+  button:not(:disabled), .press {
+    transition: scale var(--mb-dur-press) ease-out;
+  }
+  button:not(:disabled):active, .press:active {
+    scale: 0.97;
+  }
 }
 
 @layer utilities {
@@ -16,4 +50,35 @@
     scrollbar-width: none;
   }
   .no-scrollbar::-webkit-scrollbar { display: none; }
+}
+
+/* 설치 앱(standalone)에서만 숨기는 사이트 장식. lib/display-mode.ts가 <html data-display>를 붙인다 */
+@media (display-mode: standalone) { .web-only { display: none !important; } }
+html[data-display='standalone'] .web-only { display: none !important; }
+
+/*
+ * 입력칸 테두리: 대비 3:1 이상(크림 3.30:1 · paper 3.65:1).
+ * 입력칸 스타일이 여러 파일에 흩어져 있어 한 곳에서 정한다 — 유틸리티 클래스(border-line 등)보다 구체적인 선택자라 우선한다.
+ * 초점일 때는 ink로 진하게 (기존 focus:border-ink와 같은 결과).
+ */
+input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']),
+textarea,
+select {
+  border-color: var(--mb-field-border);
+}
+input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']):focus,
+textarea:focus,
+select:focus {
+  border-color: #211C16;
+}
+
+/* 움직임 줄이기 설정을 켠 사용자: 전환·애니메이션·부드러운 스크롤을 끈다 */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto !important; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  button:not(:disabled):active, .press:active { scale: none; }
 }

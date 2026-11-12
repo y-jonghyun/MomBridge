@@ -16,7 +16,8 @@ export default function AuthShell({
     <div className="flex min-h-screen items-center justify-center bg-cream px-5 py-10">
       <div className="w-full max-w-md">
         <Link href="/" className="mb-6 flex min-h-[44px] flex-col items-center justify-center text-ink">
-          <span className="font-accent text-[13px] italic tracking-[0.08em] text-muted">MomBridge</span>
+          {/* 영문 머리말 줄은 사이트 장식 — 설치 앱에서는 숨긴다 */}
+          <span className="web-only font-accent text-[13px] italic tracking-[0.08em] text-muted">MomBridge</span>
           <span className="font-serif text-[22px] font-bold tracking-[-0.02em]">맘브릿지</span>
         </Link>
 
