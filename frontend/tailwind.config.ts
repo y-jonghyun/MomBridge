@@ -10,13 +10,23 @@ const config: Config = {
         paper: '#FFFDF8',
         ink: { DEFAULT: '#211C16', 2: '#4A4238' },
         muted: '#6F665B',
-        line: { DEFAULT: '#E6DCCD', soft: '#EFE7DA' },
+        // strong: 입력칸 테두리. 크림 3.30:1 · paper 3.65:1 (WCAG 1.4.11 비텍스트 대비 3:1 이상)
+        line: { DEFAULT: '#E6DCCD', soft: '#EFE7DA', strong: '#8F8373' },
         clay: { DEFAULT: '#A9572F', dark: '#7E3E1F', tint: '#F2E3D6' },
         sage: { DEFAULT: '#46533B', tint: '#E3E6D8' },
         // 사진이 없을 때 쓰는 자리 색 (미션 id로 고정 선택)
         photo: { 1: '#E4D3C1', 2: '#D9D5C3', 3: '#E8DACB', 4: '#DDD8C8' },
         // 자리 색 위에 올리는 글자 색
         'photo-ink': { 1: '#7E5E45', 2: '#5E5A46', 3: '#7E5E45', 4: '#5E5A46' },
+      },
+      // 움직임 토큰 — 값은 globals.css의 :root 변수 (움직임 줄이기 설정에서는 globals.css가 모두 끈다)
+      transitionTimingFunction: { mb: 'var(--mb-ease)' },
+      transitionDuration: {
+        press: 'var(--mb-dur-press)',
+        quick: 'var(--mb-dur-quick)',
+        push: 'var(--mb-dur-push)',
+        'sheet-in': 'var(--mb-dur-sheet-in)',
+        'sheet-out': 'var(--mb-dur-sheet-out)',
       },
       fontFamily: {
         // app/layout.tsx의 next/font/google 변수와 연결된다

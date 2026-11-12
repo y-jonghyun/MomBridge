@@ -4,6 +4,7 @@ import './globals.css';
 import ServerWakeNotice from '@/components/common/ServerWakeNotice';
 import LogoutNotice from '@/components/ui/LogoutNotice';
 import { SITE_URL, THEME_COLOR } from '@/lib/site';
+import { DISPLAY_MODE_SCRIPT } from '@/lib/display-mode';
 import ServiceWorkerRegister from '@/components/common/ServiceWorkerRegister';
 import InstallPrompt from '@/components/common/InstallPrompt';
 
@@ -56,8 +57,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ko" className={`${sans.variable} ${serif.variable} ${accent.variable}`}>
+    <html lang="ko" className={`${sans.variable} ${serif.variable} ${accent.variable}`} suppressHydrationWarning>
       <head>
+        {/* 설치 앱이면 첫 화면이 그려지기 전에 <html data-display="standalone"> (lib/display-mode.ts) */}
+        <script dangerouslySetInnerHTML={{ __html: DISPLAY_MODE_SCRIPT }} />
         <link rel="preconnect" href="https://mombridge-backend.onrender.com" />
         <link rel="dns-prefetch" href="https://mombridge-backend.onrender.com" />
       </head>
