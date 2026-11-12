@@ -1,7 +1,9 @@
 'use client';
+import { useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ChatIcon, GridIcon, HomeIcon, UserIcon } from './icons';
+import { BOTTOM_BAR_VAR, useReportHeight } from '@/lib/bottom-chrome';
 
 const TABS = [
   { href: '/', label: '홈', Icon: HomeIcon, match: (p: string) => p === '/' },
@@ -16,8 +18,12 @@ const TABS = [
  */
 export default function BottomTabBar() {
   const pathname = usePathname() ?? '/';
+  const ref = useRef<HTMLElement>(null);
+  // 데스크톱(lg)에서는 숨겨져 높이 0으로 알린다
+  useReportHeight(ref, BOTTOM_BAR_VAR);
   return (
     <nav
+      ref={ref}
       aria-label="하단 메뉴"
       className="fixed inset-x-0 bottom-0 z-30 grid h-[calc(76px+env(safe-area-inset-bottom))] grid-cols-4 border-t border-line bg-paper pb-[calc(10px+env(safe-area-inset-bottom))] lg:hidden"
     >

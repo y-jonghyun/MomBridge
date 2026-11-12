@@ -9,6 +9,7 @@ import KeywordRecommender, { KeywordSelection } from '@/components/campaign/Keyw
 import CampaignPanel from '@/components/campaign/CampaignPanel';
 import ProvinceSelect from '@/components/common/ProvinceSelect';
 import { CategoryTabs, SiteHeader } from '@/components/ui';
+import FixedBottomBar from '@/components/ui/FixedBottomBar';
 import MissionImageUploader, { pendingUploadNotice, uploadPendingImages, type PendingImage } from '@/components/missions/MissionImageUploader';
 import { BUSINESS_CATEGORIES, MOM_TAGS } from '@/lib/mission-options';
 import { formatPhone, isMobilePhone, phoneDigits } from '@/lib/phone';
@@ -753,14 +754,14 @@ ${photoNotice}`
 
       {/* 하단 고정 — 어느 탭에서든 새 미션을 등록할 수 있게 */}
       {tab !== 'create' && (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-paper px-5 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))]">
+        <FixedBottomBar>
           <button
             onClick={() => setTab('create')}
             className="mx-auto flex h-[52px] w-full max-w-client items-center justify-center rounded-control-lg bg-clay text-base font-bold text-paper"
           >
             새 미션 등록
           </button>
-        </div>
+        </FixedBottomBar>
       )}
 
       {/* 미션 수정 — 등록 폼을 그대로 다시 쓴다 */}

@@ -5,6 +5,8 @@
 @layer base {
   * { @apply box-border; }
   html { @apply scroll-smooth; }
+  /* 설치 배너가 떠 있는 동안 그 높이만큼 아래 여백을 둔다 (lib/bottom-chrome.ts) */
+  body { padding-bottom: var(--mb-install-banner, 0px); }
 }
 
 @layer utilities {

@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { HeartIcon } from './icons';
+import FixedBottomBar from './FixedBottomBar';
 
 /** 미션 상세 하단 고정: 찜(52×52) + 신청 버튼(clay, 높이 52) */
 export function StickyCTA({
@@ -13,7 +14,7 @@ export function StickyCTA({
   onToggleSave?: () => void;
 }) {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-30 flex gap-2.5 border-t border-line bg-paper px-5 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))]">
+    <FixedBottomBar className="flex gap-2.5">
       {onToggleSave && (
         <button
           type="button" onClick={onToggleSave}
@@ -29,7 +30,7 @@ export function StickyCTA({
       >
         {label}
       </button>
-    </div>
+    </FixedBottomBar>
   );
 }
 
