@@ -1,9 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <!-- 맘브릿지 앱 아이콘 원본. 색은 tailwind.config.ts의 디자인 토큰 그대로 (cream / clay / ink).
-       두 개의 아치가 소문자 m(맘)이자 다리(브릿지)를 이룬다.
-       maskable 안전 영역(가운데 80% 원, 반지름 410) 안에 모든 획이 들어간다 — 가장 먼 모서리가 반지름 약 340. -->
-  <rect width="1024" height="1024" fill="#F6F1E8"/>
-  <path d="M292 626 V466 A110 110 0 0 1 512 466 V626 M512 466 A110 110 0 0 1 732 466 V626"
-        fill="none" stroke="#A9572F" stroke-width="64" stroke-linecap="round" stroke-linejoin="round"/>
-  <line x1="232" y1="690" x2="792" y2="690" stroke="#211C16" stroke-width="20" stroke-linecap="round"/>
+  <rect width="1024" height="1024" fill="#A9572F"/>
+  <g transform="translate(512 512) scale(1.2) translate(-512 -512)">
+  <path d="M292 622 V466 A110 110 0 0 1 512 466 V622 M512 466 A110 110 0 0 1 732 466 V622"
+        fill="none" stroke="#F6F1E8" stroke-width="64" stroke-linecap="butt" stroke-linejoin="round"/>
+  <line x1="244" y1="682" x2="780" y2="682" stroke="#F6F1E8" stroke-width="44" stroke-linecap="round"/>
+  </g>
 </svg>

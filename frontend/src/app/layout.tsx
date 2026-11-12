@@ -34,7 +34,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: '맘브릿지 — 지역 마케팅 미션 플랫폼',
   description: '소상공인과 지역 주민을 연결하는 하이퍼로컬 미션 매칭 플랫폼',
-  // 홈 화면 설치 (PWA) — manifest는 app/manifest.ts, 아이콘 원본은 public/icons/icon-source.svg
+  // 홈 화면 설치 (PWA) — manifest는 app/manifest.ts, 아이콘 원본은 public/icons/icon-source*.svg
   manifest: '/manifest.webmanifest',
   appleWebApp: { capable: true, title: '맘브릿지', statusBarStyle: 'default' },
   icons: {
