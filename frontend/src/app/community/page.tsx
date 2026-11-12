@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { BottomTabBar, BottomTabBarSpacer, SiteHeader } from '@/components/ui';
+import { AppBar, BottomTabBar, BottomTabBarSpacer } from '@/components/ui';
 import api from '@/lib/api';
 import { useAuthHydrated, useAuthStore } from '@/store/auth';
 
@@ -108,22 +108,19 @@ export default function CommunityPage() {
 
   return (
     <div className="min-h-screen bg-cream">
-      <SiteHeader showSearch={false} />
+      <AppBar
+        title="커뮤니티"
+        actions={user && (
+          <button
+            onClick={() => setShowWrite(true)}
+            className="flex h-11 shrink-0 items-center rounded-control bg-clay px-4 text-sm font-bold text-paper"
+          >
+            글 작성
+          </button>
+        )}
+      />
 
       <div className="mx-auto max-w-shell">
-        <header className="flex items-center justify-between gap-2 px-5 pb-2 pt-3.5">
-          <h1 className="font-serif text-title font-bold">커뮤니티</h1>
-          {user ? (
-            <button
-              onClick={() => setShowWrite(true)}
-              className="flex h-11 shrink-0 items-center rounded-control bg-clay px-4 text-sm font-bold text-paper"
-            >
-              글 작성
-            </button>
-          ) : (
-            <Link href="/login" className="flex h-11 items-center px-2 text-sm font-medium text-ink-2">로그인</Link>
-          )}
-        </header>
 
         {/* 카테고리 탭 — 스크롤은 되되 스크롤바는 숨긴다 */}
         <nav aria-label="게시판 분류" className="no-scrollbar flex gap-[22px] overflow-x-auto border-b border-line px-5">

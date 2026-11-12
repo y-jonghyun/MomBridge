@@ -3,6 +3,7 @@
 export { default as MissionCard, photoTone } from './MissionCard';
 export type { MissionCardData } from './MissionCard';
 export { default as SiteHeader } from './SiteHeader';
+export { default as AppBar } from './AppBar';
 export { default as Modal } from './Modal';
 export { default as AccountMenu } from './AccountMenu';
 export { default as BottomTabBar, BottomTabBarSpacer } from './BottomTabBar';
