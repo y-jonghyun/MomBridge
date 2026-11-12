@@ -28,9 +28,9 @@ vi.mock('@/lib/bookmarks', () => ({
 }));
 
 const DAY = 86400000;
-// 날짜만 다루므로 오늘 정오 기준으로 만든다 (시각에 따라 D-day가 흔들리지 않게)
-const noon = () => { const d = new Date(); d.setHours(12, 0, 0, 0); return d.getTime(); };
-const at = (days: number) => new Date(noon() + days * DAY).toISOString();
+// 지금 기준 days일 뒤에서 1분 빼서 만든다 — 화면의 D-day는 올림(ceil)이라 실행 시각과 상관없이 정확히 D-days가 된다
+// (전에는 정오 기준이라 자정 직후에 돌리면 하루가 밀렸다)
+const at = (days: number) => new Date(Date.now() + days * DAY - 60_000).toISOString();
 const md = (iso: string) => { const d = new Date(iso); return `${d.getMonth() + 1}월 ${d.getDate()}일`; };
 
 function mission(over: Record<string, unknown> = {}) {

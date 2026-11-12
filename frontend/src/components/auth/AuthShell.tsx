@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { LEGAL_LINKS } from '@/lib/legal';
 
 /**
  * 로그인·회원가입·비밀번호 화면의 공통 틀.
@@ -28,6 +29,16 @@ export default function AuthShell({
         </div>
 
         {footer && <div className="mt-4 space-y-2 text-center text-sm text-muted">{footer}</div>}
+
+        {/* 약관·방침 — 로그아웃 상태의 설치 앱에서는 사이트 하단이 없으므로 여기서 닿는다 */}
+        <nav aria-label="약관" className="mt-6 flex items-center justify-center text-xs text-muted">
+          {LEGAL_LINKS.map((l, i) => (
+            <span key={l.href} className="flex items-center">
+              {i > 0 && <span aria-hidden>·</span>}
+              <Link href={l.href} className={`inline-flex min-h-[44px] items-center px-2 ${'strong' in l && l.strong ? 'font-semibold' : ''}`}>{l.label}</Link>
+            </span>
+          ))}
+        </nav>
       </div>
     </div>
   );

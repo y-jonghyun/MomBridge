@@ -17,6 +17,7 @@ import { useBookmarks } from '@/lib/bookmarks';
 import { PAYOUT_DELAY_HINT, fetchNextPayoutDate, payoutLabel } from '@/lib/payout';
 import { submissionStatusLabel } from '@/lib/status-labels';
 import ParticipantProfileForm from '@/components/profile/ParticipantProfileForm';
+import LegalInfo from '@/components/legal/LegalInfo';
 import MissionJourney, { journeySteps } from '@/components/participant/MissionJourney';
 
 /** 기준: docs/design/mombridge-design/cream-editorial-v1.md 3번 '참여자 내 활동' + Participant.html */
@@ -591,6 +592,8 @@ function ParticipantBody({ initialTab }: { initialTab: string }) {
                     {profileSaving ? '저장 중…' : '계정 정보 저장'}
                   </button>
                 </form>
+                {/* 약관·방침·사업자 정보 — 설치 앱에서는 사이트 하단이 숨겨지므로 여기서 닿는다 */}
+                <LegalInfo />
               </div>
             )}
           </>
