@@ -17,6 +17,7 @@ import { useBookmarks } from '@/lib/bookmarks';
 import { PAYOUT_DELAY_HINT, fetchNextPayoutDate, payoutLabel } from '@/lib/payout';
 import { submissionStatusLabel } from '@/lib/status-labels';
 import ParticipantProfileForm from '@/components/profile/ParticipantProfileForm';
+import MissionJourney, { journeySteps } from '@/components/participant/MissionJourney';
 
 /** 기준: docs/design/mombridge-design/cream-editorial-v1.md 3번 '참여자 내 활동' + Participant.html */
 
@@ -52,33 +53,6 @@ const dateK = (d: string) => new Date(d).toLocaleDateString('ko-KR', { month: '2
 function maskAccount(account?: string | null) {
   const digits = String(account ?? '').replace(/\D/g, '');
   return digits.length >= 4 ? `****-${digits.slice(-4)}` : '****';
-}
-
-const STAGES = ['선정', '방문', '후기 제출', '검수', '지급'];
-
-/** 지원·제출·정산 상태를 5단계 중 어디인지로 바꾼다 */
-function stageIndex(sub: any, payout: any) {
-  if (payout?.status === 'COMPLETED') return 4;
-  if (sub?.status === 'APPROVED') return 4;
-  if (sub?.status === 'SUBMITTED') return 3;
-  return 2; // 아직 제출 전이거나 수정 요청 — '후기 제출' 단계
-}
-
-function StageBar({ current }: { current: number }) {
-  return (
-    <ol aria-label="진행 단계" className="m-0 mt-[18px] grid list-none grid-cols-5 gap-1 p-0">
-      {STAGES.map((label, i) => {
-        const done = i < current;
-        const now = i === current;
-        return (
-          <li key={label} className={`text-center text-[11px] ${now ? 'font-bold text-clay' : done ? 'text-ink' : 'text-muted'}`}>
-            <span className={`mb-1.5 block h-1 rounded ${done ? 'bg-clay' : now ? 'bg-[#E3C2AC]' : 'bg-line'}`} />
-            {label}
-          </li>
-        );
-      })}
-    </ol>
-  );
 }
 
 function ParticipantBody({ initialTab }: { initialTab: string }) {
@@ -310,16 +284,25 @@ function ParticipantBody({ initialTab }: { initialTab: string }) {
 
       <div className="mx-auto max-w-shell">
 
-        {/* 이번 달 요약 */}
-        <section className="mx-5 mt-3 rounded-box bg-ink px-5 py-[22px] text-paper">
-          <span className="font-accent text-sm italic text-[#D9A27F]">This month</span>
-          <p className="mt-1 text-[13px] text-[#CFC4B4]">
-            {payoutDay
-              ? (pendingPay.length > 0 ? `${payoutDay} 지급 예정인 보상` : `다음 정산일 ${payoutDay} 지급 예정`)
-              : '받을 보상'}
-          </p>
-          <p className="mt-1 font-serif text-hero font-bold">{won(nextAmount)}</p>
-          <p className="mt-1 text-xs text-[#CFC4B4]">
+        {/* 지급 예정 — 크림 카드. 금액은 운영자가 만든 정산 행에서만 나온다 */}
+        <section aria-label="지급 예정" className="mx-5 mt-3 rounded-box border border-line bg-paper px-5 py-[18px]">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[13px] text-muted">
+                {payoutDay
+                  ? (pendingPay.length > 0 ? `${payoutDay} 지급 예정` : `다음 정산일 ${payoutDay}`)
+                  : '받을 보상'}
+              </p>
+              <p className="mt-0.5 text-[26px] font-bold leading-tight text-ink">{won(nextAmount)}</p>
+            </div>
+            <button
+              type="button" onClick={() => setTab('payouts')}
+              className="-mr-2 flex h-11 shrink-0 items-center px-2 text-[13px] text-muted"
+            >
+              내역 ›
+            </button>
+          </div>
+          <p className="mt-1 break-keep text-xs text-ink-2">
             {pendingPay.length > 0
               ? `수수료·세금 공제 후 · 정산 대기 ${pendingPay.length}건`
               : approvedAwaitingPayout > 0
@@ -327,20 +310,20 @@ function ParticipantBody({ initialTab }: { initialTab: string }) {
                 : '아직 정산 대기 중인 건이 없어요'}
           </p>
           {payoutDay && (
-            <p className="mt-1.5 break-keep text-[11px] leading-[1.5] text-[#A89C8C]">{PAYOUT_DELAY_HINT}</p>
+            <p className="mt-1 break-keep text-[11px] leading-[1.5] text-muted">{PAYOUT_DELAY_HINT}</p>
           )}
-          <div className="mt-[18px] grid grid-cols-3 border-t border-[#3A332B] pt-3.5">
+          <dl className="m-0 mt-3.5 grid grid-cols-3 border-t border-line-soft pt-3">
             {[
               { label: '지원 중', value: String(applyingCount) },
               { label: '진행 중', value: String(activeApps.length) },
               { label: '누적 보상', value: won(totalEarned) },
-            ].map(s => (
-              <div key={s.label}>
-                <p className="text-xs text-[#CFC4B4]">{s.label}</p>
-                <p className="mt-0.5 text-lg font-bold">{s.value}</p>
+            ].map(st => (
+              <div key={st.label}>
+                <dt className="text-xs text-muted">{st.label}</dt>
+                <dd className="m-0 mt-0.5 text-base font-bold text-ink">{st.value}</dd>
               </div>
             ))}
-          </div>
+          </dl>
         </section>
 
         <div className="mt-[22px]">
@@ -359,11 +342,19 @@ function ParticipantBody({ initialTab }: { initialTab: string }) {
                 {activeApps.map(a => {
                   const sub = subByMission.get(a.missionId);
                   const payout = payoutByMission.get(a.missionId);
-                  const current = stageIndex(sub, payout);
                   const stats = reviewStats[a.missionId];
                   const tone = photoTone(a.missionId);
-                  const deadline = a.mission?.submissionDeadline;
-                  const dday = deadline ? Math.ceil((new Date(deadline).getTime() - Date.now()) / 86400000) : null;
+                  const revisionLeft = sub?.status === 'REVISION' && sub.revisionCount < sub.maxRevisions;
+                  const steps = journeySteps({
+                    appliedAt: a.createdAt,
+                    selectedAt: a.reviewedAt,
+                    deadline: a.mission?.submissionDeadline,
+                    submissionStatus: sub?.status ?? null,
+                    revisionLeft,
+                    payoutCompleted: payout?.status === 'COMPLETED',
+                    payoutDay,
+                  });
+                  const place = [a.mission?.regionGu, a.mission?.regionDong].filter(Boolean).join(' ');
                   return (
                     <section key={a.id} className="rounded-card border border-line bg-paper p-[18px]">
                       <div className="flex items-center gap-3">
@@ -373,21 +364,17 @@ function ParticipantBody({ initialTab }: { initialTab: string }) {
                           <p className="line-clamp-2 break-keep text-[15px] font-bold leading-[1.4]">
                             {a.mission?.title ?? '미션'}
                           </p>
-                          {a.mission?.clientProfile?.businessName && (
-                            <p className="mt-[3px] truncate text-[13px] text-ink-2">
-                              {a.mission.clientProfile.businessName}
-                              {(a.mission.regionDong || a.mission.regionGu)
-                                && <span className="text-muted"> · {a.mission.regionDong || a.mission.regionGu}</span>}
-                            </p>
-                          )}
-                          <p className="mt-[3px] text-xs text-muted">
-                            {deadline ? <>후기 마감 {dateK(deadline)}{dday !== null && dday >= 0 && <> · <b className="font-medium text-clay">D-{dday}</b></>}</> : '일정 미정'}
+                          <p className="mt-[3px] truncate text-[13px] text-ink-2">
+                            {a.mission?.clientProfile?.businessName}
+                            {place && <span className="text-muted">{a.mission?.clientProfile?.businessName ? ' · ' : ''}{place}</span>}
                           </p>
                         </div>
                         {sub && <StatusBadge status={sub.status} />}
                       </div>
 
-                      <StageBar current={current} />
+                      <div className="mt-4 pl-1">
+                        <MissionJourney steps={steps} />
+                      </div>
 
                       {stats && (
                         <div className="mt-3.5 rounded-control bg-cream p-3.5">
@@ -399,42 +386,30 @@ function ParticipantBody({ initialTab }: { initialTab: string }) {
                         </div>
                       )}
 
-                      <div className="mt-4 space-y-2">
+                      {/* 지금 할 일 — 큰 버튼은 하나만 */}
+                      <div className="mt-4">
                         {!sub && (
                           <button
                             onClick={() => { setSubmitForm({ description: '', snsPostUrl: '' }); setSubmitModal(a); }}
-                            className="flex h-12 w-full items-center justify-center rounded-control bg-clay text-sm font-bold text-paper"
+                            className="flex h-[52px] w-full items-center justify-center rounded-control-lg bg-clay text-[15px] font-bold text-paper"
                           >
                             후기 링크 제출하기
                           </button>
                         )}
-                        {sub?.status === 'REVISION' && sub.revisionCount < sub.maxRevisions && (
+                        {revisionLeft && (
                           <button
                             onClick={() => {
                               setSubmitForm({ description: sub.description ?? '', snsPostUrl: sub.snsPostUrl ?? '' });
                               setSubmitModal({ ...sub, resubmitId: sub.id });
                             }}
-                            className="flex h-12 w-full items-center justify-center rounded-control bg-clay text-sm font-bold text-paper"
+                            className="flex h-[52px] w-full items-center justify-center rounded-control-lg bg-clay text-[15px] font-bold text-paper"
                           >
                             수정해서 다시 제출하기 ({sub.revisionCount}/{sub.maxRevisions})
                           </button>
                         )}
-                        {sub?.status === 'SUBMITTED' && (
-                          <p className="text-center text-[13px] text-muted">검수 중 · 보통 2일 안에 결과가 나와요</p>
-                        )}
-                        {sub?.status === 'APPROVED' && (
-                          <div className="text-center">
-                            <p className="text-[13px] text-muted">
-                              {payoutDay ? `${payoutDay} 지급 예정이에요` : '정산일에 지급될 예정이에요'}
-                            </p>
-                            {payoutDay && (
-                              <p className="mt-0.5 break-keep text-[11px] leading-[1.5] text-muted">{PAYOUT_DELAY_HINT}</p>
-                            )}
-                          </div>
-                        )}
                         <button
                           onClick={() => setGuideMissionId(a.missionId)}
-                          className="flex h-11 w-full items-center justify-center rounded-control border border-line text-sm text-ink-2"
+                          className="mt-1 flex h-11 w-full items-center justify-center text-[13px] text-ink-2 underline decoration-line underline-offset-4"
                         >
                           작성 가이드 · 추적 링크 복사
                         </button>
