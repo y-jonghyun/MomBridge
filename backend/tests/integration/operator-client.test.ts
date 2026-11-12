@@ -3,6 +3,14 @@ import app from '../../src/app';
 import { describeDb, resetDb, prisma } from '../helpers/db';
 import { createClient, createOperator, createParticipant } from '../helpers/factory';
 import { sendAlimTalk } from '../../src/utils/sms';
+import { addDays, formatDay, kstDayKey } from '../../src/lib/clock';
+
+/**
+ * 미션 날짜는 실행 시점(KST 오늘) 기준으로 만든다.
+ * 고정 날짜로 두면 그 날짜가 지난 뒤에는 모집 마감이 지나 공개 목록에서 빠지고 테스트가 깨진다.
+ */
+const day = (offset: number) => formatDay(addDays(kstDayKey(), offset));
+const MISSION_DATES = { startDate: day(1), endDate: day(30), submissionDeadline: day(40) };
 
 jest.mock('../../src/utils/sms', () => ({
   sendAlimTalk: jest.fn().mockResolvedValue(undefined),
@@ -154,7 +162,7 @@ describeDb('가게 대신 등록', () => {
         title: '한식 체험', description: '점심을 드시고 후기를 남겨 주세요',
         category: 'SNS', regionSi: '서울특별시', regionGu: '마포구',
         rewardAmount: 30000, maxParticipants: 5,
-        startDate: '2026-11-01', endDate: '2026-11-10', submissionDeadline: '2026-11-20',
+        ...MISSION_DATES,
       });
       await prisma.mission.update({ where: { id: mission.body.data.id }, data: { status: 'OPEN' } });
 
@@ -202,7 +210,7 @@ describeDb('가게 대신 등록', () => {
         title: '합정 브런치 체험', description: '브런치를 드시고 후기를 남겨 주세요',
         category: 'SNS', regionSi: '서울특별시', regionGu: '마포구',
         rewardAmount: 30000, maxParticipants: 5,
-        startDate: '2026-11-01', endDate: '2026-11-10', submissionDeadline: '2026-11-20',
+        ...MISSION_DATES,
         sendPaymentLink: true,
       });
 
@@ -217,7 +225,7 @@ describeDb('가게 대신 등록', () => {
         title: '합정 브런치 체험', description: '브런치를 드시고 후기를 남겨 주세요',
         category: 'SNS', regionSi: '서울특별시', regionGu: '마포구',
         rewardAmount: 30000, maxParticipants: 5,
-        startDate: '2026-11-01', endDate: '2026-11-10', submissionDeadline: '2026-11-20',
+        ...MISSION_DATES,
       });
       await prisma.mission.update({ where: { id: mission.body.data.id }, data: { status: 'OPEN' } });
 
