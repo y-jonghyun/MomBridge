@@ -329,7 +329,7 @@ ${photoNotice}`
         </div>
       </header>
 
-      <div className="mx-auto max-w-client px-5 pb-28 pt-2">
+      <div className="mx-auto max-w-client px-5 pb-[calc(112px+env(safe-area-inset-bottom))] pt-2">
 
         {/* 결제 대기 중인 미션 알림 배너 */}
         {pendingPaymentMissions.length > 0 && tab === 'my-missions' && CLIENT_PAYMENT_ENABLED && (
@@ -753,7 +753,7 @@ ${photoNotice}`
 
       {/* 하단 고정 — 어느 탭에서든 새 미션을 등록할 수 있게 */}
       {tab !== 'create' && (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-paper px-5 py-3">
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-paper px-5 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))]">
           <button
             onClick={() => setTab('create')}
             className="mx-auto flex h-[52px] w-full max-w-client items-center justify-center rounded-control-lg bg-clay text-base font-bold text-paper"

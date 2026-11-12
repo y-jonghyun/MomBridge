@@ -19,7 +19,7 @@ export default function BottomTabBar() {
   return (
     <nav
       aria-label="하단 메뉴"
-      className="fixed inset-x-0 bottom-0 z-30 grid h-[76px] grid-cols-4 border-t border-line bg-paper pb-2.5 lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 grid h-[calc(76px+env(safe-area-inset-bottom))] grid-cols-4 border-t border-line bg-paper pb-[calc(10px+env(safe-area-inset-bottom))] lg:hidden"
     >
       {TABS.map(({ href, label, Icon, match }) => {
         const on = match(pathname);
@@ -41,5 +41,5 @@ export default function BottomTabBar() {
 
 /** 하단 고정 막대에 내용이 가리지 않도록 두는 여백 */
 export function BottomTabBarSpacer() {
-  return <div className="h-[76px] lg:hidden" aria-hidden="true" />;
+  return <div className="h-[calc(76px+env(safe-area-inset-bottom))] lg:hidden" aria-hidden="true" />;
 }

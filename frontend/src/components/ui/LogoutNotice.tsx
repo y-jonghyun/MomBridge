@@ -26,7 +26,7 @@ export default function LogoutNotice() {
   return (
     <div
       role="status"
-      className="fixed inset-x-0 bottom-[84px] z-50 mx-auto w-fit max-w-[90vw] rounded-full bg-ink px-5 py-3 text-sm text-paper"
+      className="fixed inset-x-0 bottom-[calc(84px+env(safe-area-inset-bottom))] z-50 mx-auto w-fit max-w-[90vw] rounded-full bg-ink px-5 py-3 text-sm text-paper"
     >
       로그아웃했어요
     </div>
