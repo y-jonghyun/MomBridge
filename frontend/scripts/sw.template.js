@@ -70,6 +70,8 @@ function isCacheableStatic(url) {
   return (
     url.pathname.startsWith('/_next/static/') ||
     url.pathname.startsWith('/icons/') ||
+    // 저장소에 넣은 글꼴 조각 — 파일 이름이 Google의 것 그대로라 내용이 바뀌면 이름도 바뀐다
+    url.pathname.startsWith('/fonts/') ||
     url.pathname === '/favicon.ico'
   );
 }

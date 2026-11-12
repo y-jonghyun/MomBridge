@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Cormorant_Garamond, Gowun_Batang, Noto_Sans_KR } from 'next/font/google';
+import './fonts.css';
 import './globals.css';
 import ServerWakeNotice from '@/components/common/ServerWakeNotice';
 import LogoutNotice from '@/components/ui/LogoutNotice';
@@ -9,26 +9,8 @@ import ServiceWorkerRegister from '@/components/common/ServiceWorkerRegister';
 import InstallPrompt from '@/components/common/InstallPrompt';
 
 // 디자인 기준: docs/design/mombridge-design/cream-editorial-v1.md
-const sans = Noto_Sans_KR({
-  subsets: ['latin'],
-  weight: ['400', '500', '700'],
-  display: 'swap',
-  variable: '--font-sans',
-});
-const serif = Gowun_Batang({
-  subsets: ['latin'],
-  weight: ['400', '700'],
-  display: 'swap',
-  variable: '--font-serif',
-});
-/** 섹션 위 영문 머리말 한 줄에만 쓴다 (예: After drop-off) */
-const accent = Cormorant_Garamond({
-  subsets: ['latin'],
-  weight: ['500'],
-  style: ['italic'],
-  display: 'swap',
-  variable: '--font-accent',
-});
+// 글꼴(Noto Sans KR · Gowun Batang · Cormorant Garamond)은 저장소에 넣어 둔 조각을 fonts.css로 쓴다 —
+// 빌드 때 외부(Google Fonts)에서 받지 않는다. 다시 받거나 굵기를 바꿀 때는 scripts/fetch-fonts.mjs
 
 export const metadata: Metadata = {
   // 소개 페이지의 공유 카드가 절대 주소를 갖게 한다
@@ -57,7 +39,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ko" className={`${sans.variable} ${serif.variable} ${accent.variable}`} suppressHydrationWarning>
+    <html lang="ko" suppressHydrationWarning>
       <head>
         {/* 설치 앱이면 첫 화면이 그려지기 전에 <html data-display="standalone"> (lib/display-mode.ts) */}
         <script dangerouslySetInnerHTML={{ __html: DISPLAY_MODE_SCRIPT }} />

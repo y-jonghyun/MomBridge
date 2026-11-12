@@ -29,7 +29,7 @@ const config: Config = {
         'sheet-out': 'var(--mb-dur-sheet-out)',
       },
       fontFamily: {
-        // app/layout.tsx의 next/font/google 변수와 연결된다
+        // app/fonts.css의 :root 변수와 연결된다 (저장소에 넣은 글꼴)
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
         serif: ['var(--font-serif)', 'serif'],
         accent: ['var(--font-accent)', 'serif'],
