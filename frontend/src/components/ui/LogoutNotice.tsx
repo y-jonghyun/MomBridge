@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { LOGOUT_NOTICE_KEY } from '@/store/auth';
+import { ABOVE_BOTTOM_BAR } from '@/lib/bottom-chrome';
 
 /**
  * 로그아웃한 뒤 홈에서 한 번만 뜨는 짧은 안내.
@@ -26,7 +27,8 @@ export default function LogoutNotice() {
   return (
     <div
       role="status"
-      className="fixed inset-x-0 bottom-[calc(84px+env(safe-area-inset-bottom))] z-50 mx-auto w-fit max-w-[90vw] rounded-full bg-ink px-5 py-3 text-sm text-paper"
+      style={{ bottom: ABOVE_BOTTOM_BAR }}
+      className="fixed inset-x-0 z-50 mx-auto w-fit max-w-[90vw] rounded-full bg-ink px-5 py-3 text-sm text-paper"
     >
       로그아웃했어요
     </div>

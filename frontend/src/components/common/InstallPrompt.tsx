@@ -1,5 +1,6 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { ABOVE_BOTTOM_BAR, INSTALL_BANNER_VAR, useReportHeight } from '@/lib/bottom-chrome';
 
 /** 닫으면 이 기기에서는 다시 띄우지 않는다 */
 const DISMISS_KEY = 'mb:install-dismissed';
@@ -32,7 +33,8 @@ function dismissed() {
 }
 
 /**
- * 홈 화면 설치 안내. 하단 메뉴 바로 위에 작은 카드로 띄운다.
+ * 홈 화면 설치 안내. 하단 고정 막대(탭 막대·신청 버튼) 바로 위에 작은 카드로 띄운다.
+ * 떠 있는 동안에는 자기 높이만큼 페이지 아래 여백을 늘려(globals.css의 body), 맨 아래 내용도 가리지 않는다.
  * - 안드로이드·데스크톱 크롬: beforeinstallprompt를 잡아 두었다가 "설치" 버튼으로 띄운다
  * - iOS Safari: "공유 → 홈 화면에 추가" 안내만 보여 준다
  */
@@ -60,6 +62,18 @@ export default function InstallPrompt() {
   }, []);
 
   if (!event && !ios) return null;
+  return <InstallBanner ios={ios} event={event} onClose={() => { setEvent(null); setIos(false); }} onDismissEvent={() => setEvent(null)} />;
+}
+
+function InstallBanner({ ios, event, onClose, onDismissEvent }: {
+  ios: boolean;
+  event: BeforeInstallPromptEvent | null;
+  onClose: () => void;
+  onDismissEvent: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  // 배너 높이 + 아래 막대와의 간격 8px
+  useReportHeight(ref, INSTALL_BANNER_VAR, 8);
 
   const close = () => {
     try {
@@ -67,8 +81,7 @@ export default function InstallPrompt() {
     } catch {
       // 저장소를 못 쓰면 이번 화면에서만 닫는다
     }
-    setEvent(null);
-    setIos(false);
+    onClose();
   };
 
   const install = async () => {
@@ -77,14 +90,16 @@ export default function InstallPrompt() {
     const { outcome } = await event.userChoice;
     // 설치를 고르면 다시 띄울 일이 없고, 거절해도 같은 이벤트는 다시 쓸 수 없다
     if (outcome === 'accepted') close();
-    else setEvent(null);
+    else onDismissEvent();
   };
 
   return (
     <div
+      ref={ref}
       role="dialog"
       aria-label="맘브릿지 앱 설치"
-      className="fixed inset-x-0 bottom-[calc(84px+env(safe-area-inset-bottom))] z-40 mx-auto flex w-[calc(100%-2rem)] max-w-sm items-center gap-3 rounded-card border border-line bg-paper py-2 pl-4 pr-2 shadow-lg lg:bottom-4"
+      style={{ bottom: ABOVE_BOTTOM_BAR }}
+      className="fixed inset-x-0 z-40 mx-auto flex w-[calc(100%-2rem)] max-w-sm items-center gap-3 rounded-card border border-line bg-paper py-2 pl-4 pr-2 shadow-lg"
     >
       <img src="/icons/icon-192.png" alt="" width={36} height={36} className="h-9 w-9 shrink-0 rounded-[10px]" />
       <p className="flex-1 break-keep text-[13px] leading-snug text-ink-2">
