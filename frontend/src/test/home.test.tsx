@@ -4,17 +4,31 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 /**
  * 루트(/)는 보는 사람에 따라 다르다.
  * - 로그인 전: 소개 화면 (히어로 · 소개 카드 · 미션 미리보기 · 진행 · 보상 예시 · 약속 · 사장님 띠)
- * - 로그인 후: 지금까지 쓰던 미션 중심 홈
+ * - 로그인 후: 인사 + 내 미션 다음 단계 카드 + 우리 구의 새 미션 (app-feel 1단계)
  *
  * '한부모' 같은 사회적 가치 문구는 홈에 두지 않는다 (/for-shops에만).
  */
 
-const missionsMock = vi.hoisted(() => ({ list: [] as unknown[] }));
+const missionsMock = vi.hoisted(() => ({
+  list: [] as unknown[],
+  regionList: [] as unknown[],
+  profile: { regionSi: '', regionGu: '' } as { regionSi: string; regionGu: string },
+  applications: [] as unknown[],
+}));
 const authMock = vi.hoisted(() => ({ user: null as { id: string; role: string; name: string } | null }));
 
+// 주소별로 답한다: 미션 목록(지역 조건이 있으면 regionList) · 프로필 · 내 활동 목록
 vi.mock('@/lib/api', () => ({
   default: {
-    get: vi.fn(async () => ({ data: { data: { missions: missionsMock.list } } })),
+    get: vi.fn(async (url: string) => {
+      if (url.startsWith('/missions')) {
+        const list = url.includes('regionGu=') ? missionsMock.regionList : missionsMock.list;
+        return { data: { data: { missions: list } } };
+      }
+      if (url === '/participant/profile') return { data: { data: missionsMock.profile } };
+      if (url === '/participant/applications') return { data: { data: missionsMock.applications } };
+      return { data: { data: [] } };
+    }),
     post: vi.fn(), patch: vi.fn(), put: vi.fn(), delete: vi.fn(),
   },
 }));
@@ -44,7 +58,11 @@ const mission = (id: string, shop: string) => ({
   momTags: [], clientProfile: { businessName: shop },
 });
 
-beforeEach(() => { missionsMock.list = []; authMock.user = null; });
+beforeEach(() => {
+  missionsMock.list = []; missionsMock.regionList = []; missionsMock.applications = [];
+  missionsMock.profile = { regionSi: '', regionGu: '' };
+  authMock.user = null;
+});
 afterEach(() => vi.clearAllMocks());
 
 describe('로그인 전 홈', () => {
@@ -89,21 +107,73 @@ describe('로그인 전 홈', () => {
 describe('로그인 후 홈', () => {
   beforeEach(() => { authMock.user = { id: 'u1', role: 'PARTICIPANT', name: '엄마' }; });
 
-  it('지금까지 쓰던 미션 중심 홈이 그대로 나온다', async () => {
+  it('소개 화면이 아니라 인사와 새 미션 목록이 나온다', async () => {
     missionsMock.list = [mission('1', '가게 1')];
     const { container } = render(<HomeView />);
 
-    await waitFor(() => expect(container.textContent).toContain('가볍게 버는 시간'));
-    // 소개 화면의 히어로가 아니라 기존 홈 히어로다
+    expect(screen.getByRole('heading', { level: 1, name: '엄마님, 안녕하세요' })).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('[합정동] 가게 1')).toBeTruthy());
+    expect(screen.getByRole('heading', { name: '새 미션' })).toBeTruthy();
     expect(container.textContent).not.toContain('아이 등원 후 두 시간');
-    expect(screen.getByPlaceholderText('가게 이름, 동네로 찾기')).toBeTruthy();
+    // 예전 로그인 후 홈의 히어로·검색·정산 검은 카드는 없다
+    expect(container.textContent).not.toContain('가볍게 버는 시간');
+    expect(screen.queryByPlaceholderText('가게 이름, 동네로 찾기')).toBeNull();
+    expect(container.textContent).not.toContain('내 다음 정산일');
+  });
+
+  it('활동 지역이 있으면 그 구의 새 미션을 최대 5개 보여 준다', async () => {
+    missionsMock.profile = { regionSi: '서울특별시', regionGu: '마포구' };
+    missionsMock.regionList = ['1', '2', '3', '4', '5', '6'].map(n => mission(n, `가게 ${n}`));
+    render(<HomeView />);
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: '마포구 새 미션' })).toBeTruthy());
+    expect(await screen.findByText('[합정동] 가게 5')).toBeTruthy();
+    expect(screen.queryByText('[합정동] 가게 6')).toBeNull();
+    // 머리말에 날짜와 구
+    expect(screen.getByText(/요일 · 마포구$/)).toBeTruthy();
+  });
+
+  it('우리 구에 열린 미션이 없으면 전체 새 미션을 보여 주고 그렇다고 알린다', async () => {
+    missionsMock.profile = { regionSi: '서울특별시', regionGu: '마포구' };
+    missionsMock.list = [mission('9', '다른 동네 가게')];
+    const { container } = render(<HomeView />);
+
+    await waitFor(() => expect(screen.getByText('[합정동] 다른 동네 가게')).toBeTruthy());
+    expect(screen.getByRole('heading', { name: '새 미션' })).toBeTruthy();
+    expect(container.textContent).toContain('마포구에는 아직 열린 미션이 없어');
+  });
+
+  it('활동 지역이 없으면 지역을 정하는 곳으로 안내한다', async () => {
+    missionsMock.list = [mission('1', '가게 1')];
+    render(<HomeView />);
+    const link = await screen.findByRole('link', { name: /활동 지역을 정하면/ });
+    expect(link.getAttribute('href')).toBe('/participant?tab=profile');
+  });
+
+  it('선정된 미션이 있으면 맨 위에 다음 단계 카드를 보여 준다', async () => {
+    missionsMock.applications = [{
+      id: 'a1', missionId: 'm1', status: 'APPROVED', createdAt: '2026-11-01T00:00:00Z', reviewedAt: '2026-11-03T00:00:00Z',
+      mission: { title: '한결 베이커리 아침 빵 체험', status: 'IN_PROGRESS', submissionDeadline: null },
+    }];
+    render(<HomeView />);
+
+    const card = await screen.findByRole('link', { name: /내 미션 다음 단계: 한결 베이커리 아침 빵 체험/ });
+    expect(card.getAttribute('href')).toBe('/participant');
+    expect(card.textContent).toContain('후기 제출');
+    expect(card.textContent).toContain('진행 중 1');
+  });
+
+  it('신청한 미션이 없으면 카드가 없다', async () => {
+    missionsMock.list = [mission('1', '가게 1')];
+    render(<HomeView />);
+    await waitFor(() => expect(screen.getByText('[합정동] 가게 1')).toBeTruthy());
+    expect(screen.queryByRole('link', { name: /내 미션 다음 단계/ })).toBeNull();
   });
 
   it('미션이 0개면 빈 안내와 함께 소개 카드를 보여 준다', async () => {
     const { container } = render(<HomeView />);
 
-    // 히어로에도 같은 글이 있으므로 개수로 본다
-    await waitFor(() => expect(screen.getAllByText('맘브릿지 알아보기').length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getByText('맘브릿지 알아보기')).toBeTruthy());
     const about = screen.getAllByRole('link').filter(a => a.getAttribute('href') === '/about');
     expect(about.length).toBeGreaterThan(0);
     expect(container.textContent).toContain('언제 보상을 받는지');
