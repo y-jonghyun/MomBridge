@@ -3,18 +3,26 @@ import { useState } from 'react';
 import { HeartIcon } from './icons';
 import FixedBottomBar from './FixedBottomBar';
 
-/** 미션 상세 하단 고정: 찜(52×52) + 신청 버튼(clay, 높이 52) */
+/** 미션 상세 하단 고정: 왼쪽 짧은 정보(예: 모집 마감 D-8) 또는 찜(52×52) + 신청 버튼(clay, 높이 52) */
 export function StickyCTA({
-  label, onPress, disabled = false, saved = false, onToggleSave,
+  label, onPress, disabled = false, saved = false, onToggleSave, meta,
 }: {
   label: string;
+  /** 버튼 왼쪽에 두 줄로 보여 줄 정보 */
+  meta?: { label: string; value: string } | null;
   onPress?: () => void;
   disabled?: boolean;
   saved?: boolean;
   onToggleSave?: () => void;
 }) {
   return (
-    <FixedBottomBar className="flex gap-2.5">
+    <FixedBottomBar className="flex items-center gap-3">
+      {meta && (
+        <div className="shrink-0">
+          <p className="text-xs text-muted">{meta.label}</p>
+          <p className="text-[17px] font-bold text-ink">{meta.value}</p>
+        </div>
+      )}
       {onToggleSave && (
         <button
           type="button" onClick={onToggleSave}
@@ -31,47 +39,6 @@ export function StickyCTA({
         {label}
       </button>
     </FixedBottomBar>
-  );
-}
-
-export interface ScheduleStep {
-  label: string;
-  /** 비어 있으면 그 단계는 보여주지 않는다 (데이터가 아직 없는 단계) */
-  when?: string | null;
-  /** 지금 진행 중인 단계 */
-  current?: boolean;
-  /** 오른쪽 끝에 덧붙일 강조 (예: D-3) */
-  note?: string | null;
-  /** 날짜 아래 작게 붙이는 단서 (예: 검수가 늦어지면 밀릴 수 있다는 안내) */
-  hint?: string | null;
-}
-
-/** 신청 → 선정 발표 → 방문·후기 → 보상 지급. 현재 단계 점은 clay 채움 */
-export function ScheduleTimeline({ steps }: { steps: ScheduleStep[] }) {
-  const shown = steps.filter(s => s.when);
-  if (shown.length === 0) return null;
-  return (
-    <ol className="m-0 flex list-none flex-col p-0">
-      {shown.map(s => (
-        <li key={s.label} className="grid min-h-10 grid-cols-[20px_1fr_auto] items-center gap-x-2.5 py-1">
-          <span
-            className={`h-2.5 w-2.5 justify-self-center rounded-full ${
-              s.current ? 'bg-clay' : 'border-[1.5px] border-[#B8AC9B]'
-            }`}
-          />
-          <span className={`text-sm ${s.current ? 'font-medium' : ''}`}>{s.label}</span>
-          <span className="text-right text-[13px] text-ink-2">
-            {s.when}
-            {s.note && <b className="ml-1 font-medium text-clay">{s.note}</b>}
-          </span>
-          {s.hint && (
-            <span className="col-start-2 col-end-4 mt-0.5 break-keep text-right text-[11px] leading-[1.5] text-muted">
-              {s.hint}
-            </span>
-          )}
-        </li>
-      ))}
-    </ol>
   );
 }
 
