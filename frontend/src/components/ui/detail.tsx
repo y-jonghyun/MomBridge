@@ -3,18 +3,26 @@ import { useState } from 'react';
 import { HeartIcon } from './icons';
 import FixedBottomBar from './FixedBottomBar';
 
-/** 미션 상세 하단 고정: 찜(52×52) + 신청 버튼(clay, 높이 52) */
+/** 미션 상세 하단 고정: 왼쪽 짧은 정보(예: 모집 마감 D-8) 또는 찜(52×52) + 신청 버튼(clay, 높이 52) */
 export function StickyCTA({
-  label, onPress, disabled = false, saved = false, onToggleSave,
+  label, onPress, disabled = false, saved = false, onToggleSave, meta,
 }: {
   label: string;
+  /** 버튼 왼쪽에 두 줄로 보여 줄 정보 */
+  meta?: { label: string; value: string } | null;
   onPress?: () => void;
   disabled?: boolean;
   saved?: boolean;
   onToggleSave?: () => void;
 }) {
   return (
-    <FixedBottomBar className="flex gap-2.5">
+    <FixedBottomBar className="flex items-center gap-3">
+      {meta && (
+        <div className="shrink-0">
+          <p className="text-xs text-muted">{meta.label}</p>
+          <p className="text-[17px] font-bold text-ink">{meta.value}</p>
+        </div>
+      )}
       {onToggleSave && (
         <button
           type="button" onClick={onToggleSave}

@@ -4,8 +4,8 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
 import { useAuthHydrated, useAuthStore } from '@/store/auth';
-import { KeywordBox, NoticeBox, ScheduleTimeline, StickyCTA, Tag, type ScheduleStep } from '@/components/ui';
-import { CameraIcon, ChevronLeftIcon, DocIcon, KeywordIcon, LinkIcon, PinIcon, ShareIcon } from '@/components/ui/icons';
+import { KeywordBox, NoticeBox, StickyCTA, Tag } from '@/components/ui';
+import { CameraIcon, ChevronLeftIcon, DocIcon, HeartIcon, KeywordIcon, LinkIcon, PinIcon, ShareIcon } from '@/components/ui/icons';
 import MissionGallery from '@/components/missions/MissionGallery';
 import { BUSINESS_LABEL, MOM_TAG_LABEL } from '@/components/missions/MissionBrowser';
 import { useBookmarks } from '@/lib/bookmarks';
@@ -38,7 +38,11 @@ const MISSION_POINTS: Record<string, { Icon: typeof CameraIcon; label: string }[
 };
 
 const won = (n: number) => `${Number(n).toLocaleString()}원`;
-const day = (d: string) => new Date(d).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }).replace(/\.$/, '');
+/** 일정 날짜: "11월 20일" (14px로 읽히게 숫자를 줄이지 않는다) */
+const monthDay = (d: string | Date) => { const t = new Date(d); return `${t.getMonth() + 1}월 ${t.getDate()}일`; };
+
+/** 번호 일정 한 줄. 지금 단계는 번호를 clay로 채운다 */
+interface DetailStep { label: string; when: string | null; current?: boolean; hint?: string | null }
 
 function Section({ eyebrow, title, children }: { eyebrow: string; title: string; children: React.ReactNode }) {
   return (
@@ -126,28 +130,24 @@ export default function MissionDetailPage() {
   const images: { id: string; url: string }[] = mission.images ?? [];
   const momTags: string[] = mission.momTags ?? [];
 
-  const visitFrom = mission.announceDate ?? mission.endDate;
-
-  const steps: ScheduleStep[] = [
-    { label: '신청', when: `${day(mission.startDate)} – ${day(mission.endDate)}`, current: isOpen, note: isOpen && dday >= 0 ? (dday === 0 ? 'D-Day' : `D-${dday}`) : null },
-    // 발표일을 적지 않은 미션은 이 단계를 보여주지 않는다
-    { label: '선정 발표', when: mission.announceDate ? day(mission.announceDate) : null },
-    // 선정 발표일이 있으면 그날부터 다닐 수 있다. 없으면 신청 마감 다음이다.
-    // 제출 마감이 그보다 앞서는 데이터도 있어, 역전되면 마감일만 보여준다
-    {
-      label: '방문 · 후기 등록',
-      when: new Date(mission.submissionDeadline) > new Date(visitFrom)
-        ? `${day(visitFrom)} – ${day(mission.submissionDeadline)}`
-        : `${day(mission.submissionDeadline)}까지`,
-      current: !isOpen,
-    },
+  // 번호 일정 — 서버에 있는 날짜만 쓴다 (모집 마감 · 선정 발표 · 후기 마감 · 지급 예정일)
+  const steps: DetailStep[] = ([
+    { label: '모집', when: `${monthDay(mission.endDate)}까지`, current: isOpen },
+    // 발표일을 적지 않은 미션은 이 줄을 보여주지 않는다. 선정은 맘브릿지(운영자)가 한다
+    { label: '선정 발표', when: mission.announceDate ? monthDay(mission.announceDate) : null },
+    { label: '방문하고 후기 제출', when: `${monthDay(mission.submissionDeadline)}까지`, current: !isOpen },
     // 약관 제8조에 따른 예정일. 휴일 보정까지 서버가 계산해 내려준다 (backend/src/lib/payout.ts)
     {
       label: '보상 지급',
-      when: mission.payoutDueDate ? `${payoutLabel(new Date(mission.payoutDueDate))} 지급 예정` : null,
+      when: mission.payoutDueDate ? payoutLabel(new Date(mission.payoutDueDate)) : null,
       hint: mission.payoutDueDate ? PAYOUT_DELAY_HINT : null,
     },
-  ];
+  ] as DetailStep[]).filter(st => st.when);
+  // 하단 버튼 왼쪽: 모집 중일 때만 마감까지 남은 날
+  const ctaMeta = isOpen && dday >= 0 ? { label: '모집 마감', value: dday === 0 ? 'D-Day' : `D-${dday}` } : null;
+  // 가게 이름 · 구 동 (동은 있는 미션만)
+  const shopLine = [mission.clientProfile?.businessName, [mission.regionGu, mission.regionDong].filter(Boolean).join(' ')]
+    .filter(Boolean).join(' · ');
 
   const requirements = toLines(mission.requirements);
   const visitLines = toLines(mission.visitGuide);
@@ -175,21 +175,33 @@ export default function MissionDetailPage() {
         >
           <ChevronLeftIcon size={20} strokeWidth={1.8} />
         </Link>
-        <button
-          type="button" onClick={handleShare} aria-label="공유"
-          className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full bg-paper text-ink"
-        >
-          <ShareIcon size={19} />
-        </button>
+        <div className="absolute right-3 top-3 flex gap-2">
+          {canSave && (
+            <button
+              type="button" onClick={() => void toggleBookmark(String(id))}
+              aria-label={savedIds.has(String(id)) ? '찜 해제' : '찜하기'} aria-pressed={savedIds.has(String(id))}
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-paper text-ink"
+            >
+              <HeartIcon className={savedIds.has(String(id)) ? 'fill-clay text-clay' : undefined} />
+            </button>
+          )}
+          <button
+            type="button" onClick={handleShare} aria-label="공유"
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-paper text-ink"
+          >
+            <ShareIcon size={19} />
+          </button>
+        </div>
         <span aria-live="polite" className="sr-only">{shareMsg}</span>
         {shareMsg && (
           <span className="absolute bottom-14 right-4 rounded-full bg-ink px-3 py-1 text-xs text-paper">{shareMsg}</span>
         )}
       </MissionGallery>
 
-      <div className="mx-auto max-w-shell">
+      {/* 사진 위로 둥근 시트가 24px 겹쳐 올라온다 */}
+      <div className="relative z-10 mx-auto -mt-6 max-w-shell rounded-t-[24px] bg-cream">
         {/* 정보 블록 */}
-        <section className="border-b border-line bg-paper px-5 pb-[22px] pt-6">
+        <section className="px-5 pb-2 pt-6">
           <div className="flex items-center gap-1.5">
             <span className="flex h-6 items-center rounded-full border border-line px-2.5 text-[11px] font-medium text-ink-2">
               {CATEGORY_LABEL[mission.category] ?? mission.category}
@@ -205,30 +217,54 @@ export default function MissionDetailPage() {
               {momTags.map(t => <Tag key={t}>{MOM_TAG_LABEL[t] ?? t}</Tag>)}
             </div>
           )}
-          <p className="mt-3.5 text-[13px] text-muted">{area}</p>
-          <h1 className="mb-1.5 mt-1 font-serif text-title-lg font-bold">{mission.clientProfile?.businessName ?? mission.title}</h1>
-          <p className="text-[15px] text-ink-2">{mission.title}</p>
+          <p className="mt-3.5 text-[13px] text-muted">{shopLine || area}</p>
+          <h1 className="mt-1 break-keep font-serif text-title font-bold leading-[1.35]">{mission.title}</h1>
 
-          <div className="mt-[18px] flex items-end justify-between border-t border-line-soft pt-4">
+          <div className="mt-3 flex items-end justify-between">
             <div>
-              <p className="text-xs text-muted">보상</p>
-              <p className="mt-0.5 text-[22px] font-bold text-clay">{won(mission.rewardAmount)}</p>
-              <p className="mt-0.5 text-xs text-muted">플랫폼 수수료 {PLATFORM_FEE_PERCENT}% 공제 후 {won(net)} 지급</p>
+              <p className="sr-only">보상</p>
+              <p className="text-[22px] font-bold text-clay">{won(mission.rewardAmount)}</p>
+              <p className="mt-0.5 text-xs text-muted">플랫폼 수수료 {PLATFORM_FEE_PERCENT}% 빼고 {won(net)} 지급</p>
             </div>
-            <div className="text-right">
-              <p className="text-xs text-muted">신청</p>
-              <p className="mt-0.5 text-[15px] font-medium">
-                {mission.currentCount ?? 0} <span className="font-normal text-muted">/ 모집 {mission.maxParticipants}</span>
-              </p>
-            </div>
+            <p className="text-[13.5px] text-ink-2">
+              모집 <b className="font-bold text-ink">{mission.currentCount ?? 0}</b> / {mission.maxParticipants}명
+            </p>
           </div>
+
+          {mission.visitHours && (
+            <p className="mt-3 flex items-center gap-2 rounded-control border border-line bg-paper px-3 py-2.5 text-[13.5px] text-ink-2">
+              <PinIcon size={16} strokeWidth={1.8} className="shrink-0 text-clay" />
+              방문 가능 {mission.visitHours}
+            </p>
+          )}
         </section>
 
-        {/* 일정 */}
-        <section className="mx-5 mt-4 rounded-card border border-line bg-paper p-5">
-          <span className="font-accent text-sm italic text-clay">Schedule</span>
-          <h2 className="mb-3.5 mt-0.5 font-serif text-section-sm font-bold">일정</h2>
-          <ScheduleTimeline steps={steps} />
+        {/* 일정 — 번호 목록. 날짜를 14px로 읽히게 */}
+        <section className="mt-5 px-5" aria-labelledby="schedule-title">
+          <h2 id="schedule-title" className="font-serif text-section-sm font-bold">일정</h2>
+          <ol className="m-0 mt-1 list-none p-0">
+            {steps.map((st, i) => (
+              <li key={st.label} className="flex gap-3 py-2">
+                <span
+                  aria-hidden="true"
+                  className={`flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full text-[13px] font-bold ${
+                    st.current ? 'bg-clay text-paper' : 'bg-clay-tint text-clay-dark'
+                  }`}
+                >
+                  {i + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className={`text-[15px] ${st.current ? 'font-bold' : 'font-medium'}`}>
+                      {st.label}{st.current && <span className="sr-only"> (지금 단계)</span>}
+                    </span>
+                    <span className={`whitespace-nowrap text-sm ${st.current ? 'font-bold text-clay-dark' : 'text-ink-2'}`}>{st.when}</span>
+                  </div>
+                  {st.hint && <p className="mt-0.5 break-keep text-right text-xs leading-[1.5] text-muted">{st.hint}</p>}
+                </div>
+              </li>
+            ))}
+          </ol>
         </section>
 
         {/* 신청 전 확인 */}
@@ -239,7 +275,7 @@ export default function MissionDetailPage() {
         )}
 
         {/* 방문 안내 — 지도는 자리만, 체험 시간·휴무는 데이터가 없어 숨긴다 */}
-        {(mission.clientProfile?.address || mission.visitHours || visitLines.length > 0) && (
+        {(mission.clientProfile?.address || visitLines.length > 0) && (
           <Section eyebrow="Visit" title="방문 안내">
             <div className="flex h-[150px] items-center justify-center rounded-photo bg-[#E2DCCF] text-xs text-[#5E5A46]">지도</div>
             <dl className="mt-3.5 grid grid-cols-[76px_1fr] gap-y-2.5 text-sm">
@@ -247,12 +283,6 @@ export default function MissionDetailPage() {
                 <>
                   <dt className="text-muted">주소</dt>
                   <dd className="m-0">{mission.clientProfile.address}</dd>
-                </>
-              )}
-              {mission.visitHours && (
-                <>
-                  <dt className="text-muted">방문 가능</dt>
-                  <dd className="m-0">{mission.visitHours}</dd>
                 </>
               )}
               {visitLines.length > 0 && (
@@ -324,12 +354,8 @@ export default function MissionDetailPage() {
         </Section>
       </div>
 
-      {/* 하단 고정: 찜 + 신청. 찜은 참여자 본인만 */}
-      <StickyCTA
-        label={ctaLabel} onPress={handleApply} disabled={ctaDisabled}
-        saved={savedIds.has(String(id))}
-        onToggleSave={canSave ? () => void toggleBookmark(String(id)) : undefined}
-      />
+      {/* 하단 고정: 왼쪽에 모집 마감까지 남은 날, 오른쪽 신청. 찜은 사진 위로 옮겼다 */}
+      <StickyCTA label={ctaLabel} onPress={handleApply} disabled={ctaDisabled} meta={ctaMeta} />
     </div>
   );
 }
