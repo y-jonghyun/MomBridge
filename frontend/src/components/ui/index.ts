@@ -8,5 +8,4 @@ export { default as Modal } from './Modal';
 export { default as AccountMenu } from './AccountMenu';
 export { default as BottomTabBar, BottomTabBarSpacer } from './BottomTabBar';
 export { Badge, CategoryTabs, Chip, NoticeBox, SectionHeader, Tag } from './primitives';
-export { KeywordBox, ScheduleTimeline, StickyCTA } from './detail';
-export type { ScheduleStep } from './detail';
+export { KeywordBox, StickyCTA } from './detail';
