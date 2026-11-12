@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
-import { BottomTabBar, BottomTabBarSpacer, MissionCard, SectionHeader, SiteHeader } from '@/components/ui';
+import { AppBar, BottomTabBar, BottomTabBarSpacer, MissionCard, SectionHeader, SiteHeader } from '@/components/ui';
 import { ArrowRightIcon, ChevronDownIcon, PinIcon, SearchIcon } from '@/components/ui/icons';
 import { CATEGORY_LABEL, EMPTY_MESSAGE, toCardData, type MissionListItem } from '@/components/missions/MissionBrowser';
 import MissionEmptyBox from '@/components/missions/MissionEmptyBox';
@@ -75,7 +75,7 @@ export default function HomeView() {
 
   return (
     <main className="min-h-screen bg-cream">
-      <SiteHeader />
+      <AppBar title="맘브릿지" />
 
       <div className="mx-auto max-w-shell">
         <section className="px-5 pb-7 pt-3">
@@ -89,9 +89,9 @@ export default function HomeView() {
             </span>
           </Link>
 
-          <h1 className="mb-2.5 mt-[22px] font-serif text-hero font-bold">
+          <h2 className="mb-2.5 mt-[22px] font-serif text-hero font-bold">
             아이 등원 후,<br />우리 동네에서<br />가볍게 버는 시간
-          </h1>
+          </h2>
           <p className="text-sm leading-[1.65] text-muted">동네 가게의 미션을 하고, 후기로 보상을 받아요.</p>
           <Link
             href="/about"

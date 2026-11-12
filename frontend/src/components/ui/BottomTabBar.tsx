@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ChatIcon, GridIcon, HomeIcon, UserIcon } from './icons';
 import { BOTTOM_BAR_VAR, useReportHeight } from '@/lib/bottom-chrome';
+import { useUnreadCount } from '@/lib/unread-notifications';
 
 const TABS = [
   { href: '/', label: '홈', Icon: HomeIcon, match: (p: string) => p === '/' },
@@ -14,6 +15,7 @@ const TABS = [
 
 /**
  * 모바일 하단 4칸. 데스크톱(≥1024px)에서는 숨기고 상단 메뉴를 쓴다.
+ * 지금 있는 탭은 아이콘 뒤 clay-tint 알약으로, 참여자의 안 읽은 알림은 '내 활동'에 숫자로 보여 준다.
  * 고정 막대에 가려지지 않도록, 쓰는 화면은 아래 여백을 두거나 <BottomTabBarSpacer />를 둔다.
  */
 export default function BottomTabBar() {
@@ -21,6 +23,7 @@ export default function BottomTabBar() {
   const ref = useRef<HTMLElement>(null);
   // 데스크톱(lg)에서는 숨겨져 높이 0으로 알린다
   useReportHeight(ref, BOTTOM_BAR_VAR);
+  const unread = useUnreadCount();
   return (
     <nav
       ref={ref}
@@ -32,11 +35,23 @@ export default function BottomTabBar() {
         return (
           <Link
             key={href} href={href} aria-current={on ? 'page' : undefined}
-            className={`press flex min-h-[44px] flex-col items-center justify-center gap-1 text-[11px] ${
-              on ? 'font-medium text-ink' : 'text-muted'
+            className={`press flex min-h-[44px] flex-col items-center justify-center gap-0.5 text-[11px] ${
+              on ? 'font-bold text-ink' : 'text-muted'
             }`}
           >
-            <Icon />
+            <span
+              className={`relative flex h-[30px] w-[52px] items-center justify-center rounded-full transition-colors duration-quick ease-mb ${
+                on ? 'bg-clay-tint text-clay-dark' : ''
+              }`}
+            >
+              <Icon />
+              {href === '/participant' && unread > 0 && (
+                <span className="absolute -top-0.5 left-[30px] flex h-4 min-w-[16px] items-center justify-center rounded-full bg-clay px-1 text-[10px] font-bold leading-none text-paper">
+                  {unread > 9 ? '9+' : unread}
+                  <span className="sr-only">개의 안 읽은 알림</span>
+                </span>
+              )}
+            </span>
             {label}
           </Link>
         );
