@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next';
-import { THEME_COLOR } from '@/lib/site';
+import { BACKGROUND_COLOR, THEME_COLOR } from '@/lib/site';
 
 /** /manifest.webmanifest 로 나간다 */
 export default function manifest(): MetadataRoute.Manifest {
@@ -14,7 +14,7 @@ export default function manifest(): MetadataRoute.Manifest {
     display: 'standalone',
     orientation: 'portrait',
     theme_color: THEME_COLOR,
-    background_color: THEME_COLOR,
+    background_color: BACKGROUND_COLOR,
     icons: [
       { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
       { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
