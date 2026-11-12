@@ -10,6 +10,7 @@ import CampaignPanel from '@/components/campaign/CampaignPanel';
 import ProvinceSelect from '@/components/common/ProvinceSelect';
 import { CategoryTabs, SiteHeader } from '@/components/ui';
 import FixedBottomBar from '@/components/ui/FixedBottomBar';
+import LegalInfo from '@/components/legal/LegalInfo';
 import MissionImageUploader, { pendingUploadNotice, uploadPendingImages, type PendingImage } from '@/components/missions/MissionImageUploader';
 import { BUSINESS_CATEGORIES, MOM_TAGS } from '@/lib/mission-options';
 import { formatPhone, isMobilePhone, phoneDigits } from '@/lib/phone';
@@ -693,6 +694,9 @@ ${photoNotice}`
                 </form>
               </div>
             </div>
+
+            {/* 약관·방침·사업자 정보 — 설치 앱에서는 사이트 하단이 숨겨지므로 여기서 닿는다 */}
+            <LegalInfo />
           </div>
         )}
 

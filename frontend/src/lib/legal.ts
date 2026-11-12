@@ -84,3 +84,10 @@ export function businessInfoParts(): string[] {
 
 /** 위 조각들을 한 줄로 */
 export const businessInfoLine = () => businessInfoParts().join(' · ');
+
+/** 사이트 하단·내 정보·로그인 화면이 함께 쓰는 문구 — 한 곳에서만 정해 화면마다 달라지지 않게 */
+export const FOOTER_COPYRIGHT = '© 2026 맘브릿지 · 지역 마케팅 미션 플랫폼';
+export const LEGAL_LINKS = [
+  { href: '/terms', label: '이용약관' },
+  { href: '/privacy', label: '개인정보처리방침', strong: true },
+] as const;
