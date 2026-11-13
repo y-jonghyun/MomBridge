@@ -1,5 +1,6 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import ProvinceSelect from '@/components/common/ProvinceSelect';
 import { CategoryTabs, Chip, EmptyState, MissionCard, type MissionCardData } from '@/components/ui';
@@ -11,6 +12,7 @@ import { BUSINESS_CATEGORIES, MOM_TAGS } from '@/lib/mission-options';
 import { useBookmarks } from '@/lib/bookmarks';
 import { netReward } from '@/lib/fees';
 import { useAuthStore } from '@/store/auth';
+import { readMissionList, saveMissionList } from '@/lib/mission-list-cache';
 
 /**
  * 미션 목록 화면. /missions와 참여자 홈의 '미션 탐색' 탭이 같은 이 컴포넌트를 쓴다.
@@ -65,6 +67,52 @@ export const defaultMissionFilter: MissionFilter = {
   category: '', regionSi: '', sort: 'NEWEST', keyword: '', businessCategory: '', momTags: [],
 };
 
+/**
+ * 필터 → 주소 검색어. 서버 요청과 화면 주소가 같은 규칙을 쓴다.
+ * 화면 주소에는 기본 정렬(최신순)을 넣지 않는다 (forUrl).
+ */
+export function filterToQuery(f: MissionFilter, { forUrl = false } = {}): string {
+  const params = new URLSearchParams();
+  if (f.category) params.set('category', f.category);
+  if (f.regionSi) params.set('regionSi', f.regionSi);
+  if (f.sort && !(forUrl && f.sort === defaultMissionFilter.sort)) params.set('sort', f.sort);
+  if (f.keyword) params.set('keyword', f.keyword);
+  if (f.businessCategory) params.set('businessCategory', f.businessCategory);
+  if (f.momTags.length) params.set('momTags', f.momTags.join(','));
+  return params.toString();
+}
+
+/** 주소 검색어 → 필터. 주소를 복사해 다른 탭에서 열어도 같은 목록이 나오게 */
+export function filterFromParams(params: { get: (k: string) => string | null }): MissionFilter {
+  const sort = params.get('sort') ?? '';
+  return {
+    ...defaultMissionFilter,
+    category: params.get('category') ?? '',
+    businessCategory: params.get('businessCategory') ?? '',
+    regionSi: params.get('regionSi') ?? '',
+    keyword: params.get('keyword') ?? '',
+    sort: SORTS.some(s => s.value === sort) ? sort : defaultMissionFilter.sort,
+    momTags: (params.get('momTags') ?? '').split(',').map(t => t.trim()).filter(Boolean),
+  };
+}
+
+/**
+ * 브라우저가 뒤로 가기의 스크롤 위치를 되돌릴 때까지 기다린다.
+ * 되돌리면 scroll 이벤트가 오고, 맨 위로 돌아온 경우처럼 이벤트가 없으면 잠시 뒤 넘어간다.
+ */
+function afterScrollRestore(maxWait = 450): Promise<void> {
+  if (typeof window === 'undefined') return Promise.resolve();
+  return new Promise(resolve => {
+    const done = () => { window.removeEventListener('scroll', onScroll); window.clearTimeout(timer); requestAnimationFrame(() => resolve()); };
+    const onScroll = () => done();
+    const timer = window.setTimeout(done, maxWait);
+    window.addEventListener('scroll', onScroll, { once: true, passive: true });
+  });
+}
+
+/** 같은 목록인지 (새로 받은 것이 기억한 것과 같으면 다시 그리지 않는다) */
+const sameList = (a: MissionListItem[], b: MissionListItem[]) => JSON.stringify(a) === JSON.stringify(b);
+
 /** 수수료를 뺀 실수령액 (서버 계산값이 생기면 그 값으로 바꾼다) */
 const netOf = (reward: number) => netReward(Number(reward));
 
@@ -99,36 +147,85 @@ export function toCardData(m: MissionListItem): MissionCardData {
 export default function MissionBrowser({
   initialFilter = defaultMissionFilter,
   showSearch = true,
+  syncUrl = false,
 }: {
   initialFilter?: MissionFilter;
   showSearch?: boolean;
+  /** 필터를 화면 주소(?regionSi=…)에 남긴다 — /missions에서만 켠다 */
+  syncUrl?: boolean;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [filter, setFilter] = useState<MissionFilter>(initialFilter);
   const [searchInput, setSearchInput] = useState(initialFilter.keyword);
-  const [missions, setMissions] = useState<MissionListItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  // 기억해 둔 목록이 있으면 처음부터 그린다 — 뒤로 왔을 때 페이지가 원래 길이라 브라우저가 스크롤을 제자리로 돌린다
+  const [missions, setMissions] = useState<MissionListItem[]>(
+    () => readMissionList<MissionListItem>(filterToQuery(initialFilter))?.missions ?? [],
+  );
+  const [loading, setLoading] = useState(() => !readMissionList(filterToQuery(initialFilter)));
+  const latest = useRef(0);
+  // 기억한 목록으로 처음 그렸다면(뒤로 온 경우) 브라우저가 스크롤을 되돌릴 때까지 새 목록 반영을 잠시 미룬다 —
+  // 되돌리기 전에 목록이 바뀌면 브라우저가 예전 위치로 되돌려 보던 카드가 밀린다
+  const startedFromCache = useRef(missions.length > 0);
+  const shown = useRef(missions);
+  shown.current = missions;
+  // 뒤에서 받은 목록으로 바꿀 때 사용자가 보던 카드가 밀리지 않게, 그 카드의 화면 위치를 적어 둔다
+  const anchor = useRef<{ id: string; top: number } | null>(null);
   const user = useAuthStore(s => s.user);
   const savedIds = useBookmarks(s => s.ids);
   const loadBookmarks = useBookmarks(s => s.load);
   const toggleBookmark = useBookmarks(s => s.toggle);
   const canSave = user?.role === 'PARTICIPANT';
 
+  /**
+   * 목록을 받는다. 같은 조건을 기억해 두었으면 그것을 먼저 그리고(뼈대 없이) 뒤에서 조용히 새로 받는다.
+   * 빠르게 조건을 바꾸면 마지막 요청의 답만 쓴다.
+   */
   const load = useCallback(async (f: MissionFilter) => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (f.category) params.set('category', f.category);
-      if (f.regionSi) params.set('regionSi', f.regionSi);
-      if (f.sort) params.set('sort', f.sort);
-      if (f.keyword) params.set('keyword', f.keyword);
-      if (f.businessCategory) params.set('businessCategory', f.businessCategory);
-      if (f.momTags.length) params.set('momTags', f.momTags.join(','));
-      const { data } = await api.get(`/missions?${params.toString()}`);
-      setMissions(data.data.missions);
-    } finally {
+    const query = filterToQuery(f);
+    const id = ++latest.current;
+    const cached = readMissionList<MissionListItem>(query);
+    if (cached) {
+      if (!sameList(shown.current, cached.missions)) setMissions(cached.missions);
       setLoading(false);
+    } else {
+      setLoading(true);
+    }
+    try {
+      const { data } = await api.get(`/missions?${query}`);
+      if (id !== latest.current) return;
+      const fresh: MissionListItem[] = data.data.missions;
+      saveMissionList(query, fresh);
+      if (sameList(shown.current, fresh)) return;
+      if (startedFromCache.current) {
+        startedFromCache.current = false;
+        await afterScrollRestore();
+        if (id !== latest.current) return;
+      }
+      // 화면 아래쪽을 보고 있었다면, 보이는 첫 카드의 위치를 적어 두고 바꾼 뒤 그 자리에 맞춘다
+      if (typeof window !== 'undefined' && window.scrollY > 0) {
+        const first = Array.from(document.querySelectorAll<HTMLElement>('[data-mission-id]'))
+          .find(el => el.getBoundingClientRect().bottom > 0);
+        anchor.current = first ? { id: first.dataset.missionId!, top: first.getBoundingClientRect().top } : null;
+      }
+      setMissions(fresh);
+    } catch {
+      // 못 받으면 기억한 목록(있으면)을 그대로 둔다
+    } finally {
+      if (id === latest.current) setLoading(false);
     }
   }, []);
+
+  // 목록이 바뀐 직후, 그리기 전에 보던 카드를 원래 화면 위치로 되돌린다 (사라졌으면 그대로 둔다)
+  useLayoutEffect(() => {
+    const a = anchor.current;
+    anchor.current = null;
+    if (!a) return;
+    const el = document.querySelector<HTMLElement>(`[data-mission-id="${CSS.escape(a.id)}"]`);
+    if (!el) return;
+    const delta = el.getBoundingClientRect().top - a.top;
+    if (Math.abs(delta) >= 1) window.scrollBy(0, delta);
+  }, [missions]);
 
   useEffect(() => { void load(filter); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
   useEffect(() => { if (canSave) void loadBookmarks(); }, [canSave, loadBookmarks]);
@@ -147,6 +244,11 @@ export default function MissionBrowser({
     const f = { ...filter, ...next };
     setFilter(f);
     void load(f);
+    // 상세에 갔다 돌아와도, 주소를 복사해 다른 탭에서 열어도 같은 조건이 되게 주소에 남긴다 (기록은 쌓지 않는다)
+    if (syncUrl) {
+      const q = filterToQuery(f, { forUrl: true });
+      router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+    }
   };
 
   return (
@@ -245,11 +347,13 @@ export default function MissionBrowser({
           {missions.length > 0 && (
             <div className="grid grid-cols-2 gap-x-3 gap-y-[22px] px-5 pt-2 sm:grid-cols-3 lg:grid-cols-4">
               {missions.map(m => (
-                <MissionCard
-                  key={m.id} mission={toCardData(m)}
-                  saved={savedIds.has(m.id)}
-                  onToggleSave={canSave ? () => void toggleBookmark(m.id) : undefined}
-                />
+                <div key={m.id} data-mission-id={m.id} className="min-w-0">
+                  <MissionCard
+                    mission={toCardData(m)}
+                    saved={savedIds.has(m.id)}
+                    onToggleSave={canSave ? () => void toggleBookmark(m.id) : undefined}
+                  />
+                </div>
               ))}
             </div>
           )}
