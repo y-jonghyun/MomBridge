@@ -15,6 +15,8 @@ export interface SnsAccount { id: string; platform: string; handle: string; url:
 export interface ParticipantProfile {
   regionSi: string; regionGu: string; regionDong: string | null;
   childAgeGroups: string[]; snsAccounts: SnsAccount[]; complete: boolean;
+  /** 새 미션 알림 받기 (활동 지역에 미션이 열리면 앱 안 알림함으로) */
+  newMissionAlerts?: boolean;
 }
 
 const input = 'w-full rounded-control border border-line bg-paper px-3 py-2 text-sm outline-none focus:border-ink';
@@ -33,6 +35,9 @@ export default function ParticipantProfileForm({ onComplete }: { onComplete?: (c
   const [snsError, setSnsError] = useState('');
   const [snsBusy, setSnsBusy] = useState(false);
 
+  const [alertBusy, setAlertBusy] = useState(false);
+  const [alertError, setAlertError] = useState('');
+
   const load = useCallback(async () => {
     const { data } = await api.get('/participant/profile');
     const p: ParticipantProfile = data.data;
@@ -43,6 +48,18 @@ export default function ParticipantProfileForm({ onComplete }: { onComplete?: (c
   }, [onComplete]);
 
   useEffect(() => { void load(); }, [load]);
+
+  async function toggleAlerts(next: boolean) {
+    setAlertBusy(true);
+    setAlertError('');
+    try {
+      const { data } = await api.put('/participant/profile/alerts', { newMissionAlerts: next });
+      setProfile(p => (p ? { ...p, newMissionAlerts: !!data.data.newMissionAlerts } : p));
+    } catch (err: unknown) {
+      const e2 = err as { response?: { data?: { error?: { message?: string } } } };
+      setAlertError(e2?.response?.data?.error?.message ?? '저장하지 못했어요');
+    } finally { setAlertBusy(false); }
+  }
 
   async function saveRegion(e: React.FormEvent) {
     e.preventDefault();
@@ -138,6 +155,32 @@ export default function ParticipantProfileForm({ onComplete }: { onComplete?: (c
           {saving ? '저장 중…' : '활동 지역 저장'}
         </button>
       </form>
+
+      {/* 새 미션 알림 — 저장된 활동 지역 기준 */}
+      <section className="rounded-card border border-line bg-paper p-[18px]">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h3 id="pp-alerts" className="font-serif text-section-sm font-bold text-ink">새 미션 알림</h3>
+            <p className="mt-0.5 break-keep text-xs leading-[1.6] text-muted">
+              {profile.regionGu
+                ? `${profile.regionGu}에 미션이 열리면 앱 안 알림함으로 알려 드려요. 휴대폰 알림은 아직 보내지 않아요.`
+                : '활동 지역을 저장하면 켤 수 있어요.'}
+            </p>
+          </div>
+          <button
+            type="button" role="switch" aria-labelledby="pp-alerts"
+            aria-checked={!!profile.newMissionAlerts}
+            disabled={alertBusy || !profile.regionGu}
+            onClick={() => toggleAlerts(!profile.newMissionAlerts)}
+            className="flex h-11 shrink-0 items-center disabled:opacity-50"
+          >
+            <span className={`relative block h-7 w-12 rounded-full transition-colors motion-reduce:transition-none ${profile.newMissionAlerts ? 'bg-clay' : 'bg-line-strong'}`}>
+              <span className={`absolute top-1 block h-5 w-5 rounded-full bg-paper transition-transform motion-reduce:transition-none ${profile.newMissionAlerts ? 'translate-x-6' : 'translate-x-1'}`} />
+            </span>
+          </button>
+        </div>
+        {alertError && <p role="alert" className="mt-2 text-[13px] text-clay-dark">{alertError}</p>}
+      </section>
 
       {/* SNS 계정 */}
       <section className="space-y-4 rounded-card border border-line bg-paper p-[18px]">

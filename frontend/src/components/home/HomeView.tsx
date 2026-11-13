@@ -12,11 +12,14 @@ import { pickNextStep, type NextStep } from '@/lib/next-step';
 import SiteFooter from '@/components/legal/SiteFooter';
 import HomeLanding from './HomeLanding';
 import NextStepCard from './NextStepCard';
+import NewMissionAlertToggle from './NewMissionAlertToggle';
+import NotificationBell from '@/components/notifications/NotificationBell';
 
 /**
  * 루트(/) — 보는 사람에 따라 다르다.
  * - 로그인 전: 소개 화면 (HomeLanding, 첫 방문용)
  * - 로그인 후: app-feel 1단계 시안 — 인사 + '내 미션 다음 단계' 카드 + 우리 구의 새 미션
+ *   참여자는 앱 막대에 알림 종, 새 미션 아래에 '새 미션 알림 받기'(활동 지역이 있을 때)
  */
 
 const NEW_COUNT = 5;
@@ -48,6 +51,8 @@ export default function HomeView() {
   const [region, setRegion] = useState<Region | null>(null);
   const [regionLoaded, setRegionLoaded] = useState(false);
   const [nextStep, setNextStep] = useState<NextStep | null>(null);
+  // 새 미션 알림 받기 (프로필 값). 불러오기 전에는 null — 카드를 깜빡이지 않게 그리지 않는다
+  const [alertsOn, setAlertsOn] = useState<boolean | null>(null);
   useEffect(() => {
     if (!signedIn) return;
     if (!isParticipant) { setRegionLoaded(true); return; }
@@ -56,6 +61,7 @@ export default function HomeView() {
       .then(({ data }) => {
         const p = data.data;
         if (alive && p?.regionSi?.trim() && p?.regionGu?.trim()) setRegion({ si: p.regionSi, gu: p.regionGu });
+        if (alive) setAlertsOn(!!p?.newMissionAlerts);
       })
       .catch(() => { /* 지역 없이 전체 새 미션을 보여 준다 */ })
       .finally(() => { if (alive) setRegionLoaded(true); });
@@ -127,6 +133,7 @@ export default function HomeView() {
       <AppBar
         title={`${user!.name}님, 안녕하세요`}
         eyebrow={[todayLabel(new Date()), region?.gu].filter(Boolean).join(' · ')}
+        actions={isParticipant ? <NotificationBell /> : undefined}
       />
 
       <div className="mx-auto max-w-shell px-5">
@@ -190,6 +197,11 @@ export default function HomeView() {
                   <ArrowRightIcon size={16} strokeWidth={1.8} className="shrink-0 text-muted" />
                 </Link>
               </div>
+            )}
+
+            {/* 새 미션 알림 받기 — 활동 지역이 있는 참여자만 (어느 구를 알릴지 알아야 하므로) */}
+            {loaded && isParticipant && region && alertsOn !== null && (
+              <NewMissionAlertToggle gu={region.gu} on={alertsOn} onChange={setAlertsOn} className="mt-4" />
             )}
           </section>
         </div>
