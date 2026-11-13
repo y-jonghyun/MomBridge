@@ -4,12 +4,13 @@ import { ArrowRightIcon } from '@/components/ui/icons';
 
 /**
  * '맘브릿지는 이렇게 진행돼요' 세 줄 — 출시 첫날 홈(열린 미션 0개)에서 빈자리를 채운다.
- * 지급 시기·공제는 이용약관 제8조와 같은 말로 쓴다 (수수료는 lib/fees의 값).
+ * 지급 시기는 이용약관 제8조와 같은 말로 쓴다. 공제는 실제 정산(서버 config/fees.ts)과 같게 수수료만 말한다 —
+ * 세금은 지금 정산에서 빼지 않으므로 '있으면 따로 안내'로 둔다 (약관 세금 문구는 세무 확인 뒤 따로 정한다).
  */
 const STEPS: [string, string][] = [
   ['동네 가게의 미션에 신청해요', '선정되면 알림함으로 알려 드려요'],
   ['가게에 다녀와 후기를 올려요', '미션마다 안내된 방법대로 내 SNS에 올려요'],
-  ['승인되면 다음 달 10일에 보상을 받아요', `보상금에서 수수료 ${PLATFORM_FEE_PERCENT}%와 세금 3.3%를 뺀 금액이에요`],
+  ['승인되면 다음 달 10일에 보상을 받아요', `수수료 ${PLATFORM_FEE_PERCENT}%를 뺀 금액이에요. 세금이 있으면 따로 안내해 드려요`],
 ];
 
 export default function HowItWorks({ className = '' }: { className?: string }) {

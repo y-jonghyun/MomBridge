@@ -406,7 +406,7 @@ ${photoNotice}` : msg);
                   <p className="mt-1 font-serif text-[28px] font-bold">
                     {payouts.reduce((sum, x) => sum + Number(x.netAmount ?? 0), 0).toLocaleString()}원
                   </p>
-                  <p className="mt-0.5 text-xs text-muted">{payouts.length}건 · 수수료·세금 공제 후</p>
+                  <p className="mt-0.5 text-xs text-muted">{payouts.length}건 · 수수료 공제 후</p>
                 </div>
                 <button
                   onClick={() => loadTab('payouts')}
