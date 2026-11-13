@@ -3,7 +3,8 @@ import { prisma } from '../../config/database';
 import { authenticate } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
 import { parseInput } from '../../middleware/validate';
-import { updateMissionSchema } from './missions.schema';
+import { missionKeywordsSchema, updateMissionSchema } from './missions.schema';
+import { getMissionKeywords, saveMissionKeywords } from './mission-extras';
 import { isStoreComplete, missingStoreParts } from '../client/store';
 import {
   EDITABLE_FIELDS, EditableField, NOTIFY_FIELDS, UNFAVORABLE_KEY,
@@ -51,6 +52,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       orderBy: { sortOrder: 'asc' },
       select: { id: true, url: true, sortOrder: true },
     });
+    const kw = await getMissionKeywords(mission.id);
 
     res.json({
       success: true,
@@ -64,6 +66,8 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
           businessName: mission.clientProfile.businessName,
         },
         images,
+        /** 확정 키워드 (메인 1 + 서브). 없으면 null */
+        keywords: kw.main ? { main: { keyword: kw.main.keyword }, subs: kw.subs.map(k => ({ keyword: k.keyword })) } : null,
         rules: editRules(role, state),
         applicationCount: state.applicationCount,
         /** 종료된 미션은 아예 저장할 수 없다 */
@@ -93,6 +97,8 @@ router.put('/', async (req: Request, res: Response, next: NextFunction) => {
 
     // 등록과 같은 칸 검증 + 날짜 순서
     const input = parseInput(updateMissionSchema, req.body);
+    // 키워드는 보냈을 때만 다룬다 (가게 화면의 키워드 저장과 같은 검증·저장 함수). 비우기는 하지 않는다
+    const nextKeywords = req.body?.keywords ? parseInput(missionKeywordsSchema, req.body.keywords) : null;
 
     // 무엇이 바뀌었는지 모으고, 바꿀 수 없는 칸이면 막는다
     const before: Record<string, unknown> = {};
@@ -117,15 +123,31 @@ router.put('/', async (req: Request, res: Response, next: NextFunction) => {
       after[field] = next instanceof Date ? (next as Date).toISOString() : next;
     }
 
-    if (changed.length === 0) {
+    // 키워드가 바뀌었는지 (메인·서브 이름으로 비교)
+    let keywordsChanged = false;
+    if (nextKeywords) {
+      const cur = await getMissionKeywords(mission.id);
+      const curKey = JSON.stringify([cur.main?.keyword ?? null, cur.subs.map(k => k.keyword).sort()]);
+      const nextKey = JSON.stringify([nextKeywords.main.keyword.trim(), nextKeywords.subs.map(k => k.keyword.trim()).sort()]);
+      if (curKey !== nextKey) {
+        keywordsChanged = true;
+        before.keywords = cur.main ? { main: cur.main.keyword, subs: cur.subs.map(k => k.keyword) } : null;
+        after.keywords = { main: nextKeywords.main.keyword.trim(), subs: nextKeywords.subs.map(k => k.keyword.trim()) };
+      }
+    }
+
+    if (changed.length === 0 && !keywordsChanged) {
       res.json({ success: true, data: { changed: [], notified: 0 } });
       return;
     }
 
-    const updated = await prisma.mission.update({
-      where: { id: mission.id },
-      data: Object.fromEntries(changed.map(f => [f, (input as Record<string, unknown>)[f] ?? null])),
-    });
+    if (keywordsChanged) await saveMissionKeywords(mission.id, nextKeywords!);
+    const updated = changed.length > 0
+      ? await prisma.mission.update({
+          where: { id: mission.id },
+          data: Object.fromEntries(changed.map(f => [f, (input as Record<string, unknown>)[f] ?? null])),
+        })
+      : await prisma.mission.findUniqueOrThrow({ where: { id: mission.id } });
 
     // 체험단원에게 불리한 변경(줄이기·앞당기기)은 운영자만 할 수 있다.
     // 막지는 않고, 화면에서 확인을 받았는지까지 기록에 남긴다.
@@ -184,7 +206,7 @@ router.put('/', async (req: Request, res: Response, next: NextFunction) => {
 
     res.json({
       success: true,
-      data: { changed, notified, unfavorable, mission: { id: updated.id, title: updated.title } },
+      data: { changed, keywordsChanged, notified, unfavorable, mission: { id: updated.id, title: updated.title } },
     });
   } catch (e) { next(e); }
 });

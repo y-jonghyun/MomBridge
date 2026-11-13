@@ -5,6 +5,7 @@ import MissionImageUploader, { type PendingImage } from '@/components/missions/M
 import { BUSINESS_CATEGORIES, MOM_TAGS } from '@/lib/mission-options';
 import { CLIENT_PAYMENT_ENABLED } from '@/lib/features';
 import { LockIcon } from '@/components/ui/icons';
+import KeywordRecommender, { type KeywordSelection } from '@/components/campaign/KeywordRecommender';
 
 /**
  * 운영자가 고객사 대신 미션을 등록하는 폼.
@@ -31,6 +32,8 @@ export interface RegisterForm {
   businessCategory: string;
   momTags: string[];
   visitHours: string;
+  /** 추적 링크가 이동할 곳 (가게 화면의 '도착 URL'과 같은 값·같은 검증) */
+  destinationUrl: string;
   sendPaymentLink: boolean;
 }
 
@@ -99,6 +102,7 @@ export interface FieldRule { locked: boolean; onlyBetter: boolean; reason?: stri
 export default function RegisterMissionForm({
   form, set, clients, pendingImages, onPendingChange, submitting, onSubmit, onCreateClient, onEditClient,
   mode = 'create', rules, missionId, submitLabel,
+  keywords, onKeywordsChange,
 }: {
   form: RegisterForm;
   set: (key: keyof RegisterForm, value: string | string[] | boolean) => void;
@@ -118,6 +122,9 @@ export default function RegisterMissionForm({
   /** 수정 중인 미션 — 사진을 바로 올릴 때 쓴다 */
   missionId?: string;
   submitLabel?: string;
+  /** 확정 키워드 (메인 1 + 서브). onKeywordsChange를 주면 '유입 추적'에 키워드 칸이 나온다 (운영자 화면) */
+  keywords?: KeywordSelection | null;
+  onKeywordsChange?: (v: KeywordSelection | null) => void;
 }) {
   const chosen = clients.find(c => c.id === form.clientProfileId);
   const sortedClients = sortClientOptions(clients);
@@ -348,7 +355,34 @@ export default function RegisterMissionForm({
         </div>
       </Section>
 
-      <Section step={6} title="사진" hint={editing ? '첫 장이 대표 사진이 됩니다. 사진은 고르는 즉시 저장됩니다.' : '첫 장이 대표 사진이 됩니다. 미션을 저장하면 함께 올라갑니다.'}>
+      {/* 운영자 화면에서만 (가게는 '캠페인 설정'에서 같은 값을 정한다). 가게의 수정 창에서도 값은 그대로 보존된다 */}
+      {onKeywordsChange && (
+      <Section step={6} title="유입 추적" hint="체험단원마다 도착 주소로 이어지는 추적 링크가 발급되어, 후기를 보고 들어온 방문을 셉니다.">
+        <div>
+          <label htmlFor="op-destination" className={label}>
+            도착 주소 {form.category === 'REVIEW' ? '(권장)' : '(선택)'}
+          </label>
+          <input id="op-destination" type="url" inputMode="url" className={input}
+            value={form.destinationUrl} onChange={e => set('destinationUrl', e.target.value)}
+            disabled={locked('destinationUrl')}
+            placeholder="예약 페이지·스마트스토어·홈페이지 주소 (https://...)" />
+          <p className="mt-1 break-keep text-xs leading-[1.5] text-muted">
+            비워 두면 추적 링크가 열리지 않아 유입 성과가 0으로 남습니다. 등록 후에도 바꿀 수 있습니다.
+          </p>
+          <Note field="destinationUrl" />
+        </div>
+        {onKeywordsChange && (
+          <KeywordRecommender
+            defaultCategory={chosen?.businessCategory ?? ''}
+            defaultRegion={[form.regionGu, form.regionDong].filter(Boolean).join(' ')}
+            value={keywords ?? null}
+            onChange={onKeywordsChange}
+          />
+        )}
+      </Section>
+      )}
+
+      <Section step={onKeywordsChange ? 7 : 6} title="사진" hint={editing ? '첫 장이 대표 사진이 됩니다. 사진은 고르는 즉시 저장됩니다.' : '첫 장이 대표 사진이 됩니다. 미션을 저장하면 함께 올라갑니다.'}>
         {editing && missionId
           ? <MissionImageUploader missionId={missionId} />
           : <MissionImageUploader pending={pendingImages} onPendingChange={onPendingChange} />}

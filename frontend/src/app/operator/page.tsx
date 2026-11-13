@@ -13,6 +13,8 @@ import PayoutAccount from '@/components/operator/PayoutAccount';
 import SubmissionReviewCard from '@/components/operator/SubmissionReviewCard';
 import MissionEditModal from '@/components/missions/MissionEditModal';
 import RegisterMissionForm, { type ClientOption } from '@/components/operator/RegisterMissionForm';
+import type { KeywordSelection } from '@/components/campaign/KeywordRecommender';
+import { NO_DESTINATION_WARNING } from '@/lib/mission-warnings';
 import ShopFormModal from '@/components/operator/ShopFormModal';
 import {
   CardList, CardRow, DangerButton, EmptyRow, PrimaryButton, QuietButton,
@@ -31,6 +33,11 @@ const MISSION_STATUS_BAR: Record<string, string> = {
 const MISSION_STATUS_COLOR: Record<string, string> = { DRAFT: 'bg-cream text-ink-2', OPEN: 'bg-sage-tint text-sage', IN_PROGRESS: 'bg-sage-tint text-sage', REVIEWING: 'bg-clay-tint text-clay-dark', CLOSED: 'bg-clay-tint text-clay-dark' };
 const ROLE_LABEL: Record<string, string> = { OPERATOR: '운영자', PARTICIPANT: '참여자', CLIENT: '고객사' };
 
+/** 미션 관리 목록에서 도착 주소가 빈 미션을 알아보게 하는 한 줄 */
+function NoDestinationNote() {
+  return <p className="mt-0.5 text-xs font-normal text-clay-dark">도착 주소 없음 · 유입이 집계되지 않아요</p>;
+}
+
 export default function OperatorDashboard() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
@@ -38,6 +45,8 @@ export default function OperatorDashboard() {
   const [tab, setTab] = useState<Tab>('overview');
   const [stats, setStats] = useState<Record<string, number> & { missionsByStatus?: { status: string; _count: number }[] } | null>(null);
   const [missions, setMissions] = useState<any[]>([]);
+  // 대행 등록 화면의 확정 키워드 (가게 화면의 키워드 고르기와 같은 부품)
+  const [registerKeywords, setRegisterKeywords] = useState<KeywordSelection | null>(null);
   const [applications, setApplications] = useState<any[]>([]);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [payouts, setPayouts] = useState<any[]>([]);
@@ -53,7 +62,7 @@ export default function OperatorDashboard() {
     rewardAmount: '', maxParticipants: '5', regionSi: '', regionGu: '',
     regionDong: '', visitAddress: '',
     startDate: '', endDate: '', submissionDeadline: '', requirements: '', visitGuide: '',
-    businessCategory: '', momTags: [] as string[], visitHours: '', announceDate: '',
+    businessCategory: '', momTags: [] as string[], visitHours: '', announceDate: '', destinationUrl: '',
     sendPaymentLink: false,
   });
   const [registerSubmitting, setRegisterSubmitting] = useState(false);
@@ -107,6 +116,9 @@ export default function OperatorDashboard() {
   }, []);
 
   async function updateMissionStatus(id: string, status: string) {
+    const target = missions.find(m => m.id === id);
+    if (status === 'OPEN' && target && !target.destinationUrl
+      && !confirm(NO_DESTINATION_WARNING)) return;
     await api.patch(`/operator/missions/${id}/status`, { status });
     setMissions(prev => prev.map(m => m.id === id ? { ...m, status } : m));
   }
@@ -188,6 +200,7 @@ export default function OperatorDashboard() {
         rewardAmount: Number(missionData.rewardAmount),
         maxParticipants: Number(missionData.maxParticipants),
         sendPaymentLink,
+        ...(registerKeywords ? { keywords: registerKeywords } : {}),
       });
       // 등록 화면에서 고른 사진을 만들어진 미션에 올린다 (실패해도 미션은 남는다)
       const createdId = createdRes?.data?.id;
@@ -211,9 +224,10 @@ ${photoNotice}` : msg);
         rewardAmount: '', maxParticipants: '5', regionSi: '', regionGu: '',
         regionDong: '', visitAddress: '',
         startDate: '', endDate: '', submissionDeadline: '', requirements: '', visitGuide: '',
-        businessCategory: '', momTags: [] as string[], visitHours: '', announceDate: '',
+        businessCategory: '', momTags: [] as string[], visitHours: '', announceDate: '', destinationUrl: '',
         sendPaymentLink: false,
       });
+      setRegisterKeywords(null);
     } catch (err: any) {
       alert(err?.response?.data?.error?.message ?? '등록에 실패했습니다');
     } finally { setRegisterSubmitting(false); }
@@ -427,6 +441,7 @@ ${photoNotice}` : msg);
                       <div className="min-w-0 flex-1">
                         <p className="line-clamp-2 text-sm font-semibold text-ink">{m.title}</p>
                         <p className="mt-0.5 text-xs text-muted">{m.clientProfile?.businessName}</p>
+                        {!m.destinationUrl && <NoDestinationNote />}
                       </div>
                       <StatusBadge className={MISSION_STATUS_COLOR[m.status] ?? 'bg-cream text-ink-2'}>
                         {MISSION_STATUS_LABEL[m.status] ?? m.status}
@@ -464,7 +479,10 @@ ${photoNotice}` : msg);
                   <tbody className="divide-y divide-line">
                     {missions.map(m => (
                       <tr key={m.id} className="hover:bg-cream">
-                        <td className="max-w-xs truncate px-4 py-3 font-medium text-ink" title={m.title}>{m.title}</td>
+                        <td className="max-w-xs px-4 py-3 font-medium text-ink" title={m.title}>
+                          <span className="block truncate">{m.title}</span>
+                          {!m.destinationUrl && <NoDestinationNote />}
+                        </td>
                         <td className="whitespace-nowrap px-4 py-3 text-muted">{m.clientProfile?.businessName}</td>
                         <td className="px-4 py-3">
                           <StatusBadge className={MISSION_STATUS_COLOR[m.status] ?? 'bg-cream text-ink-2'}>
@@ -670,6 +688,8 @@ ${photoNotice}` : msg);
                 onSubmit={handleRegisterMission}
                 onCreateClient={() => setShopForm('new')}
                 onEditClient={client => setShopForm(client)}
+                keywords={registerKeywords}
+                onKeywordsChange={setRegisterKeywords}
               />
             </div>
           )}

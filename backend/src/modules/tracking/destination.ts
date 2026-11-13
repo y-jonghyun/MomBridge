@@ -21,6 +21,10 @@ export function validateDestinationUrl(input: unknown): DestinationCheck {
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return { ok: false, reason: 'http 또는 https 주소만 등록할 수 있습니다' };
   if (url.username || url.password) return { ok: false, reason: '아이디·비밀번호가 포함된 URL은 등록할 수 없습니다' };
   if (!url.hostname || !url.hostname.includes('.')) return { ok: false, reason: '도메인이 올바르지 않습니다' };
+  // IP 주소(127.0.0.1, 192.168.0.1, [::1] 등)는 가게 주소가 아니다 — 도메인만 받는다
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(url.hostname) || url.hostname.startsWith('[')) {
+    return { ok: false, reason: 'IP 주소가 아닌 도메인 주소를 입력해 주세요' };
+  }
   return { ok: true, url: url.toString() };
 }
 

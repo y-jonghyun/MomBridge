@@ -58,6 +58,11 @@ describe('도착 URL 검증 (필수 4 — 등록 단계)', () => {
     'https://example.com/ path',
     'https://exa\nmple.com',
     'http://localhost',
+    'http://127.0.0.1/',
+    'https://192.168.0.10:8080/admin',
+    'http://[::1]/',
+    'https://example',
+    'mailto:shop@example.com',
     'not a url',
     '',
   ])('rejects %p', input => {
