@@ -67,7 +67,8 @@ describe('주요 화면의 누를 수 있는 것', () => {
   it('로그인 후 홈 (참여자)', async () => {
     useAuthStore.setState({ user: { ...USER, role: 'PARTICIPANT' }, token: 't', refreshToken: 'r' });
     const { container } = render(<HomeView />);
-    await screen.findByText('맘브릿지 알아보기');
+    // 열린 미션이 없으면 출시 첫날 화면 (첫 미션 준비 중 + 진행 안내)
+    await screen.findByText('맘브릿지는 이렇게 진행돼요');
     expect(smallTouchTargets(container)).toEqual([]);
   });
 

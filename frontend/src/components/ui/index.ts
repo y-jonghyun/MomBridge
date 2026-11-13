@@ -9,3 +9,4 @@ export { default as AccountMenu } from './AccountMenu';
 export { default as BottomTabBar, BottomTabBarSpacer } from './BottomTabBar';
 export { Badge, CategoryTabs, Chip, NoticeBox, SectionHeader, Tag } from './primitives';
 export { KeywordBox, StickyCTA } from './detail';
+export { default as EmptyState } from './EmptyState';

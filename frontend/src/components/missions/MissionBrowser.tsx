@@ -2,9 +2,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import api from '@/lib/api';
 import ProvinceSelect from '@/components/common/ProvinceSelect';
-import { CategoryTabs, Chip, MissionCard, type MissionCardData } from '@/components/ui';
+import { CategoryTabs, Chip, EmptyState, MissionCard, type MissionCardData } from '@/components/ui';
 import { PinIcon } from '@/components/ui/icons';
 import MissionEmptyBox from './MissionEmptyBox';
+import ShareWithShopsButton from './ShareWithShopsButton';
+import { PROVINCES } from '@/lib/regions';
 import { BUSINESS_CATEGORIES, MOM_TAGS } from '@/lib/mission-options';
 import { useBookmarks } from '@/lib/bookmarks';
 import { netReward } from '@/lib/fees';
@@ -132,6 +134,9 @@ export default function MissionBrowser({
   useEffect(() => { if (canSave) void loadBookmarks(); }, [canSave, loadBookmarks]);
 
   const filtered = !!(filter.keyword || filter.category || filter.regionSi || filter.businessCategory || filter.momTags.length);
+  // 검색어·유형·업종·태그 없이(지역만 골랐거나 아무것도 안 골랐는데) 0개 — 출시 첫날처럼 정말 열린 미션이 없는 것
+  const nothingOpen = !(filter.keyword || filter.category || filter.businessCategory || filter.momTags.length);
+  const regionShort = PROVINCES.find(p => p.name === filter.regionSi)?.short ?? filter.regionSi;
 
   const toggleMomTag = (value: string) => {
     const has = filter.momTags.includes(value);
@@ -249,7 +254,27 @@ export default function MissionBrowser({
             </div>
           )}
 
-          {/* 목록 끝 / 빈 목록 — 둘 다 같은 점선 상자로 이웃 지역을 권한다 */}
+          {/* 열린 미션이 하나도 없을 때 — 가게에 알리는 것이 가장 쓸모 있는 행동이다 */}
+          {missions.length === 0 && nothingOpen ? (
+            <div className="mx-5 mt-4">
+              <EmptyState
+                title={filter.regionSi ? <>아직 {regionShort}에{' '}<br />열린 미션이 없어요</> : <>아직 열린 미션이 없어요</>}
+                body="자주 가는 가게 사장님께 맘브릿지를 알려 주시면 우리 동네 미션이 더 빨리 열려요."
+              >
+                <ShareWithShopsButton />
+                {filter.regionSi && (
+                  <button
+                    type="button"
+                    onClick={() => { setSearchInput(''); apply({ regionSi: '' }); }}
+                    className="flex min-h-[44px] w-full items-center justify-center text-[13px] text-ink-2 underline underline-offset-2"
+                  >
+                    다른 지역 미션 보기
+                  </button>
+                )}
+              </EmptyState>
+            </div>
+          ) : (
+          /* 목록 끝 / 빈 목록 — 둘 다 같은 점선 상자로 이웃 지역을 권한다 */
           <div className="mx-5 mt-[26px]">
             <MissionEmptyBox
               message={
@@ -264,6 +289,7 @@ export default function MissionBrowser({
               }}
             />
           </div>
+          )}
         </>
       )}
     </div>

@@ -85,6 +85,8 @@ function ClientPageContent() {
   const [clientInfo, setClientInfo] = useState<{ businessName?: string; category: string; regionGu: string; regionDong: string | null } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(false);
+  // 첫 목록을 받기 전에는 '첫 미션' 화면을 띄우지 않는다 (미션이 있는 가게에서 잠깐 보였다 사라지지 않게)
+  const [missionsLoaded, setMissionsLoaded] = useState(false);
   const [selectedMission, setSelectedMission] = useState<any>(null);
   const [missionDetail, setMissionDetail] = useState<{ applications: any[]; submissions: any[] } | null>(null);
   const [profileForm, setProfileForm] = useState({ name: '', phone: '', currentPassword: '', newPassword: '' });
@@ -193,7 +195,7 @@ function ClientPageContent() {
     try {
       const r = await api.get('/client/missions');
       setMissions(r.data.data);
-    } catch { /* 에러 무시 */ } finally { setLoading(false); }
+    } catch { /* 에러 무시 */ } finally { setLoading(false); setMissionsLoaded(true); }
   }
 
   async function handleCreateComplete(paymentKey: string, orderId: string, amount: number, formData: CreateForm) {
@@ -393,7 +395,11 @@ ${photoNotice}`
         {/* 내 미션 목록 */}
         {tab === 'my-missions' && (
           <div className="space-y-3">
-            {loading && <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-ink border-t-transparent rounded-full animate-spin" /></div>}
+            {(loading || !missionsLoaded) && (
+              <div aria-hidden="true" className="space-y-3">
+                {[1, 2].map(i => <div key={i} className="h-32 animate-pulse rounded-card bg-line-soft" />)}
+              </div>
+            )}
             {!loading && missions.filter(m => m.paymentStatus !== 'PENDING').map(m => (
               <section key={m.id} className="rounded-card border border-line bg-paper p-[18px]">
                 <div className="flex items-start justify-between gap-3">
@@ -444,11 +450,45 @@ ${photoNotice}`
                 </div>
               </section>
             ))}
-            {!loading && missions.filter(m => m.paymentStatus !== 'PENDING').length === 0 && pendingPaymentMissions.length === 0 && (
-              <div className="text-center py-20 bg-paper rounded-box text-muted">
-                <p className="mb-4">등록한 미션이 없습니다</p>
-                <button onClick={() => setTab('create')} className="px-6 py-2 bg-ink text-paper rounded-card text-sm font-semibold">첫 미션 등록하기</button>
-              </div>
+            {/* 가게 첫 화면 — 아직 미션이 하나도 없을 때. 금액은 넣지 않는다 (패키지마다 달라서 문의로) */}
+            {!loading && missionsLoaded && missions.filter(m => m.paymentStatus !== 'PENDING').length === 0 && pendingPaymentMissions.length === 0 && (
+              <section aria-labelledby="first-mission" className="pb-2">
+                <h2 id="first-mission" className="break-keep font-serif text-[21px] font-bold leading-[1.4] text-ink">첫 미션을 등록해 보세요</h2>
+                <p className="mt-1 break-keep text-[13.5px] leading-[1.6] text-ink-2">동네 엄마들이 가게에 들러 체험하고 후기를 남겨요.</p>
+                <ol className="m-0 mt-2 list-none p-0">
+                  {(CLIENT_PAYMENT_ENABLED
+                    ? [['미션 내용을 써요', '패키지를 고르고 결제해요']]
+                    : [['미션 내용을 알려 주세요', '지금은 맘브릿지가 대신 등록해 드려요']]
+                  ).concat([
+                    ['맘브릿지가 확인하고 공개해요', '공개되면 신청을 받기 시작해요'],
+                    ['맘브릿지가 참여자를 선정해요', '선정된 분이 가게에 방문해요'],
+                    ['후기와 결과를 받아요', '결과 리포트에서 한눈에 봐요'],
+                  ]).map(([t, d], i) => (
+                    <li key={t} className="flex gap-3 pt-3">
+                      <span aria-hidden="true" className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-clay-tint text-[12.5px] font-bold text-clay-dark">{i + 1}</span>
+                      <span className="min-w-0">
+                        <span className="block break-keep text-[14.5px] font-medium text-ink">{t}</span>
+                        <span className="mt-px block break-keep text-[12.5px] text-muted">{d}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+                <div className="mt-4 rounded-card border border-line bg-paper px-4 py-3.5">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="text-xs font-bold text-clay-dark">예시 미션</span>
+                    <span className="text-xs text-muted">방문형</span>
+                  </div>
+                  <p className="mt-1 break-keep text-[15px] font-bold text-ink">아침 빵 맛보고 솔직한 후기 남기기</p>
+                </div>
+                <div className="mt-3 flex items-center justify-between gap-3 rounded-card border border-line bg-paper py-2 pl-3.5 pr-2">
+                  <span className="break-keep text-sm text-ink-2">비용은 패키지에 따라 달라요</span>
+                  <a href={`mailto:${BUSINESS_INFO.inquiryEmail}?subject=${encodeURIComponent('맘브릿지 비용 문의')}`}
+                    className="flex h-11 shrink-0 items-center rounded-control border-[1.5px] border-ink px-3.5 text-sm font-bold text-ink">
+                    비용 문의하기
+                  </a>
+                </div>
+                {/* 등록 버튼은 화면 아래 고정 막대('새 미션 등록') 하나만 둔다 */}
+              </section>
             )}
           </div>
         )}

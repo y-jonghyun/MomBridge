@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
-import { AppBar, BottomTabBar, BottomTabBarSpacer, MissionCard, SiteHeader } from '@/components/ui';
+import { AppBar, BottomTabBar, BottomTabBarSpacer, EmptyState, MissionCard, SiteHeader } from '@/components/ui';
 import { ArrowRightIcon } from '@/components/ui/icons';
 import { EMPTY_MESSAGE, toCardData, type MissionListItem } from '@/components/missions/MissionBrowser';
 import MissionEmptyBox from '@/components/missions/MissionEmptyBox';
@@ -13,6 +13,7 @@ import SiteFooter from '@/components/legal/SiteFooter';
 import HomeLanding from './HomeLanding';
 import NextStepCard from './NextStepCard';
 import NewMissionAlertToggle from './NewMissionAlertToggle';
+import HowItWorks from './HowItWorks';
 import NotificationBell from '@/components/notifications/NotificationBell';
 
 /**
@@ -127,6 +128,8 @@ export default function HomeView() {
   const inRegion = !!region && !regionEmpty;
   const listTitle = inRegion ? `${region!.gu} 새 미션` : '새 미션';
   const shown = missions.slice(0, NEW_COUNT);
+  // 참여자에게 열린 미션이 하나도 없다 — 출시 첫날 화면 (알림 받기·지역 정하기가 카드 안으로 들어간다)
+  const launchEmpty = loaded && isParticipant && shown.length === 0;
 
   return (
     <main className="min-h-screen bg-cream">
@@ -162,7 +165,7 @@ export default function HomeView() {
                 {region.gu}에는 아직 열린 미션이 없어 다른 지역의 새 미션을 보여 드려요.
               </p>
             )}
-            {loaded && isParticipant && !region && (
+            {loaded && isParticipant && !region && !launchEmpty && (
               <Link
                 href="/participant?tab=profile"
                 className="mb-1 flex min-h-[44px] items-center gap-1 break-keep text-[13px] text-clay"
@@ -179,6 +182,25 @@ export default function HomeView() {
             ) : shown.length > 0 ? (
               <div className="[&>a:first-child]:border-t-0">
                 {shown.map(m => <MissionCard key={m.id} mission={toCardData(m)} variant="row" />)}
+              </div>
+            ) : launchEmpty ? (
+              <div className="mt-2">
+                <EmptyState
+                  title={<>{region ? `${region.gu}의` : '우리 동네'} 첫 미션을{' '}<br />준비하고 있어요</>}
+                  body="가게가 미션을 열면 이 자리에 바로 보여요."
+                >
+                  {region ? (
+                    alertsOn !== null && <NewMissionAlertToggle bare gu={region.gu} on={alertsOn} onChange={setAlertsOn} />
+                  ) : (
+                    <Link
+                      href="/participant?tab=profile"
+                      className="flex h-12 w-full items-center justify-center rounded-control bg-clay text-[15px] font-bold text-paper"
+                    >
+                      활동 지역 정하기
+                    </Link>
+                  )}
+                </EmptyState>
+                <HowItWorks className="mt-7" />
               </div>
             ) : (
               // 공개된 미션이 하나도 없으면 /missions와 같은 안내와 소개 카드 (출시 첫날 화면은 PR 8에서 다듬는다)
@@ -200,7 +222,7 @@ export default function HomeView() {
             )}
 
             {/* 새 미션 알림 받기 — 활동 지역이 있는 참여자만 (어느 구를 알릴지 알아야 하므로) */}
-            {loaded && isParticipant && region && alertsOn !== null && (
+            {loaded && isParticipant && region && alertsOn !== null && !launchEmpty && (
               <NewMissionAlertToggle gu={region.gu} on={alertsOn} onChange={setAlertsOn} className="mt-4" />
             )}
           </section>
