@@ -251,7 +251,7 @@ function ParticipantBody({ initialTab }: { initialTab: string }) {
           </div>
           <p className="mt-1 break-keep text-xs text-ink-2">
             {pendingPay.length > 0
-              ? `수수료·세금 공제 후 · 정산 대기 ${pendingPay.length}건`
+              ? `수수료 공제 후 · 정산 대기 ${pendingPay.length}건`
               : approvedAwaitingPayout > 0
                 ? `승인된 ${approvedAwaitingPayout}건은 정산이 잡히면 금액이 표시돼요`
                 : '아직 정산 대기 중인 건이 없어요'}

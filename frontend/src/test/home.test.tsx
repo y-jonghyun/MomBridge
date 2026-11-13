@@ -186,9 +186,10 @@ describe('로그인 후 홈', () => {
     // 위쪽의 '활동 지역을 정하면…' 줄은 카드 안 버튼과 겹치므로 숨긴다
     expect(screen.queryByRole('link', { name: /활동 지역을 정하면/ })).toBeNull();
     expect(screen.getByRole('heading', { name: '맘브릿지는 이렇게 진행돼요' })).toBeTruthy();
-    // 지급 시기·공제는 약관 제8조와 같은 말
+    // 지급 시기는 약관 제8조와 같은 말, 공제는 실제 정산과 같게 수수료만 (세금은 지금 빼지 않는다)
     expect(screen.getByText('승인되면 다음 달 10일에 보상을 받아요')).toBeTruthy();
-    expect(screen.getByText('보상금에서 수수료 10%와 세금 3.3%를 뺀 금액이에요')).toBeTruthy();
+    expect(screen.getByText('수수료 10%를 뺀 금액이에요. 세금이 있으면 따로 안내해 드려요')).toBeTruthy();
+    expect(document.body.textContent).not.toContain('3.3%');
     expect(screen.getByRole('link', { name: /맘브릿지 더 알아보기/ }).getAttribute('href')).toBe('/about');
   });
 
