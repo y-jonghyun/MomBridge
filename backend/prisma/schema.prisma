@@ -145,6 +145,8 @@ model ParticipantProfile {
   regionDong   String?  @db.VarChar(50)
   /// 자녀 연령대 (선택 항목, 복수 선택)
   childAgeGroups ChildAgeGroup[]
+  /// 새 미션 알림 받기 — 켜면 활동 지역(시·구)에 미션이 열릴 때 앱 안 알림함으로 알린다. 기본은 꺼짐(직접 켠다)
+  newMissionAlerts Boolean @default(false)
   totalEarned  Decimal  @default(0) @db.Decimal(12, 2)
   missionCount Int      @default(0)
   rating       Decimal? @db.Decimal(3, 2)
@@ -230,6 +232,8 @@ model Mission {
   regionSi           String            @db.VarChar(50)
   regionGu           String            @db.VarChar(50)
   regionDong         String?           @db.VarChar(50)
+  /// 새 미션 알림을 보낸 시각. 한 번 보내면 다시 열려도(OPEN→DRAFT→OPEN) 또 보내지 않는다
+  openAlertedAt      DateTime?
   maxParticipants    Int               @default(1)
   currentCount       Int               @default(0)
   rewardAmount       Decimal           @db.Decimal(12, 2)

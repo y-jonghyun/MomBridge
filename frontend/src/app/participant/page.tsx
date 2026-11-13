@@ -3,13 +3,13 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
-import { useUnreadStore } from '@/lib/unread-notifications';
+import NotificationBell from '@/components/notifications/NotificationBell';
 import { syncSelfClickCookie } from '@/lib/self-click';
 import { logout, useAuthHydrated, useAuthStore } from '@/store/auth';
 import { PostCheckSummary, ReviewGuideModal } from '@/components/campaign/ReviewGuide';
 import { AppBar, BottomTabBar, BottomTabBarSpacer, CategoryTabs } from '@/components/ui';
 import { photoTone } from '@/components/ui/MissionCard';
-import { BellIcon, LogOutIcon } from '@/components/ui/icons';
+import { LogOutIcon } from '@/components/ui/icons';
 import { formatPhone, isMobilePhone, phoneDigits } from '@/lib/phone';
 import { MissionCard } from '@/components/ui';
 import { toCardData, type MissionListItem } from '@/components/missions/MissionBrowser';
@@ -87,18 +87,6 @@ function ParticipantBody({ initialTab }: { initialTab: string }) {
   const [guideMissionId, setGuideMissionId] = useState<string | null>(null);
   const [checkResult, setCheckResult] = useState<any>(null);
 
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [showNotif, setShowNotif] = useState(false);
-  const notifRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function onClickOutside(e: MouseEvent) {
-      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setShowNotif(false);
-    }
-    document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
-  }, []);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -147,37 +135,18 @@ function ParticipantBody({ initialTab }: { initialTab: string }) {
     } catch { /* 찜 목록은 비어 있는 상태로 둔다 */ }
   }, []);
 
-  const loadNotifications = useCallback(async () => {
-    try {
-      const r = await api.get('/notifications');
-      setNotifications(r.data.data.notifications);
-      setUnreadCount(r.data.data.unreadCount);
-      useUnreadStore.getState().set(Number(r.data.data.unreadCount ?? 0));
-    } catch { /* 알림은 없어도 화면이 동작한다 */ }
-  }, []);
-
   useEffect(() => {
     if (!hydrated) return;
     if (!user) { router.push('/login'); return; }
     if (user.role !== 'PARTICIPANT' && user.role !== 'OPERATOR') { router.push('/'); return; }
     void loadAll();
-    void loadNotifications();
     void loadProfile();
     void loadBookmarks();
     void loadBookmarkIds();
     void fetchNextPayoutDate().then(d => setPayoutDay(d ? payoutLabel(d) : null));
     // 이미 로그인해 있던 체험단원도 본인 클릭 표시를 받는다 (만료 연장 겸)
     if (user.role === 'PARTICIPANT') void syncSelfClickCookie();
-  }, [user, hydrated, loadAll, loadNotifications, loadProfile, loadBookmarks, loadBookmarkIds, router]);
-
-  async function markAllRead() {
-    try {
-      await api.patch('/notifications/read-all');
-      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-      setUnreadCount(0);
-      useUnreadStore.getState().set(0);
-    } catch { /* 실패해도 목록은 그대로 둔다 */ }
-  }
+  }, [user, hydrated, loadAll, loadProfile, loadBookmarks, loadBookmarkIds, router]);
 
   async function handleSubmitContent(e: React.FormEvent) {
     e.preventDefault();
@@ -238,40 +207,7 @@ function ParticipantBody({ initialTab }: { initialTab: string }) {
               <span className="rounded-full border border-line px-2 py-1 text-xs text-muted">운영자</span>
             </Link>
           )}
-          <div className="relative" ref={notifRef}>
-            <button
-              type="button" aria-label="알림"
-              onClick={() => { setShowNotif(v => !v); if (!showNotif) void loadNotifications(); }}
-              className="relative flex h-11 w-11 items-center justify-center text-ink"
-            >
-              <BellIcon />
-              {unreadCount > 0 && (
-                <span className="absolute right-1.5 top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-clay px-1 text-[10px] font-bold text-paper">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
-              )}
-            </button>
-            {showNotif && (
-              <div className="absolute right-0 top-11 z-50 w-80 overflow-hidden rounded-card border border-line bg-paper shadow-lg">
-                <div className="flex items-center justify-between border-b border-line-soft px-4 py-3">
-                  <span className="text-sm font-medium">알림</span>
-                  {unreadCount > 0 && (
-                    <button onClick={markAllRead} className="text-xs text-muted">전체 읽음</button>
-                  )}
-                </div>
-                <div className="max-h-80 divide-y divide-line-soft overflow-y-auto">
-                  {notifications.length === 0 ? (
-                    <p className="py-10 text-center text-sm text-muted">알림이 없습니다</p>
-                  ) : notifications.map(n => (
-                    <div key={n.id} className={`px-4 py-3 ${n.isRead ? '' : 'bg-cream'}`}>
-                      <p className={`text-sm ${n.isRead ? 'text-ink-2' : 'font-medium text-ink'}`}>{n.title}</p>
-                      <p className="mt-0.5 text-xs leading-relaxed text-muted">{n.body}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          <NotificationBell />
           <button
             type="button" aria-label="로그아웃"
             onClick={() => logout()}

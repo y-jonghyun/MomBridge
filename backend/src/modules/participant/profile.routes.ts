@@ -69,6 +69,26 @@ router.put('/', async (req: Request, res: Response, next: NextFunction) => {
   } catch (e) { next(e); }
 });
 
+/**
+ * 새 미션 알림 받기 켜기·끄기. 활동 지역(시·구)에 미션이 열리면 앱 안 알림함으로 알린다.
+ * 켜려면 활동 지역이 있어야 한다 — 어느 동네 미션을 알릴지 정해야 하므로.
+ */
+router.put('/alerts', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { newMissionAlerts } = parseInput(z.object({ newMissionAlerts: z.boolean() }), req.body);
+    const profile = await myProfile(req.user!.sub);
+    if (newMissionAlerts && (!profile.regionSi.trim() || !profile.regionGu.trim())) {
+      throw new AppError('REGION_REQUIRED', 400, '활동 지역을 먼저 정해 주세요');
+    }
+    const updated = await prisma.participantProfile.update({
+      where: { id: profile.id },
+      data: { newMissionAlerts },
+      select: { newMissionAlerts: true, regionSi: true, regionGu: true },
+    });
+    res.json({ success: true, data: updated });
+  } catch (e) { next(e); }
+});
+
 // ── SNS 계정 ──
 // 플랫폼마다 한 개씩만 등록할 수 있다 (스키마의 [profileId, platform] 유일 제약).
 

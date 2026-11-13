@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { sendNewMissionAlerts } from '../notifications/new-mission-alerts';
 import { authenticate, requireRole } from '../../middleware/auth';
 import { prisma } from '../../config/database';
 import { z } from 'zod';
@@ -95,6 +96,8 @@ router.patch('/missions/:id/status', async (req: Request, res: Response, next: N
         ...(status === 'CLOSED' && { closedAt: new Date() }),
       },
     });
+    // 열리면 같은 시·구에서 '새 미션 알림'을 켠 참여자에게 앱 안 알림 (미션마다 한 번)
+    if (status === 'OPEN') await sendNewMissionAlerts(mission.id);
     res.json({ success: true, data: mission });
   } catch (e) { next(e); }
 });

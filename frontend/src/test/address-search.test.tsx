@@ -49,13 +49,16 @@ const picked: PostcodeResult = {
   sido: '서울', sigungu: '마포구', bname: '합정동', bname1: '', buildingName: '', apartment: 'N',
 };
 
+// 전체 테스트를 함께 돌리면 jsdom이 느려 기본 1초 안에 폼이 안 뜰 때가 있다
+const SLOW = { timeout: 5000 };
+
 beforeEach(() => { postcode.mode = 'ok'; postcode.result = picked; postcode.load = 0; });
 afterEach(() => { document.body.style.overflow = ''; });
 
 describe('사장님 가게 정보 — 주소 검색', () => {
   it('고르면 시·도 · 시·군·구 · 동 · 사업장 주소가 채워지고 검색 창이 닫힌다', async () => {
     render(<ClientStoreForm />);
-    const btn = await screen.findByRole('button', { name: '주소 검색으로 채우기' });
+    const btn = await screen.findByRole('button', { name: '주소 검색으로 채우기' }, SLOW);
     fireEvent.click(btn);
     expect(screen.getByRole('dialog', { name: '주소 검색' })).toBeTruthy();
 
@@ -70,7 +73,7 @@ describe('사장님 가게 정보 — 주소 검색', () => {
   it('스크립트를 못 불러오면 안내만 보여 주고, 칸은 그대로 직접 입력할 수 있다', async () => {
     postcode.mode = 'fail';
     render(<ClientStoreForm />);
-    expect(await screen.findByText(/주소 검색을 불러오지 못했어요/)).toBeTruthy();
+    expect(await screen.findByText(/주소 검색을 불러오지 못했어요/, undefined, SLOW)).toBeTruthy();
     expect(screen.queryByRole('button', { name: '주소 검색으로 채우기' })).toBeNull();
 
     const addr = screen.getByLabelText('사업장 주소 *') as HTMLInputElement;
@@ -83,7 +86,7 @@ describe('사장님 가게 정보 — 주소 검색', () => {
     // 다시 시도
     postcode.mode = 'ok';
     fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
-    expect(await screen.findByRole('button', { name: '주소 검색으로 채우기' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: '주소 검색으로 채우기' }, SLOW)).toBeTruthy();
   });
 });
 
@@ -91,7 +94,7 @@ describe('운영자 가게 등록 — 주소 검색', () => {
   it('목록에 있는 "성남시 분당구"를 고르면 선택 상자에서 그대로 골라진다', async () => {
     postcode.result = { ...picked, sido: '경기', sigungu: '성남시 분당구', bname: '정자동', roadAddress: '경기 성남시 분당구 정자일로 1' };
     render(<ShopFormModal onClose={() => {}} onSaved={() => {}} />);
-    fireEvent.click(await screen.findByRole('button', { name: '주소 검색으로 채우기' }));
+    fireEvent.click(await screen.findByRole('button', { name: '주소 검색으로 채우기' }, SLOW));
     await waitFor(() => expect((screen.getByLabelText('주소 (선택)') as HTMLInputElement).value).toBe('경기 성남시 분당구 정자일로 1'));
     expect((screen.getByLabelText('시·군·구 *') as HTMLSelectElement).value).toBe('성남시 분당구');
     expect((screen.getByLabelText('동 (선택)') as HTMLInputElement).value).toBe('정자동');

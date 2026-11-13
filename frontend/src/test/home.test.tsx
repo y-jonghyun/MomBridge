@@ -12,7 +12,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const missionsMock = vi.hoisted(() => ({
   list: [] as unknown[],
   regionList: [] as unknown[],
-  profile: { regionSi: '', regionGu: '' } as { regionSi: string; regionGu: string },
+  profile: { regionSi: '', regionGu: '' } as { regionSi: string; regionGu: string; newMissionAlerts?: boolean },
+  notifications: [] as unknown[],
   applications: [] as unknown[],
 }));
 const authMock = vi.hoisted(() => ({ user: null as { id: string; role: string; name: string } | null }));
@@ -27,9 +28,14 @@ vi.mock('@/lib/api', () => ({
       }
       if (url === '/participant/profile') return { data: { data: missionsMock.profile } };
       if (url === '/participant/applications') return { data: { data: missionsMock.applications } };
+      if (url === '/notifications') {
+        const n = missionsMock.notifications as { isRead: boolean }[];
+        return { data: { data: { notifications: n, unreadCount: n.filter(x => !x.isRead).length } } };
+      }
       return { data: { data: [] } };
     }),
-    post: vi.fn(), patch: vi.fn(), put: vi.fn(), delete: vi.fn(),
+    post: vi.fn(), patch: vi.fn(async () => ({ data: { success: true } })), delete: vi.fn(),
+    put: vi.fn(async (_url: string, body: { newMissionAlerts: boolean }) => ({ data: { data: { newMissionAlerts: body.newMissionAlerts } } })),
   },
 }));
 
@@ -49,6 +55,8 @@ vi.mock('@/lib/payout', () => ({
 
 // vi.mock은 위로 끌어올려지므로 평범하게 들여와도 위의 가짜가 먼저 걸린다
 import HomeView from '@/components/home/HomeView';
+import api from '@/lib/api';
+import { fireEvent } from '@testing-library/react';
 
 /** 카드에는 제목이 아니라 `[구 동] 가게 이름`이 찍힌다 (toCardData) */
 const mission = (id: string, shop: string) => ({
@@ -61,6 +69,7 @@ const mission = (id: string, shop: string) => ({
 beforeEach(() => {
   missionsMock.list = []; missionsMock.regionList = []; missionsMock.applications = [];
   missionsMock.profile = { regionSi: '', regionGu: '' };
+  missionsMock.notifications = [];
   authMock.user = null;
 });
 afterEach(() => vi.clearAllMocks());
@@ -177,5 +186,52 @@ describe('로그인 후 홈', () => {
     const about = screen.getAllByRole('link').filter(a => a.getAttribute('href') === '/about');
     expect(about.length).toBeGreaterThan(0);
     expect(container.textContent).toContain('언제 보상을 받는지');
+  });
+});
+
+describe('새 미션 알림 (로그인 후 홈)', () => {
+  beforeEach(() => { authMock.user = { id: 'u1', role: 'PARTICIPANT', name: '지은' }; });
+
+  it('앱 막대에 알림 종이 있고, 안 읽은 수를 알려 준다', async () => {
+    missionsMock.notifications = [
+      { id: 'n1', type: 'MISSION_OPEN', title: '마포구 합정동에 새 미션이 열렸어요', body: '[한결] 라테', isRead: false, resourceType: 'mission', resourceId: 'm9', createdAt: '2026-11-13T00:00:00Z' },
+    ];
+    render(<HomeView />);
+    const bell = await screen.findByRole('button', { name: '알림, 안 읽은 알림 1개' });
+    fireEvent.click(bell);
+    // 새 미션 알림은 누르면 그 미션으로 가고 읽음 처리된다
+    const link = await screen.findByRole('link', { name: /마포구 합정동에 새 미션이 열렸어요/ });
+    expect(link.getAttribute('href')).toBe('/missions/m9');
+    fireEvent.click(link);
+    expect(api.patch).toHaveBeenCalledWith('/notifications/n1/read');
+  });
+
+  it('활동 지역이 있고 꺼져 있으면 알림 받기를 권하고, 누르면 켜진다', async () => {
+    missionsMock.profile = { regionSi: '서울특별시', regionGu: '마포구', newMissionAlerts: false };
+    missionsMock.regionList = [mission('1', '가게 1')];
+    render(<HomeView />);
+    expect(await screen.findByText('마포구에 새 미션이 열리면 알려 드릴까요?')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '새 미션 알림 받기' }));
+    expect(api.put).toHaveBeenCalledWith('/participant/profile/alerts', { newMissionAlerts: true });
+    expect(await screen.findByText('마포구에 새 미션이 열리면 알림함으로 알려 드려요')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '알림 끄기' }));
+    expect(api.put).toHaveBeenLastCalledWith('/participant/profile/alerts', { newMissionAlerts: false });
+    expect(await screen.findByRole('button', { name: '새 미션 알림 받기' })).toBeTruthy();
+  });
+
+  it('활동 지역이 없으면 알림 받기를 보여 주지 않는다 (어느 구인지 몰라서)', async () => {
+    missionsMock.list = [mission('1', '가게 1')];
+    render(<HomeView />);
+    await screen.findByText('[마포구 합정동] 가게 1');
+    expect(screen.queryByRole('button', { name: '새 미션 알림 받기' })).toBeNull();
+  });
+
+  it('가게 계정에는 종도 알림 받기도 없다', async () => {
+    authMock.user = { id: 'c1', role: 'CLIENT', name: '사장님' };
+    missionsMock.list = [mission('1', '가게 1')];
+    render(<HomeView />);
+    await screen.findByText('[마포구 합정동] 가게 1');
+    expect(screen.queryByRole('button', { name: /^알림/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: '새 미션 알림 받기' })).toBeNull();
   });
 });
