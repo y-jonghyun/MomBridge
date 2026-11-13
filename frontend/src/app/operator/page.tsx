@@ -1,7 +1,6 @@
 ﻿'use client';
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import api from '@/lib/api';
 import { logout, useAuthHydrated, useAuthStore } from '@/store/auth';
 import MissionImageUploader, { pendingUploadNotice, uploadPendingImages, type PendingImage } from '@/components/missions/MissionImageUploader';
@@ -282,9 +281,6 @@ ${photoNotice}` : msg);
             ))}
           </nav>
           <div className="space-y-1 border-t border-line-soft px-3 pt-3">
-            <p className="px-2 pb-1 text-xs text-muted">미리보기</p>
-            <Link href="/participant" className="block rounded-control px-3 py-2 text-sm text-ink-2">참여자 화면</Link>
-            <Link href="/client" className="block rounded-control px-3 py-2 text-sm text-ink-2">고객사 화면</Link>
             <button
               type="button"
               onClick={() => logout()}

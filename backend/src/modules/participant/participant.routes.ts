@@ -10,7 +10,9 @@ import profileRoutes from './profile.routes';
 import { nextPayoutDate } from '../../lib/payout';
 
 const router = Router();
-router.use(authenticate, requireRole('PARTICIPANT', 'OPERATOR'));
+// 참여자만. 운영자도 들어오면 아래의 '없으면 만들기'(getOrCreateParticipantProfile)가 운영자 계정에 참여자 프로필을
+// 만들어 버렸다 (2026-11-13 초기화 리허설에서 발견). 운영자는 운영자 화면(/operator)의 경로만 쓴다
+router.use(authenticate, requireRole('PARTICIPANT'));
 
 /** 체험단원 가이드에 보여줄 대가 표시 예시 (공정위 심사지침: 제목 또는 본문 첫 부분, 본문과 구분되게) */
 const DISCLOSURE_EXAMPLES = [

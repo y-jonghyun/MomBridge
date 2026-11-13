@@ -321,6 +321,8 @@ router.patch('/users/:id/active', async (req: Request, res: Response, next: Next
 router.get('/clients', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const clients = await prisma.clientProfile.findMany({
+      // 가게 계정의 프로필만. 예전에 운영자 계정에 생긴 가게 프로필은 목록·대행 등록 선택지에 나오지 않게 한다
+      where: { user: { role: 'CLIENT' } },
       orderBy: { businessName: 'asc' },
       select: {
         id: true, businessName: true, category: true, businessCategory: true,

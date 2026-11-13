@@ -78,10 +78,17 @@ describeDb('성과 리포트 · 접근 제어 · 보관 기간', () => {
     expect((await request(app).get(`/api/v1/client/missions/${mission.id}/report`)).status).toBe(401);
   });
 
-  it('operators can see any campaign report', async () => {
+  it('가게(/client) 경로는 가게 계정만 — 운영자는 403이고 가게 프로필이 생기지 않는다. 운영자는 /operator/reports로 본다', async () => {
     const { mission } = await setup();
     const op = await createOperator();
-    expect((await request(app).get(`/api/v1/client/missions/${mission.id}/report`).set('Authorization', `Bearer ${op.token}`)).status).toBe(200);
+    for (const path of ['report', 'keywords', 'report/share']) {
+      const res = await request(app).get(`/api/v1/client/missions/${mission.id}/${path}`).set('Authorization', `Bearer ${op.token}`);
+      expect(res.status).toBe(403);
+    }
+    expect(await prisma.clientProfile.count({ where: { userId: op.user.id } })).toBe(0);
+    const summary = await request(app).get('/api/v1/operator/reports/summary').set('Authorization', `Bearer ${op.token}`);
+    expect(summary.status).toBe(200);
+    expect(summary.body.data.campaigns.map((c: { missionId: string }) => c.missionId)).toContain(mission.id);
   });
 
   it('share links: masked names, expire, can be revoked, token stored only as a hash', async () => {

@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { ChatIcon, GridIcon, HomeIcon, UserIcon } from './icons';
 import { BOTTOM_BAR_VAR, useReportHeight } from '@/lib/bottom-chrome';
 import { useUnreadCount } from '@/lib/unread-notifications';
+import { useAuthStore } from '@/store/auth';
 
 const TABS = [
   { href: '/', label: '홈', Icon: HomeIcon, match: (p: string) => p === '/' },
@@ -12,6 +13,9 @@ const TABS = [
   { href: '/community', label: '커뮤니티', Icon: ChatIcon, match: (p: string) => p.startsWith('/community') },
   { href: '/participant', label: '내 활동', Icon: UserIcon, match: (p: string) => p.startsWith('/participant') },
 ];
+
+/** 운영자에게는 네 번째 칸이 운영자 화면이다 (내 활동은 참여자 화면이라 운영자는 들어가지 않는다) */
+const OPERATOR_TAB = { href: '/operator', label: '관리자', Icon: UserIcon, match: (p: string) => p.startsWith('/operator') };
 
 /**
  * 모바일 하단 4칸. 데스크톱(≥1024px)에서는 숨기고 상단 메뉴를 쓴다.
@@ -24,13 +28,15 @@ export default function BottomTabBar() {
   // 데스크톱(lg)에서는 숨겨져 높이 0으로 알린다
   useReportHeight(ref, BOTTOM_BAR_VAR);
   const unread = useUnreadCount();
+  const isOperator = useAuthStore(s => s.user?.role) === 'OPERATOR';
+  const tabs = isOperator ? [...TABS.slice(0, 3), OPERATOR_TAB] : TABS;
   return (
     <nav
       ref={ref}
       aria-label="하단 메뉴"
       className="fixed inset-x-0 bottom-0 z-30 grid h-[calc(76px+env(safe-area-inset-bottom))] grid-cols-4 border-t border-line bg-paper pb-[calc(10px+env(safe-area-inset-bottom))] lg:hidden"
     >
-      {TABS.map(({ href, label, Icon, match }) => {
+      {tabs.map(({ href, label, Icon, match }) => {
         const on = match(pathname);
         return (
           <Link
