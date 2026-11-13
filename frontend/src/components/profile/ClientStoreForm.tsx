@@ -1,8 +1,10 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '@/lib/api';
 import ProvinceSelect from '@/components/common/ProvinceSelect';
 import DistrictSelect from '@/components/common/DistrictSelect';
+import AddressSearch from '@/components/common/AddressSearch';
+import type { PickedAddress } from '@/lib/kakao-postcode';
 import { normalizeProvince } from '@/lib/regions';
 import { BUSINESS_CATEGORIES } from '@/lib/mission-options';
 
@@ -38,6 +40,19 @@ export default function ClientStoreForm({ onComplete }: { onComplete?: (complete
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
+  // 주소 검색으로 시·군·구를 바꾸면 선택 상자를 새로 그린다 (목록에 없는 값이면 직접 입력으로 열리게)
+  const [guKey, setGuKey] = useState(0);
+  const addressRef = useRef<HTMLInputElement>(null);
+
+  const onPickAddress = (p: PickedAddress) => {
+    setForm(f => ({ ...f, address: p.address, regionSi: p.regionSi, regionGu: p.regionGu, regionDong: p.regionDong }));
+    setGuKey(k => k + 1);
+    // 층·호수를 바로 이어 쓸 수 있게 주소 칸 끝으로 커서를 옮긴다
+    requestAnimationFrame(() => {
+      const el = addressRef.current;
+      if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+    });
+  };
 
   const load = useCallback(async () => {
     const { data } = await api.get('/client/profile');
@@ -93,6 +108,8 @@ export default function ClientStoreForm({ onComplete }: { onComplete?: (complete
         <p className="mt-1 text-xs text-muted">미션을 등록할 때 이 업종이 기본으로 들어갑니다.</p>
       </div>
 
+      <AddressSearch onPick={onPickAddress} />
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor="cs-si" className={label}>시·도 *</label>
@@ -101,7 +118,7 @@ export default function ClientStoreForm({ onComplete }: { onComplete?: (complete
         </div>
         <div>
           <label htmlFor="cs-gu" className={label}>시·군·구 *</label>
-          <DistrictSelect id="cs-gu" required province={form.regionSi}
+          <DistrictSelect key={guKey} id="cs-gu" required province={form.regionSi}
             value={form.regionGu} onChange={v => setForm(f => ({ ...f, regionGu: v }))} />
         </div>
       </div>
@@ -114,10 +131,10 @@ export default function ClientStoreForm({ onComplete }: { onComplete?: (complete
 
       <div>
         <label htmlFor="cs-address" className={label}>사업장 주소 *</label>
-        <input id="cs-address" required className={input} value={form.address}
+        <input id="cs-address" ref={addressRef} required className={input} value={form.address}
           onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
           placeholder="예: 서울시 마포구 합정동 123 1층" />
-        <p className="mt-1 text-xs text-muted">체험단원이 찾아올 주소예요. 미션을 등록할 때 자동으로 들어갑니다.</p>
+        <p className="mt-1 break-keep text-xs text-muted">체험단원이 찾아올 주소예요. 층·호수가 있으면 뒤에 이어 적어 주세요. 미션을 등록할 때 자동으로 들어갑니다.</p>
       </div>
 
       <div>

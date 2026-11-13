@@ -1,9 +1,11 @@
 'use client';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import api from '@/lib/api';
 import { Modal } from '@/components/ui';
 import ProvinceSelect from '@/components/common/ProvinceSelect';
 import DistrictSelect from '@/components/common/DistrictSelect';
+import AddressSearch from '@/components/common/AddressSearch';
+import type { PickedAddress } from '@/lib/kakao-postcode';
 import { BUSINESS_CATEGORIES } from '@/lib/mission-options';
 import { formatPhone } from '@/lib/phone';
 import { normalizeProvince } from '@/lib/regions';
@@ -41,6 +43,18 @@ export default function ShopFormModal({ shop, onClose, onSaved }: {
   const [error, setError] = useState('');
 
   const set = (key: keyof typeof form, value: string) => setForm(prev => ({ ...prev, [key]: value }));
+
+  // 주소 검색으로 시·군·구를 바꾸면 선택 상자를 새로 그린다 (목록에 없는 값이면 직접 입력으로 열리게)
+  const [guKey, setGuKey] = useState(0);
+  const addressRef = useRef<HTMLInputElement>(null);
+  const onPickAddress = (p: PickedAddress) => {
+    setForm(prev => ({ ...prev, address: p.address, regionSi: p.regionSi, regionGu: p.regionGu, regionDong: p.regionDong }));
+    setGuKey(k => k + 1);
+    requestAnimationFrame(() => {
+      const el = addressRef.current;
+      if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+    });
+  };
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -105,6 +119,8 @@ export default function ShopFormModal({ shop, onClose, onSaved }: {
           </select>
         </div>
 
+        <AddressSearch onPick={onPickAddress} />
+
         <div className="grid grid-cols-2 gap-3">
           <div>
             <span className={label}>시·도 *</span>
@@ -113,7 +129,7 @@ export default function ShopFormModal({ shop, onClose, onSaved }: {
           </div>
           <div>
             <label htmlFor="shop-gu" className={label}>시·군·구 *</label>
-            <DistrictSelect id="shop-gu" required province={form.regionSi} value={form.regionGu}
+            <DistrictSelect key={guKey} id="shop-gu" required province={form.regionSi} value={form.regionGu}
               onChange={v => set('regionGu', v)} className={input} />
           </div>
         </div>
@@ -126,7 +142,7 @@ export default function ShopFormModal({ shop, onClose, onSaved }: {
 
         <div>
           <label htmlFor="shop-address" className={label}>주소 (선택)</label>
-          <input id="shop-address" maxLength={500} className={input} placeholder="예: 서울시 마포구 합정동 123 1층"
+          <input id="shop-address" ref={addressRef} maxLength={500} className={input} placeholder="예: 서울시 마포구 합정동 123 1층"
             value={form.address} onChange={e => set('address', e.target.value)} />
         </div>
 

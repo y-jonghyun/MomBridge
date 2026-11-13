@@ -19,7 +19,7 @@ export function photoTone(id: string) {
 
 export interface MissionCardData {
   id: string;
-  /** [동] 가게 이름 — 동이 없으면 구 이름 */
+  /** [구 동] 가게 이름 — 동이 없으면 [구] (areaLabel) */
   place: string;
   /** 제공 내용 */
   offer?: string | null;
