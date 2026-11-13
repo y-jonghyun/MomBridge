@@ -50,7 +50,7 @@ vi.mock('@/lib/payout', () => ({
 // vi.mock은 위로 끌어올려지므로 평범하게 들여와도 위의 가짜가 먼저 걸린다
 import HomeView from '@/components/home/HomeView';
 
-/** 카드에는 제목이 아니라 `[동] 가게 이름`이 찍힌다 (toCardData) */
+/** 카드에는 제목이 아니라 `[구 동] 가게 이름`이 찍힌다 (toCardData) */
 const mission = (id: string, shop: string) => ({
   id, title: `미션 ${id}`, description: '설명', category: 'SNS', rewardAmount: 30000,
   regionSi: '서울특별시', regionGu: '마포구', regionDong: '합정동',
@@ -97,9 +97,9 @@ describe('로그인 전 홈', () => {
     render(<HomeView />);
 
     await waitFor(() => expect(screen.getByRole('heading', { name: '우리 동네 미션 미리보기' })).toBeTruthy());
-    expect(screen.getByText('[합정동] 가게 1')).toBeTruthy();
-    expect(screen.getByText('[합정동] 가게 4')).toBeTruthy();
-    expect(screen.queryByText('[합정동] 가게 5')).toBeNull();
+    expect(screen.getByText('[마포구 합정동] 가게 1')).toBeTruthy();
+    expect(screen.getByText('[마포구 합정동] 가게 4')).toBeTruthy();
+    expect(screen.queryByText('[마포구 합정동] 가게 5')).toBeNull();
     expect(screen.getByText('전체 보기')).toBeTruthy();
   });
 });
@@ -112,7 +112,7 @@ describe('로그인 후 홈', () => {
     const { container } = render(<HomeView />);
 
     expect(screen.getByRole('heading', { level: 1, name: '엄마님, 안녕하세요' })).toBeTruthy();
-    await waitFor(() => expect(screen.getByText('[합정동] 가게 1')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('[마포구 합정동] 가게 1')).toBeTruthy());
     expect(screen.getByRole('heading', { name: '새 미션' })).toBeTruthy();
     expect(container.textContent).not.toContain('아이 등원 후 두 시간');
     // 예전 로그인 후 홈의 히어로·검색·정산 검은 카드는 없다
@@ -127,8 +127,8 @@ describe('로그인 후 홈', () => {
     render(<HomeView />);
 
     await waitFor(() => expect(screen.getByRole('heading', { name: '마포구 새 미션' })).toBeTruthy());
-    expect(await screen.findByText('[합정동] 가게 5')).toBeTruthy();
-    expect(screen.queryByText('[합정동] 가게 6')).toBeNull();
+    expect(await screen.findByText('[마포구 합정동] 가게 5')).toBeTruthy();
+    expect(screen.queryByText('[마포구 합정동] 가게 6')).toBeNull();
     // 머리말에 날짜와 구
     expect(screen.getByText(/요일 · 마포구$/)).toBeTruthy();
   });
@@ -138,7 +138,7 @@ describe('로그인 후 홈', () => {
     missionsMock.list = [mission('9', '다른 동네 가게')];
     const { container } = render(<HomeView />);
 
-    await waitFor(() => expect(screen.getByText('[합정동] 다른 동네 가게')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('[마포구 합정동] 다른 동네 가게')).toBeTruthy());
     expect(screen.getByRole('heading', { name: '새 미션' })).toBeTruthy();
     expect(container.textContent).toContain('마포구에는 아직 열린 미션이 없어');
   });
@@ -166,7 +166,7 @@ describe('로그인 후 홈', () => {
   it('신청한 미션이 없으면 카드가 없다', async () => {
     missionsMock.list = [mission('1', '가게 1')];
     render(<HomeView />);
-    await waitFor(() => expect(screen.getByText('[합정동] 가게 1')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('[마포구 합정동] 가게 1')).toBeTruthy());
     expect(screen.queryByRole('link', { name: /내 미션 다음 단계/ })).toBeNull();
   });
 

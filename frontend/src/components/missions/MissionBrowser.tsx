@@ -66,8 +66,17 @@ export const defaultMissionFilter: MissionFilter = {
 /** 수수료를 뺀 실수령액 (서버 계산값이 생기면 그 값으로 바꾼다) */
 const netOf = (reward: number) => netReward(Number(reward));
 
+/**
+ * 카드에 찍는 동네 이름 — "마포구 합정동". 동이 없으면 구만.
+ * '성남시 분당구'처럼 시가 붙은 구는 끝의 구 이름만 쓴다 (카드 한 줄이 넘치지 않게).
+ */
+export function areaLabel(regionGu: string | null | undefined, regionDong: string | null | undefined): string {
+  const gu = (regionGu ?? '').trim().split(/\s+/).pop() ?? '';
+  return [gu, (regionDong ?? '').trim()].filter(Boolean).join(' ');
+}
+
 export function toCardData(m: MissionListItem): MissionCardData {
-  const area = m.regionDong || m.regionGu;
+  const area = areaLabel(m.regionGu, m.regionDong);
   const dday = Math.ceil((new Date(m.endDate).getTime() - Date.now()) / 86400000);
   return {
     id: m.id,
