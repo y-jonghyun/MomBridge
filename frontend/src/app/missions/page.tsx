@@ -1,26 +1,17 @@
 'use client';
 import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import MissionBrowser, { defaultMissionFilter } from '@/components/missions/MissionBrowser';
+import MissionBrowser, { filterFromParams } from '@/components/missions/MissionBrowser';
 import { AppBar, BottomTabBar, BottomTabBarSpacer } from '@/components/ui';
 
-/** 홈에서 넘어온 조건(유형·업종·태그·검색어)을 그대로 이어받는다 */
+/**
+ * 조건(지역·업종·유형·정렬·검색어·태그)은 화면 주소에 있다 — 홈에서 넘어온 조건도,
+ * 이 화면에서 바꾼 조건도(MissionBrowser가 주소에 남긴다). 그래서 상세에 갔다 돌아오거나
+ * 주소를 복사해 다른 탭에서 열어도 같은 목록이 나온다.
+ */
 function MissionsBody() {
   const params = useSearchParams();
-  const momTags = (params.get('momTags') ?? '').split(',').map(t => t.trim()).filter(Boolean);
-
-  return (
-    <MissionBrowser
-      initialFilter={{
-        ...defaultMissionFilter,
-        category: params.get('category') ?? '',
-        businessCategory: params.get('businessCategory') ?? '',
-        regionSi: params.get('regionSi') ?? '',
-        keyword: params.get('keyword') ?? '',
-        momTags,
-      }}
-    />
-  );
+  return <MissionBrowser initialFilter={filterFromParams(params)} syncUrl />;
 }
 
 export default function MissionsPage() {

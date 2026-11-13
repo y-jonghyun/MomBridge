@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import PageTransition from '@/components/PageTransition';
+import InstantHistoryScroll from '@/components/common/InstantHistoryScroll';
 import './fonts.css';
 import './globals.css';
 import ServerWakeNotice from '@/components/common/ServerWakeNotice';
@@ -49,6 +50,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-screen bg-cream font-sans text-ink antialiased">
         <PageTransition>{children}</PageTransition>
+        <InstantHistoryScroll />
         <LogoutNotice />
         <ServerWakeNotice />
         <InstallPrompt />
