@@ -82,3 +82,7 @@ select:focus {
   }
   button:not(:disabled):active, .press:active { scale: none; }
 }
+
+/* 화면 전환(PageTransition)이 켜져 있을 때 — 옆에서 밀려 들어오는 동안 가로 스크롤이 생기지 않게 자른다.
+   clip은 스크롤 상자를 만들지 않아 sticky 앱 막대가 그대로 동작한다 */
+body:has(> [data-page-transition]) { overflow-x: clip; }
