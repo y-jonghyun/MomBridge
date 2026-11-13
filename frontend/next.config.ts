@@ -1,6 +1,11 @@
 import type { NextConfig } from 'next';
 
 const config: NextConfig = {
+  env: {
+    // 화면 전환 움직임 (lib/page-transitions.ts). 값을 주면 그 값, 비우면 Vercel 프리뷰에서만 켠다
+    NEXT_PUBLIC_PAGE_TRANSITIONS:
+      process.env.NEXT_PUBLIC_PAGE_TRANSITIONS ?? (process.env.VERCEL_ENV === 'preview' ? 'on' : 'off'),
+  },
   async headers() {
     return [
       {
