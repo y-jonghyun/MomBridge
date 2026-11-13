@@ -18,12 +18,12 @@
 ### 남기는 것 (SQL이 끝에서 개수가 그대로인지 확인하고, 다르면 전체를 되돌린다)
 | 표 | 이유 |
 |---|---|
-| `users` 중 `role = 'OPERATOR'` (활성·비활성 모두) | 운영자 계정. 하나도 없으면 SQL이 시작하지 않는다 |
+| `users` 중 `role = 'OPERATOR'` | 운영자 계정. 하나도 없으면 SQL이 시작하지 않는다. SQL은 활성·비활성 모두 남기고, **비활성 운영자는 확인받은 뒤 3-3에서 따로 지운다** |
 | `operator_profiles`, 운영자의 `user_consents` | 운영자 계정에 딸린 것 |
 | `platform_settings` | 운영 기준값(클릭 한도, 대가 표시 문구 등). 시험하며 바꾼 값은 따로 되돌린다 |
 | `tags` | 태그 이름 목록 (`mission_tags` 연결만 지운다) |
 | `_prisma_migrations` | **절대 지우지 않는다** — 지우면 다음 배포에서 마이그레이션이 다시 돌아 깨진다 |
-| `audit_logs` 중 운영자 기록 | `audit=keep_operator`를 고른 경우만 (5절) |
+| `audit_logs` 중 운영자 기록 | **기본은 남기지 않는다(`audit=all`).** `audit=keep_operator`로 바꿔 돌린 경우만 (5절) |
 
 ### 지우는 것 — 순서는 외래 키에서 정했다
 2026-11-13 로컬 DB(마이그레이션 16개, 운영과 같은 스키마)의 `information_schema`에서 외래 키와 삭제 규칙을 읽어 정했다.
@@ -73,12 +73,18 @@ CASCADE로 함께 지워지는 표도 SQL에서는 먼저 직접 지운다 — �
 3. [db-backup-restore.md 2절](./db-backup-restore.md)대로 **로컬 빈 DB에 복원해 본다**. `users`·`_prisma_migrations` 행 수가 맞는지 확인.
 4. 복호화 키(`mombridge-backup-SECRET.asc`)와 암호가 손에 있는지 확인한다. 없으면 백업은 쓸모가 없다.
 
-### 2-3. 남길 운영자와 지울 저장소 파일 목록 받기 (읽기만)
+### 2-3. 운영자 목록과 지울 저장소 파일 목록 받기 (읽기만)
 ```bash
-psql -X -v ON_ERROR_STOP=1 -c "SELECT id, email, name, \"isActive\" FROM users WHERE role = 'OPERATOR' ORDER BY email" "$DIRECT_URL"
+# 활성 운영자 — 초기화 뒤에 남아 로그인할 계정
+psql -X -v ON_ERROR_STOP=1 -c "SELECT id, email, name, \"lastLoginAt\" FROM users WHERE role = 'OPERATOR' AND \"isActive\" ORDER BY email" "$DIRECT_URL"
+# 비활성 운영자 — 지울 후보. 이 목록을 대표에게 보내 지울 계정을 확인받는다 (3-3)
+psql -X -v ON_ERROR_STOP=1 -c "SELECT id, email, name, \"lastLoginAt\", \"updatedAt\" FROM users WHERE role = 'OPERATOR' AND NOT \"isActive\" ORDER BY email" "$DIRECT_URL"
+# 미션 사진 파일 목록 (4절에서 버킷을 비운 뒤 확인용)
 psql -X -v ON_ERROR_STOP=1 -c "\copy (SELECT \"storagePath\" FROM mission_images ORDER BY 1) TO 'mission-images-to-delete.txt'" "$DIRECT_URL"
 ```
-- 운영자 목록이 기대와 다르면 멈춘다(예: 남기고 싶은 운영자가 없다, 비활성 운영자를 지우고 싶다 → 9절).
+- **활성 운영자가 0명이거나 기대와 다르면 멈춘다.** 초기화 뒤 로그인할 사람이 있어야 한다.
+- **비활성 운영자 목록은 대표가 확인한다.** 지울 계정의 `id`를 확인받아 적어 둔다(3-3에서 그 `id`만 지운다).
+  확인받지 못한 계정은 지우지 않는다(남아 있어도 비활성이라 로그인할 수 없다).
 - 파일 목록은 4절에서 버킷을 비운 뒤 확인용으로 쓴다. DB를 지우면 `storagePath`를 잃으므로 **반드시 먼저** 받는다.
 
 ### 2-4. 로컬 리허설
@@ -106,7 +112,47 @@ psql -X -v ON_ERROR_STOP=1 -v expected_db=postgres -v audit=all -v apply=true \
   -f docs/ops/production-reset.sql "$DIRECT_URL"
 ```
 `적용했습니다 (COMMIT)`가 나오면 끝. 오류가 나면 그 자리에서 멈추고 **아무것도 지워지지 않는다**(7절).
-`audit`은 5절에서 고른 값을 쓴다.
+`audit`은 기본값 `all`을 쓴다(5절).
+
+### 3-3. 확인받은 비활성 운영자 지우기 (2-3에서 확인받은 계정이 있을 때만)
+초기화(`audit=all`)로 감사 기록이 이미 비어 있으므로, 이 순서라야 `audit_logs → users` RESTRICT에 막히지 않는다.
+아래 `VALUES`에 **확인받은 `id`만** 적는다. 한 트랜잭션이라 확인이 어긋나면 아무것도 지워지지 않는다.
+```sql
+\set ON_ERROR_STOP on
+\encoding UTF8
+BEGIN;
+CREATE TEMP TABLE drop_operators (id uuid PRIMARY KEY) ON COMMIT DROP;
+INSERT INTO drop_operators (id) VALUES
+  ('<확인받은 비활성 운영자 id 1>'),
+  ('<확인받은 비활성 운영자 id 2>');
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM drop_operators d LEFT JOIN users u ON u.id = d.id
+             WHERE u.id IS NULL OR u.role <> 'OPERATOR' OR u."isActive") THEN
+    RAISE EXCEPTION '목록에 없는 계정이나, 운영자가 아니거나 활성인 계정이 있습니다. 멈춥니다.';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM users WHERE role = 'OPERATOR' AND "isActive"
+                 AND id NOT IN (SELECT id FROM drop_operators)) THEN
+    RAISE EXCEPTION '지우고 나면 활성 운영자가 하나도 남지 않습니다. 멈춥니다.';
+  END IF;
+END $$;
+
+DELETE FROM audit_logs WHERE "actorId" IN (SELECT id FROM drop_operators);  -- audit=all로 초기화했다면 이미 0건
+DELETE FROM users WHERE id IN (SELECT id FROM drop_operators);              -- operator_profiles·user_consents는 CASCADE
+
+SELECT role, "isActive", count(*) FROM users GROUP BY 1, 2 ORDER BY 1, 2;  -- OPERATOR | true | n 만 남아야 한다
+COMMIT;
+```
+
+### 3-4. 운영자 비밀번호 바꾸기 (초기화 직후, 6절 확인보다 먼저)
+시험 기간에 쓰던 비밀번호를 그대로 들고 오픈하지 않는다. **남은 활성 운영자 모두** 바꾼다.
+
+1. 각 운영자가 운영 사이트의 **비밀번호 찾기**(`/forgot-password`)에서 자기 이메일로 재설정 메일을 받아 새 비밀번호로 바꾼다.
+   (운영자 화면에는 비밀번호 변경 화면이 없다. 재설정 메일은 활성 계정이면 운영자에게도 간다.
+   초기화가 `password_reset_tokens`를 비웠으므로 예전 링크는 쓸 수 없다.)
+2. 재설정하면 그 계정의 다른 기기 로그인은 모두 끊긴다. 새 비밀번호로 로그인되는지 확인한다.
+3. 재설정 메일이 오지 않으면(운영 메일 설정 문제) 오픈을 미루고 메일 설정부터 고친다. 비밀번호를 DB에 직접 넣지 않는다.
 
 ---
 
@@ -120,17 +166,18 @@ psql -X -v ON_ERROR_STOP=1 -v expected_db=postgres -v audit=all -v apply=true \
 
 ---
 
-## 5. `audit_logs` — 두 가지 중 하나를 고른다 (아직 정하지 않음)
+## 5. `audit_logs` — 기본은 모두 지운다 (`audit=all`, 2026-11-13 결정)
 `audit_logs.actorId → users`가 RESTRICT라서, 운영자가 아닌 회원을 지우려면 그 회원들이 남긴 기록은 어느 쪽이든 지워야 한다.
 차이는 **운영자가 남긴 기록**(정산 계좌 열람 `PAYOUT_ACCOUNT_VIEW`, 설정 변경 `SETTING_UPDATE`, 가게 등록 `OPERATOR_CLIENT_*` 등)을 남기느냐다.
 
 | 선택 | 실행 값 | SQL이 하는 일 |
 |---|---|---|
-| 모두 지움 | `-v audit=all` | `DELETE FROM audit_logs;` |
-| 운영자 기록만 남김 | `-v audit=keep_operator` | `DELETE FROM audit_logs WHERE "actorId" NOT IN (SELECT id FROM users WHERE role = 'OPERATOR');` |
+| **모두 지움 (기본)** | `-v audit=all` | `DELETE FROM audit_logs;` |
+| 운영자 기록만 남김 (바꿀 때만) | `-v audit=keep_operator` | `DELETE FROM audit_logs WHERE "actorId" NOT IN (SELECT id FROM users WHERE role = 'OPERATOR');` |
 
 - 남긴 운영자 기록의 `targetId`는 지워진 미션·정산 등을 가리키게 된다(외래 키가 없어 오류는 없다).
-- 시험 데이터에 대한 기록이라 모두 지워도 되고, '누가 언제 계좌를 봤는지'를 오픈 전 것까지 보관하려면 남긴다.
+- 오픈 전 기록은 모두 시험 데이터에 대한 것이라 모두 지운다. '누가 언제 계좌를 봤는지'를 오픈 전 것까지 보관하기로 바뀌면 `keep_operator`로 돌린다.
+- `keep_operator`로 돌렸다면 3-3에서 지우는 비활성 운영자의 기록은 3-3이 함께 지운다.
 
 ---
 
@@ -162,7 +209,8 @@ psql -X -v ON_ERROR_STOP=1 -v expected_db=postgres -v audit=all -v apply=true \
    4. 운영자: 승인 → **정산 기록(payouts)이 생겼는지**(지급액 = 보상금 − 수수료 10%)
 5. 4번에서 만든 시험 데이터는 **3절을 한 번 더**(미리 보기 → 적용) 돌려 지운다. 두 번 돌려도 안전하다(리허설 6단계).
 6. **새 백업** — 초기화된 상태를 새 기준점으로 Actions → DB backup을 한 번 더 돌린다.
-7. 운영자 계정 비밀번호를 오픈 전에 한 번 바꾼다(초기화와 무관하게 권장).
+
+운영자 비밀번호는 3-4에서 이미 바꿨다. 3번 '운영자 로그인'은 **바꾼 비밀번호로** 확인한다.
 
 ---
 
@@ -218,11 +266,20 @@ psql -X -v ON_ERROR_STOP=1 -v expected_db=postgres -v audit=all -v apply=true \
 - 운영자 계정에 참여자·가게 프로필이 생겨 있어 '비어야 하는 표가 남았습니다'로 멈췄다 → 11번에 운영자 것까지 지우는 단계를 넣었다.
 - 윈도 `psql`은 접속 주소 뒤의 옵션을 무시하고, 기본 인코딩(UHC)으로 한글을 읽지 못한다 → 옵션을 주소 앞에, SQL 첫머리에 `\encoding UTF8`.
 
-리허설로 확인하지 못한 것: 저장소 버킷 비우기(로컬에 저장소가 없다), 운영자 로그인과 가입→정산 흐름(6절 3·4번, 운영에서 한다).
+3-3(비활성 운영자 지우기)도 같은 날 임시 복사본에서 돌렸다 — 가짜 비활성 운영자 1명(감사 기록 1건 포함)을 넣고:
+- 활성 운영자 `id`를 잘못 적으면 → "운영자가 아니거나 활성인 계정이 있습니다"로 멈춤, 아무것도 안 지워짐
+- 초기화(`audit=all`) 적용 → 확인 통과(운영자 2명 그대로) → 3-3으로 비활성 운영자 지움 → 활성 운영자 1명, `operator_profiles` 1, `audit_logs` 0
+- 마지막 남은 운영자를 비활성으로 만들어 지우려 하면 → "활성 운영자가 하나도 남지 않습니다"로 멈춤
+
+리허설로 확인하지 못한 것: 저장소 버킷 비우기(로컬에 저장소가 없다), 비밀번호 재설정 메일(3-4), 운영자 로그인과 가입→정산 흐름(6절 3·4번) — 운영에서 한다.
 
 ---
 
-## 9. 아직 정하지 않은 것
-- **`audit_logs`**: 모두 지울지, 운영자 기록만 남길지 (5절).
-- **비활성 운영자 계정**: 지금 SQL은 `role = 'OPERATOR'`면 활성·비활성 모두 남긴다. 지우려면 실행 전에 따로 정한다.
-- **운영자 계정을 새로 만들지**: 그렇다면 `scripts/create-operator.ts`로 먼저 만들고, 남길 운영자 목록(2-3)을 확인한 뒤 실행한다.
+## 9. 정한 것과 아직 정하지 않은 것
+정한 것 (2026-11-13):
+- **`audit_logs`**: 기본은 모두 지운다(`audit=all`). 운영자 기록을 남기는 방법(`keep_operator`)은 바꿀 때를 위해 남겨 둔다 (5절).
+- **비활성 운영자 계정**: 초기화 전에 목록을 뽑아(2-3) 대표가 확인한 계정만 초기화 직후 지운다(3-3).
+- **운영자 비밀번호**: 초기화 직후 남은 활성 운영자 모두 바꾼다(3-4).
+
+아직 정하지 않은 것:
+- **운영자 계정을 새로 만들지**: 그렇다면 `scripts/create-operator.ts`로 먼저 만들고, 운영자 목록(2-3)을 확인한 뒤 실행한다.
