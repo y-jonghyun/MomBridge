@@ -1,7 +1,6 @@
 'use client';
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
 import api from '@/lib/api';
 import { logout, useAuthHydrated, useAuthStore } from '@/store/auth';
 import { LogOutIcon } from '@/components/ui/icons';
@@ -98,7 +97,9 @@ function ClientPageContent() {
   useEffect(() => {
     if (!hydrated) return;
     if (!user) { router.push('/login'); return; }
-    if (user.role !== 'CLIENT' && user.role !== 'OPERATOR') { router.push('/'); return; }
+    // 운영자는 운영자 화면으로 (이 화면의 요청은 가게만 받는다 — 운영자 계정에 가게 프로필을 만들지 않으려고)
+    if (user.role === 'OPERATOR') { router.replace('/operator'); return; }
+    if (user.role !== 'CLIENT') { router.push('/'); return; }
 
     // Toss failure return
     const paymentCode = searchParams.get('code');
@@ -308,7 +309,8 @@ ${photoNotice}`
   const totalAmount = Number(form.rewardAmount || 0) * Number(form.maxParticipants || 0);
   const pendingPaymentMissions = missions.filter(m => m.paymentStatus === 'PENDING');
 
-  if (!hydrated || !user) return null;
+  // 가게가 아니면 옮겨 가는 동안 아무것도 그리지 않는다 (그 사이 가게 요청을 보내지 않게)
+  if (!hydrated || !user || user.role !== 'CLIENT') return null;
 
   return (
     <div className="min-h-screen bg-cream">
@@ -320,9 +322,6 @@ ${photoNotice}`
           <h1 className="truncate font-serif text-title font-bold">{clientInfo?.businessName || user.name}</h1>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          {user.role === 'OPERATOR' && (
-            <Link href="/operator" className="rounded-full border border-line px-2 py-1 text-xs text-muted">운영자</Link>
-          )}
           <button
             type="button" aria-label="로그아웃"
             onClick={() => logout()}

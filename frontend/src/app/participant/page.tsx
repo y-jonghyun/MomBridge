@@ -149,7 +149,9 @@ function ParticipantBody({ initialTab }: { initialTab: string }) {
   useEffect(() => {
     if (!hydrated) return;
     if (!user) { router.push('/login'); return; }
-    if (user.role !== 'PARTICIPANT' && user.role !== 'OPERATOR') { router.push('/'); return; }
+    // 운영자는 운영자 화면으로 (이 화면의 요청은 참여자만 받는다 — 운영자 계정에 참여자 프로필을 만들지 않으려고)
+    if (user.role === 'OPERATOR') { router.replace('/operator'); return; }
+    if (user.role !== 'PARTICIPANT') { router.push('/'); return; }
     void loadAll();
     void loadProfile();
     void loadBookmarks();
@@ -197,7 +199,8 @@ function ParticipantBody({ initialTab }: { initialTab: string }) {
   /** 계좌는 지급 기록에만 남는다 — 가장 최근 것을 보여 준다 */
   const account = payouts.find(p => p.bankAccount);
 
-  if (!hydrated || !user) return (
+  // 참여자가 아니면 옮겨 가는 동안 뼈대만 보여 준다 (그 사이 아래 화면이 참여자 요청을 보내지 않게)
+  if (!hydrated || !user || user.role !== 'PARTICIPANT') return (
     <div className="min-h-screen bg-cream">
       <div className="mx-auto max-w-shell space-y-4 px-5 py-6">
         <div className="h-8 w-32 animate-pulse rounded bg-line-soft" />
@@ -213,11 +216,6 @@ function ParticipantBody({ initialTab }: { initialTab: string }) {
         title="내 활동"
         showAccount={false}
         actions={<>
-          {user.role === 'OPERATOR' && (
-            <Link href="/operator" className="flex min-h-[44px] items-center px-1">
-              <span className="rounded-full border border-line px-2 py-1 text-xs text-muted">운영자</span>
-            </Link>
-          )}
           <NotificationBell />
           <button
             type="button" aria-label="로그아웃"

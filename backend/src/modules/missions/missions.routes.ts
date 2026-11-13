@@ -114,15 +114,15 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 // 미션 생성 — OPERATOR만 허용 (결제 면제 or 고객사 결제 링크 발송)
 router.post('/', authenticate, requireRole('OPERATOR'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const user = req.user!;
     const { clientProfileId: requestedProfileId, sendPaymentLink: sendLinkInput, keywords, ...missionData } =
       parseInput(operatorCreateMissionSchema, req.body);
-    let clientProfileId = requestedProfileId;
-    if (!clientProfileId) {
-      const ownProfile = await prisma.clientProfile.findUnique({ where: { userId: user.sub } });
-      if (!ownProfile) throw new AppError('PROFILE_REQUIRED', 403, 'clientProfileId가 필요합니다');
-      clientProfileId = ownProfile.id;
-    }
+    // 미션은 반드시 가게 계정의 프로필에 단다. 예전에는 비워 두면 운영자 자신의 프로필로 등록됐다
+    if (!requestedProfileId) throw new AppError('CLIENT_REQUIRED', 400, '미션을 올릴 가게를 골라 주세요');
+    const target = await prisma.clientProfile.findUnique({
+      where: { id: requestedProfileId }, select: { id: true, user: { select: { role: true } } },
+    });
+    if (!target || target.user.role !== 'CLIENT') throw new AppError('CLIENT_REQUIRED', 400, '가게 계정을 골라 주세요');
+    const clientProfileId = target.id;
 
     const sendPaymentLink = !!sendLinkInput;
 

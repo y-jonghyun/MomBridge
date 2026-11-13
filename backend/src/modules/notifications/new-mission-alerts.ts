@@ -40,7 +40,8 @@ export async function sendNewMissionAlerts(missionId: string): Promise<number> {
         newMissionAlerts: true,
         regionSi: { in: provinceVariants(si) },
         regionGu: mission.regionGu,
-        user: { isActive: true, deletedAt: null },
+        // 참여자 계정만 (예전에 운영자 계정에 생긴 참여자 프로필은 알리지 않는다)
+        user: { role: 'PARTICIPANT', isActive: true, deletedAt: null },
       },
       select: { userId: true },
     });

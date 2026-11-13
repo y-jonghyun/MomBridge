@@ -15,7 +15,9 @@ import { requireCampaignAccess } from './campaign-access';
 
 /** 광고주용 캠페인 API — /client/missions/:id/... */
 const router = Router();
-router.use(authenticate, requireRole('CLIENT', 'OPERATOR'));
+// 가게(고객사)만 — /client 아래 경로는 가게 계정의 것이다. 운영자 화면은 이 경로를 쓰지 않는다
+// (운영자 성과 보기는 /operator/reports)
+router.use(authenticate, requireRole('CLIENT'));
 
 export const hashShareToken = (token: string) => createHash('sha256').update(token).digest('hex');
 

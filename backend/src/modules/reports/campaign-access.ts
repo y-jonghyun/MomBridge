@@ -12,7 +12,8 @@ export async function requireCampaignAccess(req: Request, missionId: string) {
     where: { id: missionId },
     select: { id: true, clientProfileId: true, createdAt: true, clientProfile: { select: { userId: true } } },
   });
-  const allowed = mission && (user.role === 'OPERATOR' || (user.role === 'CLIENT' && mission.clientProfile.userId === user.sub));
+  // 경로가 가게 계정만 받는다(campaign.routes). 그래도 여기서 다시 본인 미션인지 확인한다
+  const allowed = mission && user.role === 'CLIENT' && mission.clientProfile.userId === user.sub;
   if (!mission || !allowed) throw new AppError('NOT_FOUND', 404, '미션을 찾을 수 없습니다');
   return mission;
 }

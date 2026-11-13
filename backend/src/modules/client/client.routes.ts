@@ -7,7 +7,9 @@ import { formatBusinessNumber, isStoreComplete, missingStoreParts, storeSchema }
 import { maskName } from '../../lib/mask';
 
 const router = Router();
-router.use(authenticate, requireRole('CLIENT', 'OPERATOR'));
+// 가게(고객사)만. 운영자도 들어오면 getOrCreateClientProfile이 운영자 계정에 가게 프로필을 만들어, 운영자가 가게 목록에
+// '가게'로 섞였다. 운영자의 가게 등록·미션 대행 등록은 /operator/clients, POST /missions를 쓴다
+router.use(authenticate, requireRole('CLIENT'));
 
 async function getOrCreateClientProfile(userId: string, name = '') {
   return prisma.clientProfile.upsert({

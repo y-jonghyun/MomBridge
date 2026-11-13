@@ -77,13 +77,19 @@ describeDb('고객사 응답의 체험단원 정보 범위', () => {
     expect(res.body.data.ranking[0].participantName).toBe('홍○동');
   });
 
-  it('운영자 경로에는 실명이 그대로 내려간다', async () => {
+  it('운영자는 가게 경로(/client)를 쓰지 않는다 — 실명은 운영자 경로에서 그대로 본다', async () => {
     const operator = await createOperator();
-    const res = await request(app).get(`/api/v1/client/missions/${missionId}/report`)
+    // 가게 경로는 가게 계정만 받는다 (운영자 계정에 가게 프로필을 만들지 않으려고)
+    const viaClient = await request(app).get(`/api/v1/client/missions/${missionId}/report`)
       .set('Authorization', `Bearer ${operator.token}`);
+    expect(viaClient.status).toBe(403);
 
+    // 운영자 화면의 지원서 목록에는 실명이 그대로 내려간다
+    const res = await request(app).get('/api/v1/operator/applications')
+      .set('Authorization', `Bearer ${operator.token}`);
     expect(res.status).toBe(200);
-    expect(res.body.data.ranking[0].participantName).toBe('홍길동');
+    const names = (res.body.data as { participant: { user: { name: string } } }[]).map(a => a.participant.user.name);
+    expect(names).toContain('홍길동');
   });
 
   it('세 응답 어디에도 연락처·이메일·프로필·검수 메모가 섞이지 않는다', async () => {
