@@ -19,6 +19,7 @@ import { submissionStatusLabel } from '@/lib/status-labels';
 import ParticipantProfileForm from '@/components/profile/ParticipantProfileForm';
 import LegalInfo from '@/components/legal/LegalInfo';
 import MissionJourney, { journeySteps } from '@/components/participant/MissionJourney';
+import { activeApplications } from '@/lib/next-step';
 
 /** 기준: docs/design/mombridge-design/cream-editorial-v1.md 3번 '참여자 내 활동' + Participant.html */
 
@@ -211,10 +212,8 @@ function ParticipantBody({ initialTab }: { initialTab: string }) {
   const totalEarned = payouts.filter(p => p.status === 'COMPLETED').reduce((sum, p) => sum + Number(p.netAmount ?? 0), 0);
   const applyingCount = applications.filter(a => a.status === 'PENDING').length;
   // 지급까지 끝났거나 미션이 종료됐으면 '진행 중'이 아니다
-  const activeApps = applications.filter(a =>
-    a.status === 'APPROVED'
-    && payoutByMission.get(a.missionId)?.status !== 'COMPLETED'
-    && a.mission?.status !== 'CLOSED');
+  // 로그인 후 홈의 '다음 단계' 카드와 같은 기준 (lib/next-step)
+  const activeApps = activeApplications(applications, payouts);
   /** 계좌는 지급 기록에만 남는다 — 가장 최근 것을 보여 준다 */
   const account = payouts.find(p => p.bankAccount);
 

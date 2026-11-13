@@ -64,6 +64,13 @@ describe('주요 화면의 누를 수 있는 것', () => {
     expect(smallTouchTargets(container)).toEqual([]);
   });
 
+  it('로그인 후 홈 (참여자)', async () => {
+    useAuthStore.setState({ user: { ...USER, role: 'PARTICIPANT' }, token: 't', refreshToken: 'r' });
+    const { container } = render(<HomeView />);
+    await screen.findByText('맘브릿지 알아보기');
+    expect(smallTouchTargets(container)).toEqual([]);
+  });
+
   it('로그인 화면 (로그인 전)', () => {
     const { container } = render(<LoginPage />);
     expect(smallTouchTargets(container)).toEqual([]);
