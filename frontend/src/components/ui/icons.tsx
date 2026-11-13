@@ -117,3 +117,7 @@ export const LivingIcon = (p: IconProps) => (
 export const ShopIcon = (p: IconProps) => (
   <Svg {...p}><path d="M4 4h16l1 5a3 3 0 0 1-6 0 3 3 0 0 1-6 0 3 3 0 0 1-6 0z" /><path d="M5 11v9h14v-9" /><path d="M10 20v-5h4v5" /></Svg>
 );
+/** 앱 아이콘의 두 아치 — 빈 화면의 표지 그림에 쓴다 */
+export const ArchIcon = (p: IconProps) => (
+  <Svg {...p}><path d="M6.75 15v-4.5a2.63 2.63 0 0 1 5.25 0V15M12 10.5a2.63 2.63 0 0 1 5.25 0V15M5.25 17.25h13.5" /></Svg>
+);

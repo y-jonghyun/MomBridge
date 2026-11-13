@@ -111,6 +111,17 @@ function ParticipantBody({ initialTab }: { initialTab: string }) {
     } catch { /* 내 정보 탭을 열었을 때 다시 받는다 */ }
   }, []);
 
+  // 아직 아무 미션에도 신청하지 않았으면 '프로필을 미리 채워 두세요'를 띄울지 정한다
+  const noApplications = !loading && applications.length === 0;
+  useEffect(() => {
+    if (!noApplications || user?.role !== 'PARTICIPANT') return;
+    let alive = true;
+    api.get('/participant/profile')
+      .then(({ data }) => { if (alive) setProfileComplete(!!data.data?.complete); })
+      .catch(() => { /* 모르면 카드를 띄우지 않는다 */ });
+    return () => { alive = false; };
+  }, [noApplications, user?.role]);
+
   async function handleSaveProfile(e: React.FormEvent) {
     e.preventDefault();
     setProfileSaving(true);
@@ -353,8 +364,43 @@ function ParticipantBody({ initialTab }: { initialTab: string }) {
                     </section>
                   );
                 })}
-                {activeApps.length === 0 && (
+                {activeApps.length === 0 && applications.length > 0 && (
                   <EmptyBox>진행 중인 미션이 없어요. <Link href="/missions" className="font-medium text-clay">미션 둘러보기</Link></EmptyBox>
+                )}
+                {/* 출시 첫날처럼 아직 한 번도 신청하지 않았을 때 — 무엇이 기다리는지 단계를 미리 보여 준다 */}
+                {applications.length === 0 && (
+                  <>
+                    <section aria-labelledby="no-apps" className="rounded-card border border-line bg-paper px-[18px] pb-[18px] pt-5">
+                      <h2 id="no-apps" className="font-serif text-[19px] font-bold text-ink">신청한 미션이 없어요</h2>
+                      <p className="mt-1.5 break-keep text-[13.5px] leading-[1.6] text-ink-2">
+                        미션을 신청하면 여기에서 지금 할 일을 하나씩 알려 드려요.
+                      </p>
+                      <div className="mt-4 pl-1 opacity-60">
+                        <MissionJourney steps={[
+                          { label: '신청', detail: '동네 가게의 미션에 신청해요', state: 'todo' },
+                          { label: '선정', detail: '맘브릿지가 신청자를 확인하고 골라요', state: 'todo' },
+                          { label: '방문하고 후기 제출', detail: '가게에 다녀와 내 SNS에 후기를 올려요', state: 'todo' },
+                          { label: '보상 지급', detail: '승인되면 다음 달 10일', state: 'todo' },
+                        ]} />
+                      </div>
+                      <Link href="/missions"
+                        className="mt-4 flex h-12 w-full items-center justify-center rounded-control border border-ink text-[15px] font-bold text-ink">
+                        미션 둘러보기
+                      </Link>
+                    </section>
+                    {!profileComplete && (
+                      <section aria-labelledby="fill-profile" className="rounded-card border border-line bg-paper px-[18px] py-4">
+                        <h2 id="fill-profile" className="text-[15px] font-bold text-ink">프로필을 미리 채워 두세요</h2>
+                        <p className="mt-1 break-keep text-[13px] leading-[1.55] text-ink-2">
+                          활동 지역과 SNS 계정이 있어야 미션에 신청할 수 있어요.
+                        </p>
+                        <button type="button" onClick={() => setTab('profile')}
+                          className="mt-3 flex h-12 w-full items-center justify-center rounded-control bg-clay text-[15px] font-bold text-paper">
+                          프로필 채우기
+                        </button>
+                      </section>
+                    )}
+                  </>
                 )}
               </div>
             )}

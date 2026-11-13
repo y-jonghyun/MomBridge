@@ -8,11 +8,13 @@ import { BellIcon } from '@/components/ui/icons';
  * 휴대폰 푸시·문자는 보내지 않는다 (1단계는 알림함만).
  * 꺼져 있으면 권하는 카드, 켜져 있으면 한 줄 + '끄기'.
  */
-export default function NewMissionAlertToggle({ gu, on, onChange, className = '' }: {
+export default function NewMissionAlertToggle({ gu, on, onChange, className = '', bare = false }: {
   gu: string;
   on: boolean;
   onChange: (on: boolean) => void;
   className?: string;
+  /** 다른 카드 안에 넣을 때 — 권하는 카드 테두리·문구 없이 버튼만 */
+  bare?: boolean;
 }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -49,19 +51,32 @@ export default function NewMissionAlertToggle({ gu, on, onChange, className = ''
     );
   }
 
+  const button = (
+    <button
+      type="button" disabled={saving} onClick={() => save(true)}
+      className={`flex w-full items-center justify-center gap-1.5 rounded-control bg-clay font-bold text-paper disabled:opacity-50 ${bare ? 'h-12 text-[15px]' : 'mt-3 h-11 text-sm'}`}
+    >
+      <BellIcon size={16} strokeWidth={1.8} />
+      {saving ? '저장 중…' : '새 미션 알림 받기'}
+    </button>
+  );
+
+  if (bare) {
+    return (
+      <div className={className}>
+        {button}
+        {error && <p role="alert" className="mt-2 text-[13px] text-clay-dark">{error}</p>}
+      </div>
+    );
+  }
+
   return (
     <div className={`rounded-card border border-line bg-paper px-4 py-4 ${className}`}>
       <p className="break-keep text-sm font-medium text-ink">{gu}에 새 미션이 열리면 알려 드릴까요?</p>
       <p className="mt-1 break-keep text-[13px] leading-[1.6] text-muted">
         앱 안 알림함(종 모양)으로 알려 드려요. 언제든 끌 수 있어요.
       </p>
-      <button
-        type="button" disabled={saving} onClick={() => save(true)}
-        className="mt-3 flex h-11 w-full items-center justify-center gap-1.5 rounded-control bg-clay text-sm font-bold text-paper disabled:opacity-50"
-      >
-        <BellIcon size={16} strokeWidth={1.8} />
-        {saving ? '저장 중…' : '새 미션 알림 받기'}
-      </button>
+      {button}
       {error && <p role="alert" className="mt-2 text-[13px] text-clay-dark">{error}</p>}
     </div>
   );

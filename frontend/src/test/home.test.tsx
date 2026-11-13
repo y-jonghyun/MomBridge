@@ -179,13 +179,33 @@ describe('로그인 후 홈', () => {
     expect(screen.queryByRole('link', { name: /내 미션 다음 단계/ })).toBeNull();
   });
 
-  it('미션이 0개면 빈 안내와 함께 소개 카드를 보여 준다', async () => {
-    const { container } = render(<HomeView />);
+  it('열린 미션이 하나도 없으면 출시 첫날 화면 — 지역이 없으면 지역 정하기, 진행 안내, 소개 링크', async () => {
+    render(<HomeView />);
+    expect(await screen.findByRole('heading', { name: '우리 동네 첫 미션을 준비하고 있어요' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: '활동 지역 정하기' }).getAttribute('href')).toBe('/participant?tab=profile');
+    // 위쪽의 '활동 지역을 정하면…' 줄은 카드 안 버튼과 겹치므로 숨긴다
+    expect(screen.queryByRole('link', { name: /활동 지역을 정하면/ })).toBeNull();
+    expect(screen.getByRole('heading', { name: '맘브릿지는 이렇게 진행돼요' })).toBeTruthy();
+    // 지급 시기·공제는 약관 제8조와 같은 말
+    expect(screen.getByText('승인되면 다음 달 10일에 보상을 받아요')).toBeTruthy();
+    expect(screen.getByText('보상금에서 수수료 10%와 세금 3.3%를 뺀 금액이에요')).toBeTruthy();
+    expect(screen.getByRole('link', { name: /맘브릿지 더 알아보기/ }).getAttribute('href')).toBe('/about');
+  });
 
+  it('활동 지역이 있으면 "{구}의 첫 미션" + 카드 안에서 새 미션 알림 받기 (아래 카드는 겹치지 않게 뺀다)', async () => {
+    missionsMock.profile = { regionSi: '서울특별시', regionGu: '마포구', newMissionAlerts: false };
+    render(<HomeView />);
+    expect(await screen.findByRole('heading', { name: '마포구의 첫 미션을 준비하고 있어요' })).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: '새 미션 알림 받기' })).toHaveLength(1);
+    expect(screen.queryByText('마포구에 새 미션이 열리면 알려 드릴까요?')).toBeNull();
+  });
+
+  it('가게 계정은 미션이 0개여도 예전 빈 안내와 소개 카드', async () => {
+    authMock.user = { id: 'c1', role: 'CLIENT', name: '사장님' };
+    const { container } = render(<HomeView />);
     await waitFor(() => expect(screen.getByText('맘브릿지 알아보기')).toBeTruthy());
-    const about = screen.getAllByRole('link').filter(a => a.getAttribute('href') === '/about');
-    expect(about.length).toBeGreaterThan(0);
     expect(container.textContent).toContain('언제 보상을 받는지');
+    expect(screen.queryByText('맘브릿지는 이렇게 진행돼요')).toBeNull();
   });
 });
 

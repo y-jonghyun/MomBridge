@@ -2,7 +2,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { AppBar, BottomTabBar, BottomTabBarSpacer } from '@/components/ui';
+import { AppBar, BottomTabBar, BottomTabBarSpacer, EmptyState } from '@/components/ui';
+import { ChatIcon } from '@/components/ui/icons';
 import api from '@/lib/api';
 import { useAuthHydrated, useAuthStore } from '@/store/auth';
 
@@ -13,6 +14,13 @@ const CATEGORIES = [
   { key: '지역정보', label: '지역 정보' },
   { key: '자유게시판', label: '자유게시판' },
   { key: '질문', label: '질문/문의' },
+];
+
+/** 첫 글 주제 예시 — 누르면 제목과 분류가 채워진 글쓰기 창이 열린다 */
+const FIRST_POST_TOPICS: [string, string][] = [
+  ['아이랑 가기 좋은 카페', '지역정보'],
+  ['체험단이 처음이에요', '질문'],
+  ['동네 소아과 추천', '지역정보'],
 ];
 
 const ROLE_BADGE: Record<string, string> = {
@@ -50,6 +58,8 @@ export default function CommunityPage() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
+  // 첫 목록을 받기 전에는 '첫 이야기' 화면을 띄우지 않는다
+  const [postsLoaded, setPostsLoaded] = useState(false);
 
   const [showWrite, setShowWrite] = useState(false);
   const [writeForm, setWriteForm] = useState({ category: '체험후기', title: '', content: '' });
@@ -65,7 +75,7 @@ export default function CommunityPage() {
       setPosts(r.data.data.posts);
       setTotal(r.data.data.total);
       setPage(p);
-    } catch { } finally { setLoading(false); }
+    } catch { } finally { setLoading(false); setPostsLoaded(true); }
   }, [category, sort, keyword]);
 
   const loadBest = useCallback(async () => {
@@ -209,16 +219,60 @@ export default function CommunityPage() {
             </div>
           )}
 
+          {/* 출시 첫날 — 전체 분류에 글이 하나도 없을 때 */}
+          {tab === 'LIST' && category === 'ALL' && !keyword && !loading && postsLoaded && posts.length === 0 && (
+            <EmptyState
+              icon={<ChatIcon size={32} strokeWidth={1.7} />}
+              title={<>우리 동네 첫 이야기를{' '}<br />들려주세요</>}
+              body={<>아직 올라온 글이 없어요.{' '}<br />이런 이야기부터 시작해 보세요.</>}
+            >
+              <div className="-mt-1 flex flex-wrap justify-center gap-1.5">
+                {FIRST_POST_TOPICS.map(([title, cat]) => (
+                  <button
+                    key={title} type="button"
+                    onClick={() => {
+                      if (!user) { router.push('/login'); return; }
+                      setWriteForm({ category: cat, title, content: '' });
+                      setShowWrite(true);
+                    }}
+                    className="flex h-11 items-center rounded-full border border-line bg-cream px-3.5 text-[13px] text-ink-2"
+                  >
+                    {title}
+                  </button>
+                ))}
+              </div>
+              {user ? (
+                <button type="button" onClick={() => setShowWrite(true)}
+                  className="mt-4 flex h-12 w-full items-center justify-center rounded-control bg-clay text-[15px] font-bold text-paper">
+                  첫 글 쓰기
+                </button>
+              ) : (
+                <Link href="/login"
+                  className="mt-4 flex h-12 w-full items-center justify-center rounded-control bg-clay text-[15px] font-bold text-paper">
+                  로그인하고 첫 글 쓰기
+                </Link>
+              )}
+            </EmptyState>
+          )}
+
           {/* 게시글 목록 테이블 */}
-          {(tab === 'LIST' || (tab === 'MY' && user)) && (
+          {(tab === 'LIST' || (tab === 'MY' && user)) && !(tab === 'LIST' && category === 'ALL' && !keyword && !loading && postsLoaded && posts.length === 0) && (
             <div className="bg-paper rounded-card overflow-hidden border border-line-soft">
-              {loading && (
-                <div className="flex justify-center py-16">
-                  <div className="w-6 h-6 border-ink border-t-transparent rounded-full animate-spin border-4" />
+              {(loading || !postsLoaded) && (
+                <div aria-hidden="true" className="divide-y divide-line-soft">
+                  {[1, 2, 3, 4].map(i => (
+                    <div key={i} className="flex animate-pulse gap-3 px-4 py-3.5">
+                      <div className="h-5 w-14 shrink-0 rounded-full bg-line-soft" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-3.5 w-3/4 rounded bg-line-soft" />
+                        <div className="h-3 w-1/2 rounded bg-line-soft" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
               {/* 모바일: 카드형 */}
-              {!loading && (
+              {!loading && postsLoaded && (
                 <div className="lg:hidden divide-y">
                   {(tab === 'LIST' ? posts : myPosts).map(p => (
                     <Link key={p.id} href={`/community/${p.id}`} className="flex items-start gap-3 px-4 py-3 hover:bg-cream">
@@ -235,7 +289,7 @@ export default function CommunityPage() {
                 </div>
               )}
               {/* 데스크탑: 테이블형 */}
-              {!loading && (
+              {!loading && postsLoaded && (
                 <div className="hidden lg:block">
                   <div className="grid grid-cols-[80px_1fr_80px_70px_60px_60px] gap-2 px-4 py-2.5 bg-cream border-b text-xs font-semibold text-muted">
                     <span>분류</span><span>제목</span><span>작성자</span><span>작성일</span><span className="text-center">조회</span><span className="text-center">좋아요</span>
