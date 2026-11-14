@@ -112,6 +112,29 @@ describe('수정 창', () => {
     expect(body.destinationUrl).toBe('https://booking.naver.com/x');
     expect(body.keywords).toBeUndefined(); // 키워드는 그대로라 보내지 않는다
   });
+
+  it('운영자: 키워드를 모두 지우면 "이 창에서 비울 수 없어요" 안내가 뜨고, 저장해도 키워드를 보내지 않는다', async () => {
+    signIn('OPERATOR');
+    state.editMission = mission;
+    state.keywords = { main: { keyword: '합정 브런치' }, subs: [] };
+    render(<MissionEditModal missionId="m1" onClose={() => {}} />);
+    await screen.findByLabelText(/도착 주소/);
+    expect(screen.queryByText(/이 창에서 비울 수 없어요/)).toBeNull();
+    fireEvent.click(screen.getByText('선택 해제'));
+    expect(screen.getByText(/키워드는 이 창에서 비울 수 없어요/)).toBeTruthy();
+    fireEvent.click(screen.getByText('수정 내용 저장'));
+    await waitFor(() => expect(api.put).toHaveBeenCalled());
+    const body = (api.put as unknown as { mock: { calls: [string, Record<string, unknown>][] } }).mock.calls[0][1];
+    expect(body.keywords).toBeUndefined();
+  });
+
+  it('키워드가 없던 미션은 비어 있어도 안내를 띄우지 않는다', async () => {
+    signIn('OPERATOR');
+    state.editMission = mission;
+    render(<MissionEditModal missionId="m1" onClose={() => {}} />);
+    await screen.findByLabelText(/도착 주소/);
+    expect(screen.queryByText(/이 창에서 비울 수 없어요/)).toBeNull();
+  });
 });
 
 describe('도착 주소 없이 모집 시작', () => {

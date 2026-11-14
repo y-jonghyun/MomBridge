@@ -186,7 +186,7 @@ export default function MissionEditModal({ missionId, onClose, onSaved }: {
               submitting={saving}
               onSubmit={save}
               submitLabel="수정 내용 저장"
-              {...(role === 'OPERATOR' ? { keywords, onKeywordsChange: setKeywords } : {})}
+              {...(role === 'OPERATOR' ? { keywords, onKeywordsChange: setKeywords, keywordsCannotClear: initialKeywords !== 'null' } : {})}
             />
             {asking && (
               <div className="mt-3 rounded-card border border-clay-dark bg-clay-tint/40 p-4">

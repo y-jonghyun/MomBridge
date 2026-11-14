@@ -102,7 +102,7 @@ export interface FieldRule { locked: boolean; onlyBetter: boolean; reason?: stri
 export default function RegisterMissionForm({
   form, set, clients, pendingImages, onPendingChange, submitting, onSubmit, onCreateClient, onEditClient,
   mode = 'create', rules, missionId, submitLabel,
-  keywords, onKeywordsChange,
+  keywords, onKeywordsChange, keywordsCannotClear,
 }: {
   form: RegisterForm;
   set: (key: keyof RegisterForm, value: string | string[] | boolean) => void;
@@ -125,6 +125,8 @@ export default function RegisterMissionForm({
   /** 확정 키워드 (메인 1 + 서브). onKeywordsChange를 주면 '유입 추적'에 키워드 칸이 나온다 (운영자 화면) */
   keywords?: KeywordSelection | null;
   onKeywordsChange?: (v: KeywordSelection | null) => void;
+  /** 이미 키워드가 있는 미션의 수정 창 — 서버가 비우기를 받지 않으므로, 선택 해제하면 안내 한 줄을 띄운다 */
+  keywordsCannotClear?: boolean;
 }) {
   const chosen = clients.find(c => c.id === form.clientProfileId);
   const sortedClients = sortClientOptions(clients);
@@ -378,6 +380,11 @@ export default function RegisterMissionForm({
             value={keywords ?? null}
             onChange={onKeywordsChange}
           />
+        )}
+        {keywordsCannotClear && !keywords && (
+          <p role="status" className="break-keep text-xs leading-[1.5] text-clay-dark">
+            키워드는 이 창에서 비울 수 없어요. 저장하면 원래 키워드가 그대로 남습니다.
+          </p>
         )}
       </Section>
       )}
