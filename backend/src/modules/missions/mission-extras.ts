@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
 import { randomCampaignCode } from '../../lib/random';
@@ -22,8 +23,13 @@ export async function normalizeMissionKeywords(input: MissionKeywordsInput): Pro
   return { main: input.main, subs };
 }
 
-/** 메인 1개 + 서브 키워드를 통째로 교체한다 */
-export async function saveMissionKeywords(missionId: string, raw: MissionKeywordsInput): Promise<void> {
+/**
+ * 메인 1개 + 서브 키워드를 통째로 교체한다.
+ * tx를 주면 그 트랜잭션 안에서 쓴다 (미션 수정과 함께 묶을 때). 검사(서브 개수)는 쓰기 전에 끝낸다
+ */
+export async function saveMissionKeywords(
+  missionId: string, raw: MissionKeywordsInput, tx?: Prisma.TransactionClient,
+): Promise<void> {
   const input = await normalizeMissionKeywords(raw);
   const subs = input.subs;
 
@@ -36,10 +42,12 @@ export async function saveMissionKeywords(missionId: string, raw: MissionKeyword
     isLowVolume: k.isLowVolume ?? false,
     compIdx: k.compIdx ?? null,
   });
-  await prisma.$transaction([
-    prisma.missionKeyword.deleteMany({ where: { missionId } }),
-    prisma.missionKeyword.createMany({ data: [row(input.main, 'MAIN'), ...subs.map(s => row(s, 'SUB'))] }),
-  ]);
+  const write = async (db: Prisma.TransactionClient) => {
+    await db.missionKeyword.deleteMany({ where: { missionId } });
+    await db.missionKeyword.createMany({ data: [row(input.main, 'MAIN'), ...subs.map(s => row(s, 'SUB'))] });
+  };
+  if (tx) await write(tx);
+  else await prisma.$transaction(write);
 }
 
 export async function getMissionKeywords(missionId: string) {

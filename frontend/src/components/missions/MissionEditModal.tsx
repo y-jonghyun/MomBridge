@@ -7,6 +7,7 @@ import RegisterMissionForm, {
 import { normalizeProvince } from '@/lib/regions';
 import { missionDateError } from '@/lib/mission-dates';
 import { useAuthStore } from '@/store/auth';
+import type { KeywordSelection } from '@/components/campaign/KeywordRecommender';
 
 /**
  * 미션 수정 — 등록 폼을 그대로 다시 쓰고, 칸마다 서버가 내려준 잠금 규칙을 입힌다.
@@ -51,6 +52,9 @@ export default function MissionEditModal({ missionId, onClose, onSaved }: {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState('');
+  /** 확정 키워드 — 운영자만 이 창에서 고친다 (가게는 '캠페인 설정'에서) */
+  const [keywords, setKeywords] = useState<KeywordSelection | null>(null);
+  const [initialKeywords, setInitialKeywords] = useState<string>('null');
 
   const load = useCallback(async () => {
     setError('');
@@ -81,8 +85,12 @@ export default function MissionEditModal({ missionId, onClose, onSaved }: {
         businessCategory: m.businessCategory ?? '',
         momTags: m.momTags ?? [],
         visitHours: m.visitHours ?? '',
+        // 서버의 수정 가능 칸이다. 불러와서 그대로 돌려보내야 저장할 때 지워지지 않는다
+        destinationUrl: m.destinationUrl ?? '',
         sendPaymentLink: false,
       };
+      setKeywords(data.data.keywords ?? null);
+      setInitialKeywords(JSON.stringify(data.data.keywords ?? null));
       setForm(loaded);
       setInitial(loaded);
     } catch (err: unknown) {
@@ -127,8 +135,10 @@ export default function MissionEditModal({ missionId, onClose, onSaved }: {
         maxParticipants: Number(form.maxParticipants),
         // 불리한 변경을 확인하고 보냈다는 표시 (기록에 남는다)
         ...(acknowledged ? { acknowledgeUnfavorable: true } : {}),
+        // 운영자가 키워드를 바꿨을 때만 보낸다
+        ...(role === 'OPERATOR' && keywords && JSON.stringify(keywords) !== initialKeywords ? { keywords } : {}),
       });
-      const changed: string[] = data.data.changed ?? [];
+      const changed: string[] = [...(data.data.changed ?? []), ...(data.data.keywordsChanged ? ['keywords'] : [])];
       const notified: number = data.data.notified ?? 0;
       setDone(
         changed.length === 0
@@ -176,6 +186,7 @@ export default function MissionEditModal({ missionId, onClose, onSaved }: {
               submitting={saving}
               onSubmit={save}
               submitLabel="수정 내용 저장"
+              {...(role === 'OPERATOR' ? { keywords, onKeywordsChange: setKeywords, keywordsCannotClear: initialKeywords !== 'null' } : {})}
             />
             {asking && (
               <div className="mt-3 rounded-card border border-clay-dark bg-clay-tint/40 p-4">

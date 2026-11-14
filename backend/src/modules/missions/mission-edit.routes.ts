@@ -3,7 +3,8 @@ import { prisma } from '../../config/database';
 import { authenticate } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
 import { parseInput } from '../../middleware/validate';
-import { updateMissionSchema } from './missions.schema';
+import { missionKeywordsSchema, updateMissionSchema } from './missions.schema';
+import { getMissionKeywords, normalizeMissionKeywords, saveMissionKeywords } from './mission-extras';
 import { isStoreComplete, missingStoreParts } from '../client/store';
 import {
   EDITABLE_FIELDS, EditableField, NOTIFY_FIELDS, UNFAVORABLE_KEY,
@@ -42,6 +43,17 @@ async function loadForEdit(req: Request) {
   };
 }
 
+/**
+ * 보낸 도착 주소가 서버에 저장된 문자열과 같은지.
+ * 앞뒤 공백과 URL 정규화 차이(끝의 / 등)는 같은 주소로 본다 — 저장할 때 new URL().toString()으로 정규화하기 때문이다
+ */
+export function sameStoredDestination(sent: unknown, stored: string | null): boolean {
+  if (typeof sent !== 'string' || !stored) return false;
+  const raw = sent.trim();
+  if (raw === stored) return true;
+  try { return new URL(raw).toString() === stored; } catch { return false; }
+}
+
 /** 수정 화면이 쓸 값과 규칙 */
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -51,6 +63,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       orderBy: { sortOrder: 'asc' },
       select: { id: true, url: true, sortOrder: true },
     });
+    const kw = await getMissionKeywords(mission.id);
 
     res.json({
       success: true,
@@ -64,6 +77,8 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
           businessName: mission.clientProfile.businessName,
         },
         images,
+        /** 확정 키워드 (메인 1 + 서브). 없으면 null */
+        keywords: kw.main ? { main: { keyword: kw.main.keyword }, subs: kw.subs.map(k => ({ keyword: k.keyword })) } : null,
         rules: editRules(role, state),
         applicationCount: state.applicationCount,
         /** 종료된 미션은 아예 저장할 수 없다 */
@@ -91,8 +106,27 @@ router.put('/', async (req: Request, res: Response, next: NextFunction) => {
       throw new AppError('STORE_INCOMPLETE', 422, `${missingStoreParts(mission.clientProfile).join(' · ')}을 먼저 입력해 주세요`);
     }
 
+    // 도착 주소를 저장된 값 그대로 돌려보냈으면 '변경 없음'이다 — 형식 검사도 하지 않는다.
+    // 예전 규칙으로 저장된 주소(예: IP 주소)가 새 규칙에 걸려, 다른 칸만 고쳐도 400이 나는 일을 막는다.
+    // 값이 달라질 때만 validateDestinationUrl을 적용한다
+    const destinationUnchanged = sameStoredDestination(req.body?.destinationUrl, mission.destinationUrl);
+    const body = destinationUnchanged ? { ...req.body, destinationUrl: undefined } : req.body;
+
     // 등록과 같은 칸 검증 + 날짜 순서
-    const input = parseInput(updateMissionSchema, req.body);
+    const input = parseInput(updateMissionSchema, body);
+    // 키워드는 운영자만 이 경로로 고친다. 가게는 '캠페인 설정'(PUT /client/missions/:id/keywords)에서 고친다.
+    // 조용히 버리지 않고 거절한다 — 무엇도 저장하기 전에
+    const keywordsSent = req.body?.keywords !== undefined && req.body?.keywords !== null;
+    if (keywordsSent && role !== 'OPERATOR') {
+      throw new AppError('FORBIDDEN', 403, "키워드는 '캠페인 설정'에서 바꿔 주세요");
+    }
+    // 가게 경로와 같은 검증·정리 함수 (서브 개수 상한, 메인과 겹치는 서브 빼기). 비우기는 하지 않는다
+    const nextKeywords = keywordsSent
+      ? await normalizeMissionKeywords(parseInput(missionKeywordsSchema, req.body.keywords))
+      : null;
+    // 도착 주소는 요청에 키가 아예 없으면 '그대로 둠'이다 (예전 수정 창은 이 칸을 보내지 않았다).
+    // null 또는 ''를 명시해 보냈을 때만 비운다
+    const destinationSent = req.body?.destinationUrl !== undefined && !destinationUnchanged;
 
     // 무엇이 바뀌었는지 모으고, 바꿀 수 없는 칸이면 막는다
     const before: Record<string, unknown> = {};
@@ -100,6 +134,7 @@ router.put('/', async (req: Request, res: Response, next: NextFunction) => {
     const changed: EditableField[] = [];
 
     for (const field of EDITABLE_FIELDS) {
+      if (field === 'destinationUrl' && !destinationSent) continue;
       const next = (input as Record<string, unknown>)[field] ?? null;
       const prev = (mission as unknown as Record<string, unknown>)[field] ?? null;
       if (sameValue(prev, next)) continue;
@@ -117,15 +152,23 @@ router.put('/', async (req: Request, res: Response, next: NextFunction) => {
       after[field] = next instanceof Date ? (next as Date).toISOString() : next;
     }
 
-    if (changed.length === 0) {
+    // 키워드가 바뀌었는지 (메인·서브 이름으로 비교)
+    let keywordsChanged = false;
+    if (nextKeywords) {
+      const cur = await getMissionKeywords(mission.id);
+      const curKey = JSON.stringify([cur.main?.keyword ?? null, cur.subs.map(k => k.keyword).sort()]);
+      const nextKey = JSON.stringify([nextKeywords.main.keyword.trim(), nextKeywords.subs.map(k => k.keyword.trim()).sort()]);
+      if (curKey !== nextKey) {
+        keywordsChanged = true;
+        before.keywords = cur.main ? { main: cur.main.keyword, subs: cur.subs.map(k => k.keyword) } : null;
+        after.keywords = { main: nextKeywords.main.keyword.trim(), subs: nextKeywords.subs.map(k => k.keyword.trim()) };
+      }
+    }
+
+    if (changed.length === 0 && !keywordsChanged) {
       res.json({ success: true, data: { changed: [], notified: 0 } });
       return;
     }
-
-    const updated = await prisma.mission.update({
-      where: { id: mission.id },
-      data: Object.fromEntries(changed.map(f => [f, (input as Record<string, unknown>)[f] ?? null])),
-    });
 
     // 체험단원에게 불리한 변경(줄이기·앞당기기)은 운영자만 할 수 있다.
     // 막지는 않고, 화면에서 확인을 받았는지까지 기록에 남긴다.
@@ -143,21 +186,33 @@ router.put('/', async (req: Request, res: Response, next: NextFunction) => {
       };
     }
 
-    // 누가 언제 무엇을 바꿨는지 남긴다
-    await prisma.auditLog.create({
-      data: {
-        actorId: req.user!.sub,
-        action: 'MISSION_UPDATE',
-        targetTable: 'missions',
-        targetId: mission.id,
-        // Prisma의 Json 칸이라 평범한 객체로 넣는다
-        before: before as object,
-        after: afterWithMark as object,
-        ipAddress: req.ip ?? null,
-        userAgent: req.get('user-agent')?.slice(0, 500) ?? null,
-      },
+    // 키워드 저장 · 미션 수정 · 감사 기록을 한 트랜잭션으로 — 중간에 실패하면 셋 다 남지 않는다
+    const updated = await prisma.$transaction(async tx => {
+      if (keywordsChanged) await saveMissionKeywords(mission.id, nextKeywords!, tx);
+      const row = changed.length > 0
+        ? await tx.mission.update({
+            where: { id: mission.id },
+            data: Object.fromEntries(changed.map(f => [f, (input as Record<string, unknown>)[f] ?? null])),
+          })
+        : await tx.mission.findUniqueOrThrow({ where: { id: mission.id } });
+      // 누가 언제 무엇을 바꿨는지 남긴다
+      await tx.auditLog.create({
+        data: {
+          actorId: req.user!.sub,
+          action: 'MISSION_UPDATE',
+          targetTable: 'missions',
+          targetId: mission.id,
+          // Prisma의 Json 칸이라 평범한 객체로 넣는다
+          before: before as object,
+          after: afterWithMark as object,
+          ipAddress: req.ip ?? null,
+          userAgent: req.get('user-agent')?.slice(0, 500) ?? null,
+        },
+      });
+      return row;
     });
 
+    // 알림은 저장이 끝난 뒤에 따로 보낸다 (실패해도 수정은 되돌리지 않는다 — 예전과 같다).
     // 일정·방문 안내·주소가 바뀌면 선정된 체험단원에게 알린다
     let notified = 0;
     const notifyChanges = changed.filter(f => NOTIFY_FIELDS.includes(f));
@@ -184,7 +239,7 @@ router.put('/', async (req: Request, res: Response, next: NextFunction) => {
 
     res.json({
       success: true,
-      data: { changed, notified, unfavorable, mission: { id: updated.id, title: updated.title } },
+      data: { changed, keywordsChanged, notified, unfavorable, mission: { id: updated.id, title: updated.title } },
     });
   } catch (e) { next(e); }
 });
