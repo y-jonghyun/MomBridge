@@ -43,6 +43,17 @@ async function loadForEdit(req: Request) {
   };
 }
 
+/**
+ * 보낸 도착 주소가 서버에 저장된 문자열과 같은지.
+ * 앞뒤 공백과 URL 정규화 차이(끝의 / 등)는 같은 주소로 본다 — 저장할 때 new URL().toString()으로 정규화하기 때문이다
+ */
+export function sameStoredDestination(sent: unknown, stored: string | null): boolean {
+  if (typeof sent !== 'string' || !stored) return false;
+  const raw = sent.trim();
+  if (raw === stored) return true;
+  try { return new URL(raw).toString() === stored; } catch { return false; }
+}
+
 /** 수정 화면이 쓸 값과 규칙 */
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -95,8 +106,14 @@ router.put('/', async (req: Request, res: Response, next: NextFunction) => {
       throw new AppError('STORE_INCOMPLETE', 422, `${missingStoreParts(mission.clientProfile).join(' · ')}을 먼저 입력해 주세요`);
     }
 
+    // 도착 주소를 저장된 값 그대로 돌려보냈으면 '변경 없음'이다 — 형식 검사도 하지 않는다.
+    // 예전 규칙으로 저장된 주소(예: IP 주소)가 새 규칙에 걸려, 다른 칸만 고쳐도 400이 나는 일을 막는다.
+    // 값이 달라질 때만 validateDestinationUrl을 적용한다
+    const destinationUnchanged = sameStoredDestination(req.body?.destinationUrl, mission.destinationUrl);
+    const body = destinationUnchanged ? { ...req.body, destinationUrl: undefined } : req.body;
+
     // 등록과 같은 칸 검증 + 날짜 순서
-    const input = parseInput(updateMissionSchema, req.body);
+    const input = parseInput(updateMissionSchema, body);
     // 키워드는 운영자만 이 경로로 고친다. 가게는 '캠페인 설정'(PUT /client/missions/:id/keywords)에서 고친다.
     // 조용히 버리지 않고 거절한다 — 무엇도 저장하기 전에
     const keywordsSent = req.body?.keywords !== undefined && req.body?.keywords !== null;
@@ -109,7 +126,7 @@ router.put('/', async (req: Request, res: Response, next: NextFunction) => {
       : null;
     // 도착 주소는 요청에 키가 아예 없으면 '그대로 둠'이다 (예전 수정 창은 이 칸을 보내지 않았다).
     // null 또는 ''를 명시해 보냈을 때만 비운다
-    const destinationSent = req.body?.destinationUrl !== undefined;
+    const destinationSent = req.body?.destinationUrl !== undefined && !destinationUnchanged;
 
     // 무엇이 바뀌었는지 모으고, 바꿀 수 없는 칸이면 막는다
     const before: Record<string, unknown> = {};

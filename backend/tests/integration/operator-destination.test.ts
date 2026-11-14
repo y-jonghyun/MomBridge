@@ -218,6 +218,56 @@ describeDb('운영자 대행 미션의 도착 주소·키워드', () => {
     expect(await destOf()).toBeNull();
   });
 
+  it('예전 규칙으로 저장된 주소(IP)는 그대로 돌려보내면 검사하지 않는다 — 바꿀 때만 새 규칙', async () => {
+    const { op, shopId } = await shopAndOperator();
+    const created = await request(app).post('/api/v1/missions').set(auth(op.token)).send(missionBody(shopId));
+    const missionId: string = created.body.data.id;
+    const LEGACY = 'http://192.168.0.10/';
+    await prisma.mission.update({ where: { id: missionId }, data: { destinationUrl: LEGACY } });
+    const form = (await request(app).get(`/api/v1/missions/${missionId}/edit`).set(auth(op.token))).body.data.mission;
+    expect(form.destinationUrl).toBe(LEGACY);
+    const destOf = async () => (await prisma.mission.findUniqueOrThrow({ where: { id: missionId } })).destinationUrl;
+    const put = (b: Record<string, unknown>) => request(app).put(`/api/v1/missions/${missionId}/edit`).set(auth(op.token)).send(b);
+
+    // (가) 주소를 그대로 돌려보내며 제목만 고친다 → 200, 주소 그대로
+    const keep = await put({ ...form, title: '제목만 고침' });
+    expect(keep.status).toBe(200);
+    expect(keep.body.data.changed).toEqual(['title']);
+    expect(await destOf()).toBe(LEGACY);
+    // 끝의 / 가 빠지거나 앞뒤 공백이 있어도 같은 주소다
+    for (const same of ['http://192.168.0.10', `  ${LEGACY}  `]) {
+      const r = await put({ ...form, title: '제목만 고침', destinationUrl: same });
+      expect([same, r.status, r.body.data.changed]).toEqual([same, 200, []]);
+    }
+    expect(await destOf()).toBe(LEGACY);
+
+    // (나) 다른 잘못된 주소로 바꾸면 400
+    expect((await put({ ...form, destinationUrl: 'http://10.0.0.1/' })).status).toBe(400);
+    expect((await put({ ...form, destinationUrl: 'javascript:alert(1)' })).status).toBe(400);
+    expect(await destOf()).toBe(LEGACY);
+
+    // (다) 정상 도메인 주소로 바꾸면 200
+    const fixed = await put({ ...form, title: '제목만 고침', destinationUrl: DEST });
+    expect(fixed.status).toBe(200);
+    expect(fixed.body.data.changed).toEqual(['destinationUrl']);
+    expect(await destOf()).toBe(DEST);
+  });
+
+  it('정상 주소도 정규화 차이(끝의 /)만 있으면 변경으로 잡지 않는다', async () => {
+    const { op, shopId } = await shopAndOperator();
+    const created = await request(app).post('/api/v1/missions').set(auth(op.token))
+      .send(missionBody(shopId, { destinationUrl: 'https://booking.naver.com' }));
+    const missionId: string = created.body.data.id;
+    const stored = (await prisma.mission.findUniqueOrThrow({ where: { id: missionId } })).destinationUrl;
+    expect(stored).toBe('https://booking.naver.com/'); // 저장할 때 정규화된다
+    const form = (await request(app).get(`/api/v1/missions/${missionId}/edit`).set(auth(op.token))).body.data.mission;
+    for (const same of ['https://booking.naver.com', 'https://booking.naver.com/', 'HTTPS://BOOKING.NAVER.COM/']) {
+      const r = await request(app).put(`/api/v1/missions/${missionId}/edit`).set(auth(op.token)).send({ ...form, destinationUrl: same });
+      expect([same, r.status, r.body.data.changed]).toEqual([same, 200, []]);
+    }
+    expect(await prisma.auditLog.count({ where: { targetId: missionId, action: 'MISSION_UPDATE' } })).toBe(0);
+  });
+
   it('가게 계정이 수정 경로로 키워드를 보내면 403 — 아무것도 저장하지 않는다 (가게는 캠페인 설정 경로로)', async () => {
     const shop = await createClient('망원');
     await prisma.clientProfile.update({ where: { id: shop.profile.id }, data: { businessCategory: 'CAFE' } });
